@@ -61,7 +61,7 @@ class Plan:
 
 def _count_indent(line: str) -> Tuple[int, str]:
 	"""Counts indentation (tabs or 4-spaces) and returns the level and content."""
-	raw = line.rstrip("\\n")
+	raw = line.rstrip("\n")
 	if not raw.strip():
 		return 0, ""
 
@@ -87,7 +87,7 @@ def parse_tree_text(text: str) -> Tuple[List[NodeItem], Optional[str]]:
 	
 	lines = text.splitlines()
 	for i, line in enumerate(lines):
-		raw = line.strip("\\n")
+		raw = line.strip("\n")
 		trimmed = raw.strip()
 
 		if not trimmed or trimmed.startswith("#"):

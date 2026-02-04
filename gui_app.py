@@ -277,11 +277,11 @@ class ScaffoldApp:
 		self._populate_after_tree(self.current_plan)
 
 		if self.current_plan.errors:
-			error_message = "\\n".join(self.current_plan.errors)
-			messagebox.showerror("Planning Error", f"Errors found in scaffold tree:\\n\\n{error_message}")
+			error_message = "\n".join(self.current_plan.errors)
+			messagebox.showerror("Planning Error", f"Errors found in scaffold tree:\n\n{error_message}")
 			self.apply_button.config(state=tk.DISABLED)
 		elif self.current_plan.has_conflicts:
-			messagebox.showwarning("Conflicts Found", "Path conflicts were detected. 'Apply' is disabled.\\nCheck the 'After' view for items marked in red.")
+			messagebox.showwarning("Conflicts Found", "Path conflicts were detected. 'Apply' is disabled.\nCheck the 'After' view for items marked in red.")
 			self.apply_button.config(state=tk.DISABLED)
 		else:
 			self.apply_button.config(state=tk.NORMAL)
@@ -296,11 +296,11 @@ class ScaffoldApp:
 
 		is_dry_run = self.dry_run.get()
 		if is_dry_run:
-			msg = "This is a DRY RUN. No files will be written.\\n\\nProceed with logging the simulation?"
+			msg = "This is a DRY RUN. No files will be written.\n\nProceed with logging the simulation?"
 		else:
 			num_dirs = len([p for p, s in self.current_plan.path_states.items() if s == 'new' and p in self.current_plan.planned_dirs])
 			num_files = len([p for p, s in self.current_plan.path_states.items() if s == 'new' and p in self.current_plan.planned_files])
-			msg = f"This will create {num_dirs} directories and {num_files} files.\\n\\nAre you sure you want to proceed?"
+			msg = f"This will create {num_dirs} directories and {num_files} files.\n\nAre you sure you want to proceed?"
 
 		if messagebox.askyesno("Confirm Apply", msg):
 			self.notebook.select(1) # Switch to log tab
@@ -326,7 +326,7 @@ class ScaffoldApp:
 			self.log_text.tag_configure(tag, foreground=color)
 			setattr(self, tag, True)
 
-		self.log_text.insert(tk.END, message + '\\n', tag)
+		self.log_text.insert(tk.END, message + '\n', tag)
 		self.log_text.see(tk.END)
 		self.log_text.config(state=tk.DISABLED)
 		self.root.update_idletasks()
@@ -375,12 +375,12 @@ class ScaffoldApp:
 				self._log(f"[SKIP FILE] {path}", "skip")
 				stats["files_skipped"] += 1
 		
-		self._log("\\n" + "="*25 + " SUMMARY " + "="*26)
+		self._log("\n" + "="*25 + " SUMMARY " + "="*26)
 		self._log(f"- Dirs created: {stats['dirs_created']}, skipped: {stats['dirs_skipped']}, errors: {stats['dirs_error']}")
 		self._log(f"- Files created: {stats['files_created']}, skipped: {stats['files_skipped']}, errors: {stats['files_error']}")
 		
 		if plan.duplicate_warnings or plan.similarity_warnings:
-			self._log("\\n--- Warnings ---", "warn")
+			self._log("\n--- Warnings ---", "warn")
 			# This could be expanded to log the full warning details
 			self._log(f"- Duplicate name warnings: {len(plan.duplicate_warnings)}", "warn")
 			self._log(f"- Similar name warnings: {len(plan.similarity_warnings)}", "warn")
@@ -451,7 +451,7 @@ class ScaffoldApp:
 			if result["ok"]:
 				return True, result["resolved_path"]
 			else:
-				error_message = "\\n".join(result["errors"])
+				error_message = "\n".join(result["errors"])
 				return False, error_message
 
 		except subprocess.CalledProcessError as e:
