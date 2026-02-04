@@ -30,7 +30,16 @@
 
 ### 1️⃣ 트리 텍스트 기반 구조 정의
 
-`{{Root}}/     NewModule/         NewModule.Build.cs         Public/             NewModule.h         Private/             NewModule.cpp`
+```
+{{Root}}/
+    NewModule/
+        NewModule.Build.cs
+        Public/
+            NewModule.h
+        Private/
+            NewModule.cpp
+```
+``
 
 ---
 
@@ -74,7 +83,16 @@
 
 예시:
 
-`{   "🎵": [".mp3", ".wav", ".ogg"],   "🖼️": [".png", ".jpg", ".jpeg"],   "🧩": [".cpp", ".c", ".hlsl"],   "📘": [".h", ".hpp"],   "📄": [] }`
+```
+{
+  "🎵": [".mp3", ".wav", ".ogg"],
+  "🖼️": [".png", ".jpg", ".jpeg"],
+  "🧩": [".cpp", ".c", ".hlsl"],
+  "📘": [".h", ".hpp"],
+  "📄": []
+}
+```
+
 
 ---
 
