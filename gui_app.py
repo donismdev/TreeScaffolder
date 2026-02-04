@@ -68,6 +68,9 @@ class ScaffoldApp:
 		# To be filled by the analysis
 		self.current_plan: scaffold_core.Plan | None = None
 		self.classifier = FileTypeClassifier()
+		self.tree_text = None # Initialized in setup_left_panel
+		self.source_code_text = None # Initialized in setup_left_panel
+		self.content_text = None # Initialized in setup_left_panel
 
 		# --- Main Layout ---
 		self.main_paned_window = ttk.PanedWindow(self.root, orient=tk.HORIZONTAL)
@@ -122,29 +125,71 @@ class ScaffoldApp:
 		browse_button = ttk.Button(folder_frame, text="Browse...", command=self.on_browse_folder)
 		browse_button.grid(row=0, column=1, padx=5, pady=5)
 
-		# --- Tree Editor Frame ---
-		editor_frame = ttk.LabelFrame(self.left_frame, text="2. Define Scaffold Tree")
-		editor_frame.grid(row=1, column=0, sticky="nsew")
-		editor_frame.rowconfigure(0, weight=1)
-		editor_frame.columnconfigure(0, weight=1)
+		# --- Editor Tabs ---
+		editor_tabs_frame = ttk.LabelFrame(self.left_frame, text="2. Define Scaffold Tree")
+		editor_tabs_frame.grid(row=1, column=0, sticky="nsew")
+		editor_tabs_frame.rowconfigure(0, weight=1)
+		editor_tabs_frame.columnconfigure(0, weight=1)
+
+		self.editor_notebook = ttk.Notebook(editor_tabs_frame)
+		self.editor_notebook.grid(row=0, column=0, sticky="nsew")
+
+		# --- Scaffold Tree Tab ---
+		scaffold_tree_frame = ttk.Frame(self.editor_notebook)
+		self.editor_notebook.add(scaffold_tree_frame, text="Scaffold Tree")
+		scaffold_tree_frame.rowconfigure(0, weight=1)
+		scaffold_tree_frame.columnconfigure(0, weight=1)
 		
-		self.tree_text = tk.Text(editor_frame, wrap=tk.NONE, undo=True, font=self.editor_font, tabs=(self.editor_font.measure('    '),))
+		self.tree_text = tk.Text(scaffold_tree_frame, wrap=tk.NONE, undo=True, font=self.editor_font, tabs=(self.editor_font.measure('    '),))
 		
-		yscroller = ttk.Scrollbar(editor_frame, orient=tk.VERTICAL, command=self.tree_text.yview)
-		xscroller = ttk.Scrollbar(editor_frame, orient=tk.HORIZONTAL, command=self.tree_text.xview)
-		self.tree_text.config(yscrollcommand=yscroller.set, xscrollcommand=xscroller.set)
+		tree_yscroller = ttk.Scrollbar(scaffold_tree_frame, orient=tk.VERTICAL, command=self.tree_text.yview)
+		tree_xscroller = ttk.Scrollbar(scaffold_tree_frame, orient=tk.HORIZONTAL, command=self.tree_text.xview)
+		self.tree_text.config(yscrollcommand=tree_yscroller.set, xscrollcommand=tree_xscroller.set)
 		
 		self.tree_text.grid(row=0, column=0, sticky="nsew")
-		yscroller.grid(row=0, column=1, sticky="ns")
-		xscroller.grid(row=1, column=0, sticky="ew")
+		tree_yscroller.grid(row=0, column=1, sticky="ns")
+		tree_xscroller.grid(row=1, column=0, sticky="ew")
 		
 		self.tree_text.insert("1.0", EXAMPLE_TREE_TEXT)
 		
 		# Load example button
-		button_frame = ttk.Frame(editor_frame)
+		button_frame = ttk.Frame(scaffold_tree_frame)
 		button_frame.grid(row=2, column=0, columnspan=2, sticky="ew")
 		load_example_button = ttk.Button(button_frame, text="Load Example", command=self.on_load_example)
 		load_example_button.pack(side=tk.RIGHT, padx=2, pady=2)
+
+		# --- Source Code Tab ---
+		source_code_frame = ttk.Frame(self.editor_notebook)
+		self.editor_notebook.add(source_code_frame, text="Source Code")
+		source_code_frame.rowconfigure(0, weight=1)
+		source_code_frame.columnconfigure(0, weight=1)
+
+		self.source_code_text = tk.Text(source_code_frame, wrap=tk.NONE, undo=True, font=self.editor_font, tabs=(self.editor_font.measure('    '),))
+		
+		source_yscroller = ttk.Scrollbar(source_code_frame, orient=tk.VERTICAL, command=self.source_code_text.yview)
+		source_xscroller = ttk.Scrollbar(source_code_frame, orient=tk.HORIZONTAL, command=self.source_code_text.xview)
+		self.source_code_text.config(yscrollcommand=source_yscroller.set, xscrollcommand=source_xscroller.set)
+		
+		self.source_code_text.grid(row=0, column=0, sticky="nsew")
+		source_yscroller.grid(row=0, column=1, sticky="ns")
+		source_xscroller.grid(row=1, column=0, sticky="ew")
+
+		# --- Content Tab ---
+		content_frame = ttk.Frame(self.editor_notebook)
+		self.editor_notebook.add(content_frame, text="Content")
+		content_frame.rowconfigure(0, weight=1)
+		content_frame.columnconfigure(0, weight=1)
+
+		self.content_text = tk.Text(content_frame, wrap=tk.NONE, undo=True, font=self.editor_font, tabs=(self.editor_font.measure('    '),))
+		
+		content_yscroller = ttk.Scrollbar(content_frame, orient=tk.VERTICAL, command=self.content_text.yview)
+		content_xscroller = ttk.Scrollbar(content_frame, orient=tk.HORIZONTAL, command=self.content_text.xview)
+		self.content_text.config(yscrollcommand=content_yscroller.set, xscrollcommand=content_xscroller.set)
+		
+		self.content_text.grid(row=0, column=0, sticky="nsew")
+		content_yscroller.grid(row=0, column=1, sticky="ns")
+		content_xscroller.grid(row=1, column=0, sticky="ew")
+
 
 		# --- Settings & Actions Frame ---
 		settings_frame = ttk.LabelFrame(self.left_frame, text="3. Settings & Actions")
