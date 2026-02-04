@@ -159,8 +159,7 @@ def main():
 	print(f"- Root Dir: '{root.resolve()}'")
 	
 	if not root.exists() or not root.is_dir():
-		print(_red(f"
-[FATAL] Root directory does not exist: {root}"))
+		print(_red(f"\n[FATAL] Root directory does not exist: {root}"))
 		sys.exit(1)
 
 	config = {
@@ -172,13 +171,11 @@ def main():
 	}
 
 	# 1. Generate a plan (read-only)
-	print("
-[1/3] Parsing tree and analyzing structure...")
+	print("\n[1/3] Parsing tree and analyzing structure...")
 	plan = scaffold_core.generate_plan(root, TREE_TEXT, config)
 
 	if plan.errors or plan.has_conflicts:
-		print(_red("
-[FATAL] Errors found in plan. Cannot proceed."))
+		print(_red("\n[FATAL] Errors found in plan. Cannot proceed."))
 		for error in plan.errors:
 			print(_red(f"- {error}"))
 		sys.exit(1)
@@ -186,8 +183,7 @@ def main():
 	print(f"Plan: {len(plan.planned_dirs)} directories, {len(plan.planned_files)} files to create.")
 	
 	# 2. Execute the plan (write to filesystem)
-	print("
-[2/3] Executing scaffold operation...")
+	print("\n[2/3] Executing scaffold operation...")
 	
 	created_files, skipped_files, error_files = 0, 0, 0
 	created_dirs, skipped_dirs, error_dirs = 0, 0, 0
@@ -220,20 +216,16 @@ def main():
 			skipped_files += 1
 
 	# 3. Print final summary and warnings
-	print("
-[3/3] Reporting results...")
-	print("
-" + "="*20 + " SUMMARY " + "="*20)
+	print("\n[3/3] Reporting results...")
+	print("\n" + "="*20 + " SUMMARY " + "="*20)
 	print(f"Directories : {created_dirs} created, {skipped_dirs} skipped, {error_dirs} errors")
 	print(f"Files       : {created_files} created, {skipped_files} skipped, {error_files} errors")
 
 	# Print warnings if any were found during planning
 	if plan.duplicate_warnings or plan.similarity_warnings:
-		print("
-" + "="*18 + " WARNINGS " + "="*19)
+		print("\n" + "="*18 + " WARNINGS " + "="*19)
 		if plan.duplicate_warnings:
-			print(_yellow(f"
---- Found {len(plan.duplicate_warnings)} file(s) with duplicate names ---"))
+			print(_yellow(f"\n--- Found {len(plan.duplicate_warnings)} file(s) with duplicate names ---"))
 			for i, (target, others) in enumerate(plan.duplicate_warnings.items()):
 				if i >= MAX_LIST_ITEMS:
 					print(_dim(f"...and {len(plan.duplicate_warnings) - MAX_LIST_ITEMS} more."))
@@ -244,8 +236,7 @@ def main():
 					print(_dim(f"  - Exists at:  {other_path}"))
 		
 		if plan.similarity_warnings:
-			print(_yellow(f"
---- Found {len(plan.similarity_warnings)} file(s) with similar names ---"))
+			print(_yellow(f"\n--- Found {len(plan.similarity_warnings)} file(s) with similar names ---"))
 			for i, (target, cands) in enumerate(plan.similarity_warnings.items()):
 				if i >= MAX_LIST_ITEMS:
 					print(_dim(f"...and {len(plan.similarity_warnings) - MAX_LIST_ITEMS} more."))
@@ -254,11 +245,9 @@ def main():
 				for name, ratio, paths in cands:
 					print(_dim(f"  - Similar to '{name}' (ratio: {ratio:.2f}) at: {paths[0]}"))
 
-	print("
-" + "="*50)
+	print("\n" + "="*50)
 
-	print(f"
-Final Status: {_status_light(final_ok)}")
+	print(f"\nFinal Status: {_status_light(final_ok)}")
 	if not final_ok:
 		print(_red("Errors occurred during the operation."))
 	else:
@@ -268,11 +257,9 @@ if __name__ == "__main__":
 	try:
 		main()
 	except Exception as e:
-		print(_red(f"
-[UNHANDLED EXCEPTION] {e}"))
+		print(_red(f"\n[UNHANDLED EXCEPTION] {e}"))
 		sys.exit(1)
 	finally:
 		if sys.stdout.isatty(): # Pause only if in interactive terminal
-			input("
-Press Enter to exit.")
+			input("\nPress Enter to exit.")
 

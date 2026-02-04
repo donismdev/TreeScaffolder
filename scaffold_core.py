@@ -61,7 +61,7 @@ class Plan:
 
 def _count_indent(line: str) -> Tuple[int, str]:
 	"""Counts indentation (tabs or 4-spaces) and returns the level and content."""
-	raw = line.rstrip("\\n")
+	raw = line.rstrip("\n")
 	if not raw.strip():
 		return 0, ""
 
@@ -87,7 +87,7 @@ def parse_tree_text(text: str) -> Tuple[List[NodeItem], Optional[str]]:
 	
 	lines = text.splitlines()
 	for i, line in enumerate(lines):
-		raw = line.strip("\\n")
+		raw = line.strip("\n")
 		trimmed = raw.strip()
 
 		if not trimmed or trimmed.startswith("#"):
@@ -106,6 +106,14 @@ def parse_tree_text(text: str) -> Tuple[List[NodeItem], Optional[str]]:
 
 		is_dir = content.endswith("/")
 		name = content[:-1] if is_dir else content
+		
+		# Security: Validate the name to prevent path traversal attacks
+		if name.startswith('/') or name.startswith('\\'):
+			return [], f"Error at line {i + 1}: Path names cannot start with '/' or '\\' (absolute paths not allowed)."
+		if name == '..' or '/..' in name or '\\..' in name or name.startswith('..'):
+			return [], f"Error at line {i + 1}: Path traversal with '..' is not allowed."
+		if ':' in name and len(name) > 1 and name[1] == ':':
+			return [], f"Error at line {i + 1}: Windows drive letters in paths are not allowed."
 		
 		items.append(NodeItem(indent=indent, name=name, is_dir=is_dir, line_number=i + 1))
 	
