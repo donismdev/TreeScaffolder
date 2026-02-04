@@ -436,15 +436,29 @@ class ScaffoldApp:
 		"""Calls the external validator script and returns (is_valid, message)."""
 		try:
 			# Ensure python executable is the same one running this script
-			python_exe = sys.executable.replace("python.exe", "pythonw.exe")
+			python_exe = sys.executable
+			# On Windows, prefer pythonw.exe to avoid console window
+			if sys.platform == 'win32' and python_exe.endswith('python.exe'):
+				python_exe = python_exe.replace("python.exe", "pythonw.exe")
+			
 			validator_script = Path(__file__).parent / "folder_selection_validator.py"
 			
 			if not validator_script.exists():
 				return False, "folder_selection_validator.py not found in the script directory."
 
+			# Set up subprocess arguments
+			run_kwargs = {
+				'capture_output': True,
+				'text': True,
+				'check': True
+			}
+			# Add Windows-specific flag to hide console window
+			if sys.platform == 'win32':
+				run_kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+
 			process = subprocess.run(
 				[python_exe, str(validator_script), path],
-				capture_output=True, text=True, check=True, creationflags=subprocess.CREATE_NO_WINDOW
+				**run_kwargs
 			)
 			result = json.loads(process.stdout)
 			
