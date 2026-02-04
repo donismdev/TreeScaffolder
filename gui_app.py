@@ -90,6 +90,7 @@ class ScaffoldApp:
 		self.after_tree.tag_configure('new', foreground='green')
 		self.after_tree.tag_configure('conflict', foreground='red', font=font.Font(weight='bold'))
 		self.after_tree.tag_configure('warning', foreground='#E59400')
+		self.after_tree.tag_configure('modified_parent', foreground='#DAA520')
 
 	def setup_styles(self):
 		"""Configure styles for Treeview and other widgets."""
@@ -528,6 +529,18 @@ class ScaffoldApp:
 		# It will contain all existing AND newly planned directories.
 		dir_nodes = {}
 
+		# Identify parent directories of 'new' items that are themselves existing.
+		modified_parent_dirs = set()
+		for p, state in plan.path_states.items():
+			if state == 'new':
+				current_parent = p.parent
+				while current_parent != root_path and current_parent.is_relative_to(root_path):
+					# Only mark as 'modified_parent' if it's an *existing* directory
+					# and not itself marked as 'new' or 'conflict'
+					if plan.path_states.get(current_parent) not in ('new', 'conflict_file', 'conflict_dir'):
+						modified_parent_dirs.add(current_parent)
+					current_parent = current_parent.parent
+
 		# 1. Insert the root node
 		icon = self.classifier.classify_path(root_path)
 		root_node_id = self.after_tree.insert("", "end", text=f"{icon} {root_path.name}", open=True, values=[str(root_path)])
@@ -569,6 +582,8 @@ class ScaffoldApp:
 				tags.append('new')
 			elif state == 'conflict_file':
 				tags.append('conflict')
+			elif dir_path in modified_parent_dirs:
+				tags.append('modified_parent')
 			
 			# 예정된 디렉토리이면 무조건 폴더 아이콘 사용
 			if dir_path in plan.planned_dirs:
