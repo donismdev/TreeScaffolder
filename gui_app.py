@@ -791,11 +791,8 @@ class ScaffoldApp:
 			return False, f"Validator script failed: {e.stderr}"
 		except FileNotFoundError:
 			return False, "Python executable or validator script not found."
-		except json.JSONDecodeError:
-			if process:
-				return False, f"Could not parse response from validator script: {process.stdout}"
-			else:
-				return False, "Could not parse response from validator script."
+		except json.JSONDecodeError as e:
+			return False, f"Could not parse response from validator script: {process.stdout}"
 		except Exception as e:
 			return False, f"An unexpected error occurred during validation: {e}"
 
