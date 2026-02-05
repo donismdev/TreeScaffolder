@@ -203,6 +203,9 @@ class ScaffoldApp:
 		self.apply_button = ttk.Button(actions_subframe, text="Apply Scaffold", command=self.on_apply, state=tk.DISABLED)
 		self.apply_button.grid(row=0, column=1, padx=2, sticky="ew")
 
+		self.load_test_data_button = ttk.Button(actions_subframe, text="Load Test Data", command=self.on_load_test_data)
+		self.load_test_data_button.grid(row=1, column=0, columnspan=2, padx=2, pady=(5,0), sticky="ew")
+
 	def setup_right_panel(self):
 		"""Creates the notebook for showing diffs and logs."""
 		self.notebook = ttk.Notebook(self.right_frame)
@@ -289,24 +292,17 @@ class ScaffoldApp:
 
 		root_path = Path(root_path_str)
 		
-		# Get text from the currently active editor tab
-		active_tab_widget = self.root.nametowidget(self.editor_notebook.select())
+		tree_input = self.tree_text.get("1.0", tk.END)
+		source_code_input = self.source_code_text.get("1.0", tk.END)
 		
-		# Find the text widget more robustly
-		text_widget = None
-		for child in active_tab_widget.winfo_children():
-			if isinstance(child, tk.Text):
-				text_widget = child
-				break
-		
-		if text_widget is None:
-			messagebox.showerror("Error", "Could not find a text editor in the active tab.")
-			return
-		
-		text_input = text_widget.get("1.0", tk.END)
+		# Combine the inputs as expected by scaffold_core.generate_plan
+		# The core logic expects the tree definition and then potentially content blocks
+		# if the source code tab is used for defining content.
+		# A simple concatenation should work if the format expects it.
+		text_input = tree_input + "\n" + source_code_input
 
 		if not text_input.strip():
-			messagebox.showinfo("Info", "The active editor is empty. Nothing to compute.")
+			messagebox.showinfo("Info", "Both the Scaffold Tree and Source Code editors are empty. Nothing to compute.")
 			return
 
 		config = {
@@ -450,6 +446,38 @@ class ScaffoldApp:
 		self.content_text.delete("1.0", tk.END)
 		self.content_text.insert("1.0", source_info + "="*40 + "\n" + content_to_show)
 		self.editor_notebook.select(2) # Switch to Content tab
+
+	def on_load_test_data(self):
+		"""Loads content from test_tree.txt and test_data.txt into respective editors."""
+		test_tree_path = Path("test_tree.txt")
+		test_data_path = Path("test_data.txt")
+
+		try:
+			# Load test_tree.txt into Scaffold Tree view
+			if test_tree_path.exists():
+				with open(test_tree_path, "r", encoding="utf-8") as f:
+					tree_content = f.read()
+				self.tree_text.delete("1.0", tk.END)
+				self.tree_text.insert("1.0", tree_content)
+				self._log(f"Loaded '{test_tree_path}' into Scaffold Tree.", "info")
+			else:
+				messagebox.showwarning("File Not Found", f"'{test_tree_path}' not found in the current directory.")
+				self._log(f"Warning: '{test_tree_path}' not found.", "warn")
+
+			# Load test_data.txt into Source Code view
+			if test_data_path.exists():
+				with open(test_data_path, "r", encoding="utf-8") as f:
+					data_content = f.read()
+				self.source_code_text.delete("1.0", tk.END)
+				self.source_code_text.insert("1.0", data_content)
+				self._log(f"Loaded '{test_data_path}' into Source Code.", "info")
+			else:
+				messagebox.showwarning("File Not Found", f"'{test_data_path}' not found in the current directory.")
+				self._log(f"Warning: '{test_data_path}' not found.", "warn")
+
+		except Exception as e:
+			messagebox.showerror("Error Loading Data", f"An error occurred while loading test data: {e}")
+			self._log(f"Error loading test data: {e}", "error")
 
 	# --- Helper Methods ---
 
