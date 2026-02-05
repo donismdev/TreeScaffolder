@@ -1,0 +1,16 @@
+{
+  "📁": [],
+  "📄": [],
+  "🧩": [".cpp", ".c", ".hlsl", ".glsl", ".shader"],
+  "📘": [".h", ".hpp"],
+  "🧱": [".cs", ".vb", ".java", ".go", ".rs", ".swift", ".kt"],
+  "🧾": [".txt", ".md", ".log", ".nfo", ".doc", ".docx", ".pdf", ".rtf"],
+  "🗂️": [".json", ".xml", ".ini", ".yaml", ".yml", ".toml", ".env"],
+  "🖼️": [".png", ".jpg", ".jpeg", ".bmp", ".gif", ".tiff", ".svg", ".ico", ".webp"],
+  "🎵": [".mp3", ".wav", ".ogg", ".flac", ".aac", ".wma"],
+  "🎬": [".mp4", ".avi", ".mkv", ".mov", ".wmv", ".flv"],
+  "📦": [".zip", ".rar", ".7z", ".tar", ".gz", ".iso", ".jar", ".deb", ".rpm"],
+  "⚙️": [".bat", ".ps1", ".sh", ".cmd", ".tool", ".proj", ".config", ".build.cs", ".target.cs", ".cmake", ".sln", ".vcxproj"],
+  "💻": [".py", ".js", ".ts", ".html", ".css", ".php", ".rb", ".pl"],
+  "🚀": [".exe", ".dll", ".bin", ".lib", ".so", ".dylib", ".apk", ".msi"]
+}
