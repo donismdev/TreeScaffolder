@@ -58,17 +58,18 @@ class FileTypeClassifier:
                 # Store extensions in lowercase for case-insensitive lookup
                 self._extension_to_icon[ext.lower()] = icon
 
-    def classify_path(self, path: Path) -> str:
+    def classify_path(self, path: Path, is_planned_dir: bool = False) -> str:
         """
         Classifies a given path (file or directory) and returns its corresponding icon string.
 
         Args:
             path: The pathlib.Path object to classify.
+            is_planned_dir: If True, forces classification as a directory, even if it doesn't exist yet.
 
         Returns:
             An emoji string representing the file type.
         """
-        if path.is_dir():
+        if is_planned_dir or path.is_dir():
             return self.FOLDER_ICON
             
         # For files, check against known extensions
@@ -76,15 +77,11 @@ class FileTypeClassifier:
         file_name_lower = path.name.lower()
         
         # Check full name for multi-suffix matches first
-        for ext_key, icon in self._extension_to_icon.items():
+        # Sort by length to check for ".build.cs" before ".cs"
+        for ext_key in sorted(self._extension_to_icon.keys(), key=len, reverse=True):
             if file_name_lower.endswith(ext_key):
-                return icon
+                return self._extension_to_icon[ext_key]
         
-        # Fallback to single-suffix if no multi-suffix match
-        suffix_lower = path.suffix.lower()
-        if suffix_lower in self._extension_to_icon:
-            return self._extension_to_icon[suffix_lower]
-            
         return self.GENERIC_FILE_ICON
 
 if __name__ == "__main__":

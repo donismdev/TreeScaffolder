@@ -6,6 +6,7 @@ A Windows GUI application for scaffolding projects from a tree text description.
 Provides a tree editor, safe folder selection, a before/after diff view,
 and logging. Built with tkinter and ttk.
 """
+import datetime
 import json
 import subprocess
 import sys
@@ -15,9 +16,14 @@ from tkinter import ttk, filedialog, messagebox, font
 
 import scaffold_core
 from file_classifier import FileTypeClassifier
+import v2_parser
+from v2_parser import V2ParserError
 
 # --- Constants ---
-APP_TITLE = "Tree Scaffolder v1.0"
+APP_TITLE = "Tree Scaffolder v1.1"
+LOG_DIR = "Log"
+CONFIG_FILE = "config.json"
+DEFAULT_GEOMETRY = "1200x700"
 EXAMPLE_TREE_TEXT = r"""
 # =========================================================
 # - Use @ROOT to define the logical root marker.
@@ -51,8 +57,9 @@ class ScaffoldApp:
 	def __init__(self, root: tk.Tk):
 		self.root = root
 		self.root.title(APP_TITLE)
-		self.root.geometry("1200x800")
+		self.root.geometry("1200x700") # Default size
 		self.root.minsize(800, 600)
+		self._load_window_geometry() # Load saved geometry, if any
 		
 		# --- Style Configuration ---
 		self.style = ttk.Style()
@@ -94,6 +101,10 @@ class ScaffoldApp:
 		self.after_tree.tag_configure('conflict', foreground='red', font=font.Font(weight='bold'))
 		self.after_tree.tag_configure('warning', foreground='#E59400')
 		self.after_tree.tag_configure('modified_parent', foreground='#DAA520')
+		self.after_tree.tag_configure('overwrite', foreground='#0078D7', font=font.Font(weight='bold'))
+
+		# Bind window close event to save geometry
+		self.root.bind("<Destroy>", lambda event: self._save_window_geometry())
 
 	def setup_styles(self):
 		"""Configure styles for Treeview and other widgets."""
@@ -240,6 +251,10 @@ class ScaffoldApp:
 		self.after_tree = self.create_treeview(after_frame)
 		diff_paned.add(after_frame, weight=1)
 
+		# Bind selection event
+		self.before_tree.bind("<<TreeviewSelect>>", self.on_tree_select)
+		self.after_tree.bind("<<TreeviewSelect>>", self.on_tree_select)
+
 		# --- Log View ---
 		log_frame = ttk.Frame(self.notebook, padding=5)
 		self.notebook.add(log_frame, text="Log")
@@ -300,13 +315,20 @@ class ScaffoldApp:
 			return
 
 		root_path = Path(root_path_str)
-		tree_text = self.tree_text.get("1.0", tk.END)
+		
+		# Get text from the currently active editor tab
+		active_tab_widget = self.root.nametowidget(self.editor_notebook.select())
+		text_widget = active_tab_widget.winfo_children()[0] # Relies on the Text widget being the first child
+		text_input = text_widget.get("1.0", tk.END)
+
+		if not text_input.strip():
+			messagebox.showinfo("Info", "The active editor is empty. Nothing to compute.")
+			return
 
 		config = {
 			"DRY_RUN": self.dry_run.get(),
 			"ENABLE_SIMILARITY_SCAN": self.enable_similarity_scan.get(),
 			"SIMILARITY_RATIO_THRESHOLD": self.similarity_threshold.get(),
-			# Re-use settings from the standalone script's defaults
 			"NORMALIZE_LOWER": True,
 			"NORMALIZE_REMOVE_NONALNUM": True,
 			"SCAN_INCLUDE_EXTENSIONS": {
@@ -315,23 +337,40 @@ class ScaffoldApp:
 			}
 		}
 
-		self.current_plan = scaffold_core.generate_plan(root_path, tree_text, config)
+		# --- Unified Planning ---
+		self.current_plan = scaffold_core.generate_plan(root_path, text_input, config)
 		
-		# Refresh "Before" view in case filesystem changed
-		self._populate_before_tree(root_path)
-		# Populate "After" view with the new plan
-		self._populate_after_tree(self.current_plan)
+		# --- Logging ---
+		self.log_text.config(state=tk.NORMAL)
+		self.log_text.delete('1.0', tk.END)
+		self.log_text.config(state=tk.DISABLED)
 
 		if self.current_plan.errors:
-			error_message = "\n".join(self.current_plan.errors)
-			messagebox.showerror("Planning Error", f"Errors found in scaffold tree:\n\n{error_message}")
-			self.apply_button.config(state=tk.DISABLED)
-		elif self.current_plan.has_conflicts:
+			self._log("Plan generation finished with errors:", "error")
+			for err in self.current_plan.errors:
+				self._log(f"- {err}", "error")
+			messagebox.showerror("Planning Error", f"Errors found during planning:\n\n{self.current_plan.errors[0]}")
+		else:
+			self._log("Plan generated successfully.", "success")
+			num_new_dirs = len([p for p, s in self.current_plan.path_states.items() if s == 'new' and p in self.current_plan.planned_dirs])
+			num_new_files = len([p for p, s in self.current_plan.path_states.items() if s == 'new' and p in self.current_plan.planned_files])
+			num_overwrite_files = len([s for s in self.current_plan.path_states.values() if s == 'overwrite'])
+			self._log(f"- Planned new directories: {num_new_dirs}", "info")
+			self._log(f"- Planned new files: {num_new_files}", "info")
+			self._log(f"- Planned overwritten files: {num_overwrite_files}", "info")
+
+		# --- UI Updates ---
+		self._populate_before_tree(root_path)
+		self._populate_after_tree(self.current_plan)
+
+		if self.current_plan.has_conflicts:
 			messagebox.showwarning("Conflicts Found", "Path conflicts were detected. 'Apply' is disabled.\nCheck the 'After' view for items marked in red.")
 			self.apply_button.config(state=tk.DISABLED)
-		else:
+		elif not self.current_plan.errors:
 			self.apply_button.config(state=tk.NORMAL)
 			self.notebook.select(0) # Switch to diff view
+		else:
+			self.apply_button.config(state=tk.DISABLED)
 
 
 	def on_apply(self):
@@ -341,12 +380,17 @@ class ScaffoldApp:
 			return
 
 		is_dry_run = self.dry_run.get()
+		num_new_files = len([p for p, s in self.current_plan.path_states.items() if s == 'new' and p in self.current_plan.planned_files])
+		num_overwrite_files = len([p for p, s in self.current_plan.path_states.items() if s == 'overwrite'])
+		num_dirs = len([p for p, s in self.current_plan.path_states.items() if s == 'new' and p in self.current_plan.planned_dirs])
+
 		if is_dry_run:
-			msg = "This is a DRY RUN. No files will be written.\n\nProceed with logging the simulation?"
+			msg = "This is a DRY RUN. No files will be written.\n\n"
+			msg += f"Action Summary:\n- Create: {num_dirs} directories, {num_new_files} files\n- Overwrite: {num_overwrite_files} files\n\n"
+			msg += "Proceed with logging the simulation?"
 		else:
-			num_dirs = len([p for p, s in self.current_plan.path_states.items() if s == 'new' and p in self.current_plan.planned_dirs])
-			num_files = len([p for p, s in self.current_plan.path_states.items() if s == 'new' and p in self.current_plan.planned_files])
-			msg = f"This will create {num_dirs} directories and {num_files} files.\n\nAre you sure you want to proceed?"
+			msg = f"This will create {num_dirs} directories, create {num_new_files} files, and overwrite {num_overwrite_files} files.\n\n"
+			msg += "Are you sure you want to proceed?"
 
 		if messagebox.askyesno("Confirm Apply", msg):
 			self.notebook.select(1) # Switch to log tab
@@ -355,7 +399,159 @@ class ScaffoldApp:
 			
 			self.root.after(100, self._execute_scaffold)
 
+	def on_tree_select(self, event: tk.Event):
+		"""Handles selection changes in either the 'Before' or 'After' tree."""
+		widget = event.widget
+		selection = widget.selection()
+		if not selection:
+			return
+
+		item_id = selection[0]
+		values = widget.item(item_id, "values")
+		if not values:
+			return # Should not happen for file/dir items
+			
+		path_str = values[0]
+		path = Path(path_str)
+
+		content_to_show = ""
+		source_info = ""
+
+		try:
+			# Determine if this is a directory
+			is_dir = path.is_dir()
+			if widget == self.after_tree and not is_dir:
+				if self.current_plan and self.current_plan.path_states.get(path) in ("new", "overwrite"):
+					is_dir = path in self.current_plan.planned_dirs
+				else: # Fallback for existing items in after tree
+					is_dir = path.is_dir()
+			
+			if is_dir:
+				self.content_text.delete("1.0", tk.END)
+				self.content_text.insert("1.0", f"Directory selected:\n{path}")
+				self.editor_notebook.select(2) # Switch to Content tab
+				return
+
+			# It's a file, determine which tree and get content
+			if widget == self.after_tree and self.current_plan:
+				# For "After" tree, content might be in the plan
+				planned_content = self.current_plan.file_contents.get(path.resolve()) # Use resolve() for lookup
+				if planned_content is not None:
+					content_to_show = planned_content
+					source_info = f"--- PLANNED CONTENT (PREVIEW) ---\nFile: {path}\n"
+				elif path.exists():
+					content_to_show = path.read_text(encoding='utf-8', errors='replace')
+					source_info = f"--- EXISTING CONTENT ---\nFile: {path}\n"
+				else: # New, empty file from tree scaffold
+					content_to_show = ""
+					source_info = f"--- NEW EMPTY FILE (PLANNED) ---\nFile: {path}\n"
+			else: # "Before" tree or no plan
+				if path.exists():
+					content_to_show = path.read_text(encoding='utf-8', errors='replace')
+					source_info = f"--- CURRENT CONTENT ---\nFile: {path}\n"
+				else:
+					# This can happen if file was deleted after 'before' tree was populated
+					content_to_show = ""
+					source_info = f"--- FILE NOT FOUND ---\nFile: {path}\n"
+
+		except Exception as e:
+			content_to_show = f"Error reading file content:\n{e}"
+
+		# Update the content view
+		self.content_text.delete("1.0", tk.END)
+		self.content_text.insert("1.0", source_info + "="*40 + "\n" + content_to_show)
+		self.editor_notebook.select(2) # Switch to Content tab
+
 	# --- Helper Methods ---
+
+	def _load_window_geometry(self):
+		"""Loads window geometry from config.json if available, with validation."""
+		config_path = Path.cwd() / CONFIG_FILE
+		loaded_geometry = None
+
+		if config_path.exists():
+			try:
+				with open(config_path, "r", encoding="utf-8") as f:
+					config = json.load(f)
+					if "geometry" in config:
+						loaded_geometry = config["geometry"]
+			except Exception as e:
+				print(f"Error loading window geometry from config: {e}")
+
+		if loaded_geometry:
+			try:
+				# Geometry format: "WxH+X+Y"
+				match = re.match(r"(\d+)x(\d+)\+(-?\d+)\+(-?\d+)", loaded_geometry)
+				if match:
+					width, height, x, y = map(int, match.groups())
+					
+					# Basic validation: ensure dimensions are not too small and position is not extremely off-screen
+					min_width, min_height = 300, 200 # A reasonable minimum size
+					max_negative_coord = -1000 # Allow some negative coords for multi-monitor setups
+
+					if width >= min_width and height >= min_height and x > max_negative_coord and y > max_negative_coord:
+						self.root.geometry(loaded_geometry)
+					else:
+						print(f"Loaded geometry '{loaded_geometry}' failed validation. Using default.")
+						self.root.geometry(DEFAULT_GEOMETRY)
+				else:
+					print(f"Loaded geometry string '{loaded_geometry}' has invalid format. Using default.")
+					self.root.geometry(DEFAULT_GEOMETRY)
+			except Exception as e:
+				print(f"Error parsing loaded geometry '{loaded_geometry}': {e}. Using default.")
+				self.root.geometry(DEFAULT_GEOMETRY)
+		else:
+			# If no geometry was loaded or file didn't exist, ensure default is applied
+			self.root.geometry(DEFAULT_GEOMETRY)
+
+
+	def _save_window_geometry(self):
+		"""Saves current window geometry to config.json."""
+		config_path = Path.cwd() / CONFIG_FILE
+		try:
+			config = {}
+			if config_path.exists():
+				with open(config_path, "r", encoding="utf-8") as f:
+					config = json.load(f)
+			
+			config["geometry"] = self.root.geometry()
+			
+			with open(config_path, "w", encoding="utf-8") as f:
+				json.dump(config, f, indent=4)
+		except Exception as e:
+			print(f"Error saving window geometry: {e}") # Print to console as GUI might be closing
+
+	def _write_execution_log(self,):
+		"""Writes the current tree and source code text to a timestamped log file."""
+		log_path = Path.cwd() / LOG_DIR
+		log_path.mkdir(exist_ok=True)
+
+		timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+		log_filename = log_path / f"scaffold_execution_{timestamp}.log"
+
+		tree_content = self.tree_text.get("1.0", tk.END).strip()
+		source_content = self.source_code_text.get("1.0", tk.END).strip()
+
+		log_entries = [
+			f"Execution Log - {datetime.datetime.now().isoformat()}",
+			"=" * 80,
+			"Scaffold Tree Content:",
+			"=" * 80,
+			tree_content,
+			"",
+			"=" * 80,
+			"Source Code Content:",
+			"=" * 80,
+			source_content,
+			"=" * 80,
+		]
+
+		try:
+			with open(log_filename, "w", encoding="utf-8") as f:
+				f.write("\n".join(log_entries))
+			self._log(f"Execution details logged to: {log_filename}", "info")
+		except Exception as e:
+			self._log(f"Error writing execution log: {e}", "error")
 
 	def _log(self, message: str, level: str = "info"):
 		"""Appends a message to the log widget."""
@@ -387,43 +583,69 @@ class ScaffoldApp:
 		self.log_text.config(state=tk.DISABLED)
 		
 		self._log("="*60)
+		
+		# Log the input content before execution
+		self._write_execution_log()
+
 		if is_dry_run:
 			self._log("Starting scaffold simulation (DRY RUN)...", "warn")
 		else:
 			self._log("Starting scaffold operation...", "info")
+		
+		# Calculate total lines of content that will be written
+		total_content_lines = sum(len(content.splitlines()) for content in plan.file_contents.values())
+
+		# Log a brief summary of what is about to happen
+		num_planned_new_dirs = len([p for p in plan.planned_dirs if plan.path_states.get(p) == 'new'])
+		num_planned_new_files = len([p for p in plan.planned_files if plan.path_states.get(p) == 'new'])
+		num_planned_overwrite_files = len([p for p in plan.planned_files if plan.path_states.get(p) == 'overwrite'])
+
+		self._log(f"\nPlanned Actions Summary:")
+		self._log(f"- New directories: {num_planned_new_dirs}")
+		self._log(f"- New files: {num_planned_new_files}")
+		self._log(f"- Overwritten files: {num_planned_overwrite_files}")
+		self._log(f"- Total lines of content to be written: {total_content_lines} lines")
+
 		self._log("="*60)
 
-		stats = {"dirs_created": 0, "dirs_skipped": 0, "dirs_error": 0, "files_created": 0, "files_skipped": 0, "files_error": 0}
+		stats = {"dirs_created": 0, "dirs_skipped": 0, "dirs_error": 0, "files_created": 0, "files_overwritten": 0, "files_skipped": 0, "files_error": 0}
 
 		# Create directories first
-		for path in sorted(plan.planned_dirs, key=lambda p: len(p.parts)):
-			if plan.path_states.get(path) == "new":
+		# Sorting ensures parent directories are created before children
+		for path in sorted(list(plan.planned_dirs), key=lambda p: len(p.parts)):
+			state = plan.path_states.get(path)
+			if state == "new":
 				ok, created, skipped = self._ensure_dir(path, is_dry_run)
 				if ok:
 					if created: stats["dirs_created"] += 1
 					if skipped: stats["dirs_skipped"] += 1
 				else:
 					stats["dirs_error"] += 1
-			elif plan.path_states.get(path) == "exists":
+			elif state == "exists":
 				self._log(f"[SKIP DIR]  {path}", "skip")
 				stats["dirs_skipped"] += 1
 
-		# Create files
-		for path in sorted(plan.planned_files, key=lambda p: len(p.parts)):
-			if plan.path_states.get(path) == "new":
-				ok, created, skipped = self._ensure_file(path, is_dry_run)
+		# Create/overwrite files
+		for path in sorted(list(plan.planned_files), key=lambda p: len(p.parts)):
+			state = plan.path_states.get(path)
+			content = plan.file_contents.get(path.resolve()) # Use resolve() for lookup
+
+			if state == "new" or state == "overwrite":
+				is_overwrite = state == "overwrite"
+				ok, created, skipped = self._ensure_file(path, is_dry_run, content, is_overwrite)
 				if ok:
-					if created: stats["files_created"] += 1
+					if created and not is_overwrite: stats["files_created"] += 1
+					if created and is_overwrite: stats["files_overwritten"] += 1
 					if skipped: stats["files_skipped"] += 1
 				else:
 					stats["files_error"] += 1
-			elif plan.path_states.get(path) == "exists":
+			elif state == "exists":
 				self._log(f"[SKIP FILE] {path}", "skip")
 				stats["files_skipped"] += 1
 		
 		self._log("\n" + "="*25 + " SUMMARY " + "="*26)
 		self._log(f"- Dirs created: {stats['dirs_created']}, skipped: {stats['dirs_skipped']}, errors: {stats['dirs_error']}")
-		self._log(f"- Files created: {stats['files_created']}, skipped: {stats['files_skipped']}, errors: {stats['files_error']}")
+		self._log(f"- Files created: {stats['files_created']}, overwritten: {stats['files_overwritten']}, skipped: {stats['files_skipped']}, errors: {stats['files_error']}")
 		
 		if plan.duplicate_warnings or plan.similarity_warnings:
 			self._log("\n--- Warnings ---", "warn")
@@ -439,7 +661,9 @@ class ScaffoldApp:
 			
 		# Finalize
 		self.recompute_button.config(state=tk.NORMAL)
-		self.on_recompute() # Refresh the view
+		self.apply_button.config(state=tk.NORMAL if plan and not plan.has_conflicts else tk.DISABLED)
+		self._populate_before_tree(plan.root_path) # Refresh the 'before' view
+		self._populate_after_tree(plan) # Refresh the 'after' view with the same plan
 		self.notebook.select(0) # Switch back to diff view
 
 
@@ -458,23 +682,27 @@ class ScaffoldApp:
 				return False, False, False
 		return True, True, False
 
-	def _ensure_file(self, path: Path, dry_run: bool) -> tuple[bool, bool, bool]:
+	def _ensure_file(self, path: Path, dry_run: bool, content: str | None, is_overwrite: bool) -> tuple[bool, bool, bool]:
 		"""(ok, created, skipped)"""
-		if path.exists(): # Safeguard
-			self._log(f"[SKIP FILE] {path}", "skip")
+		verb = "[OVERWRITE]" if is_overwrite else "[CREATE]"
+		
+		# Safeguard: if we think we're creating, but it exists, log as skip.
+		if not is_overwrite and path.exists():
+			self._log(f"[SKIP FILE] {path} (already exists)", "skip")
 			return True, False, True
 
-		self._log(f"[CREATE]    {path}", "info")
+		log_level = "info" if content is not None else "success" # Different color for content files
+		self._log(f"{verb:<11} {path}", log_level)
+
 		if not dry_run:
 			try:
+				# Ensure parent directory exists first
 				path.parent.mkdir(parents=True, exist_ok=True)
-				with path.open("xb"):
-					pass
-			except FileExistsError:
-				self._log(f"[SKIP FILE] {path} (already exists)", "skip")
-				return True, False, True
+				# Open with "w" to create or overwrite.
+				# Use write_text for simplicity and correct encoding.
+				path.write_text(content or "", encoding='utf-8')
 			except Exception as e:
-				self._log(f"[ERROR] create file failed: {path} | {e}", "error")
+				self._log(f"[ERROR] write file failed: {path} | {e}", "error")
 				return False, False, False
 		return True, True, False
 
@@ -568,20 +796,19 @@ class ScaffoldApp:
 	def _populate_after_tree(self, plan: scaffold_core.Plan):
 		"""Renders the generated plan in the 'After' treeview."""
 		self._clear_tree(self.after_tree)
+		if not plan:
+			return
 		root_path = plan.root_path
 
-		# This dictionary will map a Path object to its corresponding treeview item ID.
-		# It will contain all existing AND newly planned directories.
 		dir_nodes = {}
 
-		# Identify parent directories of 'new' items that are themselves existing.
 		modified_parent_dirs = set()
-		for p, state in plan.path_states.items():
-			if state == 'new':
+		all_planned_paths = plan.planned_dirs.union(plan.planned_files)
+		for p in all_planned_paths:
+			state = plan.path_states.get(p)
+			if state in ('new', 'overwrite'):
 				current_parent = p.parent
 				while current_parent != root_path and current_parent.is_relative_to(root_path):
-					# Only mark as 'modified_parent' if it's an *existing* directory
-					# and not itself marked as 'new' or 'conflict'
 					if plan.path_states.get(current_parent) not in ('new', 'conflict_file', 'conflict_dir'):
 						modified_parent_dirs.add(current_parent)
 					current_parent = current_parent.parent
@@ -593,18 +820,14 @@ class ScaffoldApp:
 
 		# 2. Get all directory paths: existing and planned
 		all_dirs = set()
-		# Add existing dirs
 		try:
 			for p in root_path.rglob('*'):
 				if p.is_dir():
 					all_dirs.add(p)
 		except Exception:
-			# Failsafe, though root should be readable
 			pass
-		# Add planned dirs
 		for p in plan.planned_dirs:
 			all_dirs.add(p)
-			# Also add all parents of the planned dir so the tree can be built
 			for parent in p.parents:
 				if parent != root_path and parent.is_relative_to(root_path):
 					all_dirs.add(parent)
@@ -630,39 +853,36 @@ class ScaffoldApp:
 			elif dir_path in modified_parent_dirs:
 				tags.append('modified_parent')
 			
-			# 예정된 디렉토리이면 무조건 폴더 아이콘 사용
-			if dir_path in plan.planned_dirs:
-				icon = self.classifier.FOLDER_ICON
-			else: # 실제 이미 존재하는 디렉토리라면 classify_path가 Path.is_dir()을 통해 폴더 아이콘 반환할 것임
-				icon = self.classifier.classify_path(dir_path)
+			icon = self.classifier.classify_path(dir_path, is_planned_dir=dir_path in plan.planned_dirs)
 			
-			node_id = self.after_tree.insert(parent_id, "end", text=f"{icon} {dir_path.name}", open=False, tags=tags, values=[str(dir_path)])
+			node_id = self.after_tree.insert(parent_id, "end", text=f"{icon} {dir_path.name}", open=True, tags=tags, values=[str(dir_path)])
 			dir_nodes[dir_path] = node_id
 
 		# 4. Get all file paths: existing and planned
 		all_files = set()
-		# Add existing files
 		try:
 			for p in root_path.rglob('*'):
 				if p.is_file():
 					all_files.add(p)
 		except Exception:
 			pass
-		# Add planned files
-		for p in plan.planned_files:
-			all_files.add(p)
+		all_files.update(plan.planned_files)
 		
 		# 5. Insert all file nodes into the treeview
 		sorted_files = sorted(list(all_files), key=lambda p: (len(p.parts), p.name.lower()))
 		for file_path in sorted_files:
 			parent_id = dir_nodes.get(file_path.parent)
 			if not parent_id:
+				# This can happen if a file is in a dir that we couldn't list/create.
+				# The error should be caught elsewhere, but we prevent a crash here.
 				continue
 			
 			tags = []
 			state = plan.path_states.get(file_path)
 			if state == 'new':
 				tags.append('new')
+			elif state == 'overwrite':
+				tags.append('overwrite')
 			elif state == 'conflict_dir':
 				tags.append('conflict')
 			
