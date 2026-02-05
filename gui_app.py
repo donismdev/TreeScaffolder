@@ -865,6 +865,8 @@ class ScaffoldApp:
 				if p.is_dir():
 					all_dirs.add(p)
 		except Exception:
+			# Silently ignore filesystem errors (permission denied, broken symlinks, etc.)
+			# The planned directories will still be added below and shown in the tree
 			pass
 		for p in plan.planned_dirs:
 			all_dirs.add(p)
@@ -905,6 +907,8 @@ class ScaffoldApp:
 				if p.is_file():
 					all_files.add(p)
 		except Exception:
+			# Silently ignore filesystem errors (permission denied, broken symlinks, etc.)
+			# The planned files will still be added below and shown in the tree
 			pass
 		all_files.update(plan.planned_files)
 		
