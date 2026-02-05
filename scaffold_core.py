@@ -132,10 +132,8 @@ def parse_tree_text(text: str) -> Tuple[List[NodeItem], Optional[str], Optional[
         is_dir = content.endswith("/")
         name = content[:-1] if is_dir else content
         
-        # Check for invalid path characters
-        # Allow Windows drive letters (e.g., C:) at position 1, but reject colons elsewhere
-        has_invalid_colon = ':' in name and not (len(name) >= 2 and name[1] == ':' and name[0].isalpha())
-        if name.startswith(('/', '\\')) or '..' in name or has_invalid_colon:
+        # Check for invalid path characters - reject absolute paths and path traversal
+        if name.startswith(('/', '\\')) or '..' in name or ':' in name:
             return [], None, f"Error at line {line_index + 1}: Invalid characters in path name ('..', '/', '\\', ':'). Found: '{name}'"
         
         items.append(NodeItem(indent=effective_indent, name=name, is_dir=is_dir, line_number=line_index + 1))
