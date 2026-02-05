@@ -48,9 +48,11 @@ def parse_v2_format(text: str, root_marker: str | None = None, root_marker_name:
         file_blocks.append({'path': path, 'content': content})
     
     # Check for hanging FILE_BEGIN
-    last_pos = 0
-    if (match := list(pattern.finditer(text))):
-        last_pos = match[-1].end()
+    last_match = None
+    for match in pattern.finditer(text):
+        last_match = match
+    
+    last_pos = last_match.end() if last_match else 0
     
     remaining_text = text[last_pos:]
     if '@@@FILE_BEGIN' in remaining_text and '@@@FILE_END' not in remaining_text:
@@ -99,7 +101,7 @@ Some content here.
         parse_v2_format(test_text_fail_no_end)
         print("OK (no error, just ignores the block)")
     except V2ParserError as e:
-        print(f"FAILED: {e}") # Should not fail with the new logic, but we added a check for hanging blocks.
+        print(f"EXPECTED: {e}") # This is expected to raise an error with the hanging block check.
         
     # Test for the hanging block at the very end
     test_text_fail_hanging = r"""
@@ -109,7 +111,7 @@ Some content here.
     @@@FILE_BEGIN bad/path.txt
     Hanging content
     """
-    print("\n--- Testing hanging FILE_END ---")
+    print("\n--- Testing hanging FILE_BEGIN ---")
     try:
         parse_v2_format(test_text_fail_hanging)
         print("FAILED: Expected an error.")

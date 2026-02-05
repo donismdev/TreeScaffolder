@@ -105,7 +105,7 @@ def parse_tree_text(text: str) -> Tuple[List[NodeItem], Optional[str], Optional[
             continue
 
         if trimmed.startswith("@ROOT"):
-            match = re.search(r'@ROOT\s+([^{\s}]+|{{\w+}})', trimmed)
+            match = re.search(r'@ROOT\s+([^{\s}]+|{{[^}]+}})', trimmed)
             if match:
                 root_marker_name = match.group(1)
             continue
@@ -113,7 +113,6 @@ def parse_tree_text(text: str) -> Tuple[List[NodeItem], Optional[str], Optional[
         tree_lines_info.append((i, raw))
 
     # --- Determine base indentation from the collected tree lines ---
-    min_indent_level = float('inf')
     if tree_lines_info:
         # Find the indentation of the first actual tree node to handle global offsets
         first_node_line = tree_lines_info[0][1]
@@ -133,7 +132,7 @@ def parse_tree_text(text: str) -> Tuple[List[NodeItem], Optional[str], Optional[
         is_dir = content.endswith("/")
         name = content[:-1] if is_dir else content
         
-        if name.startswith(('/', '\\')) or '..' in name or (':' in name and len(name) > 1 and name[1] == ':'):
+        if name.startswith(('/', '\\')) or '..' in name or ':' in name:
             return [], None, f"Error at line {line_index + 1}: Invalid characters in path name ('..', '/', '\\', ':'). Found: '{name}'"
         
         items.append(NodeItem(indent=effective_indent, name=name, is_dir=is_dir, line_number=line_index + 1))
