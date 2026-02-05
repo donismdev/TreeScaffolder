@@ -8,6 +8,8 @@ and ends with '@@@FILE_END'.
 """
 import re
 
+from collections import deque
+
 class V2ParserError(Exception):
     """Custom exception for parsing errors."""
     pass
@@ -47,12 +49,9 @@ def parse_v2_format(text: str, root_marker: str | None = None, root_marker_name:
 
         file_blocks.append({'path': path, 'content': content})
     
-    # Check for hanging FILE_BEGIN
-    last_match = None
-    for match in pattern.finditer(text):
-        last_match = match
-    
-    last_pos = last_match.end() if last_match else 0
+    # Check for hanging FILE_BEGIN - efficiently get the last match
+    last_match_deque = deque(pattern.finditer(text), maxlen=1)
+    last_pos = last_match_deque[0].end() if last_match_deque else 0
     
     remaining_text = text[last_pos:]
     if '@@@FILE_BEGIN' in remaining_text and '@@@FILE_END' not in remaining_text:

@@ -132,7 +132,8 @@ def parse_tree_text(text: str) -> Tuple[List[NodeItem], Optional[str], Optional[
         is_dir = content.endswith("/")
         name = content[:-1] if is_dir else content
         
-        # Check for invalid path characters - reject absolute paths and path traversal
+        # Check for invalid path characters
+        # Reject absolute paths, path traversal, and colons (invalid on Windows, avoided for cross-platform compatibility)
         if name.startswith(('/', '\\')) or '..' in name or ':' in name:
             return [], None, f"Error at line {line_index + 1}: Invalid characters in path name ('..', '/', '\\', ':'). Found: '{name}'"
         
