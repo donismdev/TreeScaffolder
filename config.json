@@ -1,3 +1,4 @@
 {
-    "geometry": "1200x700+74+59"
+    "geometry": "1200x696+15+47",
+    "DEFAULT_TREE_TEMPLATE": "# =========================================================\n# - Use @ROOT to define the logical root marker.\n# - The first node must be that marker, ending with a '/'.\n# - Indent with TABS or 4-SPACES.\n# =========================================================\n\n @ROOT {{Root}}\n\n{{Root}}/"
 }

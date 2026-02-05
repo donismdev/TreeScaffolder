@@ -15,6 +15,7 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, font
 
 import scaffold_core
+import re
 from file_classifier import FileTypeClassifier
 import v2_parser
 from v2_parser import V2ParserError
@@ -24,32 +25,17 @@ APP_TITLE = "Tree Scaffolder v1.1"
 LOG_DIR = "Log"
 CONFIG_FILE = "config.json"
 DEFAULT_GEOMETRY = "1200x700"
-EXAMPLE_TREE_TEXT = r"""
-# =========================================================
+DEFAULT_TREE_TEMPLATE = """# =========================================================
 # - Use @ROOT to define the logical root marker.
 # - The first node must be that marker, ending with a '/'.
 # - Indent with TABS or 4-SPACES.
 # =========================================================
 
-@ROOT {{Root}}
+ @ROOT {{Root}}
 
 {{Root}}/
-	NewModule/
-		NewModule.Build.cs
-		Public/
-			NewModule.h
-		Private/
-			NewModule.cpp
-	AnotherModule/
-		AnotherModule.uplugin
-		Resources/
-			Icon128.png
-		Source/
-			Private/
-				AnotherModule.cpp
-			Public/
-				AnotherModule.h
-""".strip()
+"""
+# No longer needed
 
 class ScaffoldApp:
 	"""The main application class for the Tree Scaffolder GUI."""
@@ -161,13 +147,10 @@ class ScaffoldApp:
 		tree_yscroller.grid(row=0, column=1, sticky="ns")
 		tree_xscroller.grid(row=1, column=0, sticky="ew")
 		
-		self.tree_text.insert("1.0", EXAMPLE_TREE_TEXT)
+		self.tree_text.insert("1.0", DEFAULT_TREE_TEMPLATE)
 		
 		# Load example button
-		button_frame = ttk.Frame(scaffold_tree_frame)
-		button_frame.grid(row=2, column=0, columnspan=2, sticky="ew")
-		load_example_button = ttk.Button(button_frame, text="Load Example", command=self.on_load_example)
-		load_example_button.pack(side=tk.RIGHT, padx=2, pady=2)
+# Load Example button removed
 
 		# --- Source Code Tab ---
 		source_code_frame = ttk.Frame(self.editor_notebook)
@@ -280,10 +263,7 @@ class ScaffoldApp:
 		
 	# --- Event Handlers ---
 
-	def on_load_example(self):
-		"""Clears the text area and inserts the example tree text."""
-		self.tree_text.delete("1.0", tk.END)
-		self.tree_text.insert("1.0", EXAMPLE_TREE_TEXT)
+# on_load_example method removed
 
 	def on_browse_folder(self):
 		"""Handles the 'Browse...' button click to select and validate a folder."""
@@ -384,15 +364,20 @@ class ScaffoldApp:
 		num_overwrite_files = len([p for p, s in self.current_plan.path_states.items() if s == 'overwrite'])
 		num_dirs = len([p for p, s in self.current_plan.path_states.items() if s == 'new' and p in self.current_plan.planned_dirs])
 
+		dialog_icon = messagebox.INFO # Default blue 'i'
+		dialog_title = "Confirm Apply"
+
 		if is_dry_run:
 			msg = "This is a DRY RUN. No files will be written.\n\n"
 			msg += f"Action Summary:\n- Create: {num_dirs} directories, {num_new_files} files\n- Overwrite: {num_overwrite_files} files\n\n"
-			msg += "Proceed with logging the simulation?"
+			msg += "Proceed with logging the simulation? (드라이런이 켜져있습니다)"
+			dialog_icon = messagebox.WARNING # Red exclamation mark
+			dialog_title = "Confirm Apply (DRY RUN)"
 		else:
 			msg = f"This will create {num_dirs} directories, create {num_new_files} files, and overwrite {num_overwrite_files} files.\n\n"
 			msg += "Are you sure you want to proceed?"
 
-		if messagebox.askyesno("Confirm Apply", msg):
+		if messagebox.askyesno(dialog_title, msg, icon=dialog_icon):
 			self.notebook.select(1) # Switch to log tab
 			self.recompute_button.config(state=tk.DISABLED)
 			self.apply_button.config(state=tk.DISABLED)
@@ -521,8 +506,8 @@ class ScaffoldApp:
 		except Exception as e:
 			print(f"Error saving window geometry: {e}") # Print to console as GUI might be closing
 
-	def _write_execution_log(self,):
-		"""Writes the current tree and source code text to a timestamped log file."""
+	def _write_execution_log(self, stats: dict, is_dry_run: bool, captured_logs: list):
+		"""Writes a comprehensive execution log to a timestamped file."""
 		log_path = Path.cwd() / LOG_DIR
 		log_path.mkdir(exist_ok=True)
 
@@ -532,41 +517,68 @@ class ScaffoldApp:
 		tree_content = self.tree_text.get("1.0", tk.END).strip()
 		source_content = self.source_code_text.get("1.0", tk.END).strip()
 
+		summary_header = (
+			f"{'DRY RUN' if is_dry_run else 'EXECUTION'} SUMMARY\n"
+			f"New Directories: {stats['dirs_created']}\n"
+			f"New Files: {stats['files_created']}\n"
+			f"Overwritten Files: {stats['files_overwritten']}\n"
+			f"Directory Errors: {stats['dirs_error']}\n"
+			f"File Errors: {stats['files_error']}\n"
+		)
+
 		log_entries = [
 			f"Execution Log - {datetime.datetime.now().isoformat()}",
 			"=" * 80,
-			"Scaffold Tree Content:",
+			summary_header,
+			"=" * 80,
+			"\n--- detail ---\n",
+		]
+
+		# Add captured raw logs
+		for message, level in captured_logs:
+			log_entries.append(f"[{level.upper()}] {message}")
+			
+		# Add original input content for context
+		log_entries.extend([
+			"\n" + "=" * 80,
+			"Scaffold Tree Content (Input):",
 			"=" * 80,
 			tree_content,
 			"",
 			"=" * 80,
-			"Source Code Content:",
+			"Source Code Content (Input):",
 			"=" * 80,
 			source_content,
 			"=" * 80,
-		]
+		])
 
 		try:
 			with open(log_filename, "w", encoding="utf-8") as f:
 				f.write("\n".join(log_entries))
+			# This log message now goes to the GUI buffer
 			self._log(f"Execution details logged to: {log_filename}", "info")
 		except Exception as e:
 			self._log(f"Error writing execution log: {e}", "error")
 
-	def _log(self, message: str, level: str = "info"):
-		"""Appends a message to the log widget."""
+	def _log(self, message: str, level: str = "info", buffer_list: list = None):
+		"""Appends a message to the log widget or a buffer list."""
+		if buffer_list is not None:
+			buffer_list.append((message, level))
+			return
+
 		self.log_text.config(state=tk.NORMAL)
 		
 		# Simple colored logging
 		tag = f"log_{level}"
-		if not hasattr(self, tag):
+		if not hasattr(self, f"configured_{tag}"): # Check if tag is already configured
 			color = "black"
 			if level == "error": color = "red"
 			elif level == "warn": color = "#E59400"
 			elif level == "success": color = "green"
 			elif level == "skip": color = "gray"
 			self.log_text.tag_configure(tag, foreground=color)
-			setattr(self, tag, True)
+			# Store the fact that this tag has been configured
+			setattr(self, f"configured_{tag}", True) 
 
 		self.log_text.insert(tk.END, message + '\n', tag)
 		self.log_text.see(tk.END)
@@ -578,15 +590,16 @@ class ScaffoldApp:
 		plan = self.current_plan
 		is_dry_run = self.dry_run.get()
 
-		self.log_text.config(state=tk.NORMAL)
-		self.log_text.delete('1.0', tk.END)
-		self.log_text.config(state=tk.DISABLED)
+		# Create a buffer to capture logs temporarily
+		captured_logs = []
 		
+		# Store the original _log method and temporarily override it
+		original_log_method = self._log
+		# All calls to self._log within this function will now append to captured_logs
+		self._log = lambda msg, level="info": original_log_method(msg, level, buffer_list=captured_logs)
+
 		self._log("="*60)
 		
-		# Log the input content before execution
-		self._write_execution_log()
-
 		if is_dry_run:
 			self._log("Starting scaffold simulation (DRY RUN)...", "warn")
 		else:
@@ -658,6 +671,33 @@ class ScaffoldApp:
 			self._log("Operation finished with errors.", "error")
 		else:
 			self._log("Operation finished successfully.", "success")
+
+		# Write the comprehensive file log before assembling the GUI log
+		self._write_execution_log(stats, is_dry_run, captured_logs)
+			
+		# --- Final Log Assembly ---
+		# Restore the original _log method to write to the widget directly
+		self._log = original_log_method
+
+		self.log_text.config(state=tk.NORMAL)
+		self.log_text.delete("1.0", tk.END) # Clear the log widget for final output
+		
+		summary_header = (
+			f"{'DRY RUN' if is_dry_run else 'EXECUTION'} SUMMARY\n"
+			f"New Directories: {stats['dirs_created']}\n"
+			f"New Files: {stats['files_created']}\n"
+			f"Overwritten Files: {stats['files_overwritten']}\n"
+		)
+		
+		# Insert the summary header and separator
+		self._log(summary_header, "info")
+		self._log("\n--- detail ---\n")
+
+		# Insert all captured detailed logs, applying original tags
+		for message, level in captured_logs:
+			self._log(message, level)
+		
+		self.log_text.config(state=tk.DISABLED)
 			
 		# Finalize
 		self.recompute_button.config(state=tk.NORMAL)
