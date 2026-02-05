@@ -105,7 +105,7 @@ def parse_tree_text(text: str) -> Tuple[List[NodeItem], Optional[str], Optional[
             continue
 
         if trimmed.startswith("@ROOT"):
-            match = re.search(r'@ROOT\s+([^{\s}]+|{{[^}]+}})', trimmed)
+            match = re.search(r'@ROOT\s+([^{\s}]+|{{[\w-]+}})', trimmed)
             if match:
                 root_marker_name = match.group(1)
             continue
