@@ -4,50 +4,40 @@
 # - Indent with TABS or 4-SPACES.
 # =========================================================
 
-@ROOT {{Root}}
+ @ROOT {{Root}}
 
 {{Root}}/
-	MercenaryMode/
-		MercenaryMode.Build.cs
+	CDR/
+		CDR.Build.cs
 		Public/
-			MercenaryModeCore.h
-			Presentation/
-				MercenaryPresentation.h
+			CDRGameInstance.h
 		Private/
-			MercenaryModeCore.cpp
-			MercenaryModeModule.cpp
-			Presentation/
-				MercenaryPresentation.cpp
-	ScoreMode/
-		ScoreMode.Build.cs
-		Public/
-			ScoreModeCore.h
-			Presentation/
-				ScorePresentation.h
-			Private/
-				ScoreModeCore.cpp
-				ScoreModeModule.cpp
-				Presentation/
-					ScorePresentation.cpp
-	PartyMode/
-		PartyMode.Build.cs
-		Public/
-			PartyModeCore.h
-			Presentation/
-				PartyPresentation.h
-			Private/
-				PartyModeCore.cpp
-				PartyModeModule.cpp
-				Presentation/
-					PartyModePresentation.cpp
+			CDRGameInstance.cpp
+
 	GameplayCore/
 		Public/
+			Flow/
+				CDRStartContext.h
 			Presentation/
-				IPuzzlePresentation.h
-			Rules/
-				Calendar/
-					CalendarPuzzleRules.h
-			Private/
-				Rules/
-					Calendar/
-						CalendarPuzzleRules.cpp
+				IPuzzlePresentation.h		(기존)
+
+	FrontendUI/
+		FrontendUI.Build.cs
+		Public/
+			UI/
+				MainMenuWidget.h
+		Private/
+			UI/
+				MainMenuWidget.cpp
+
+	FrontendEntry/
+		FrontendEntry.Build.cs
+		Public/
+			Bootstrap/
+				FrontendEntryGameMode.h
+				FrontendEntryPlayerController.h
+		Private/
+			Bootstrap/
+				FrontendEntryGameMode.cpp
+				FrontendEntryPlayerController.cpp
+			FrontendEntryModule.cpp

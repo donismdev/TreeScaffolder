@@ -55,6 +55,7 @@ class ScaffoldApp:
 		self.dry_run = tk.BooleanVar(value=True)
 		self.enable_similarity_scan = tk.BooleanVar(value=True)
 		self.similarity_threshold = tk.DoubleVar(value=0.86)
+		self.last_root_path = None # Initialize member variable to store the last selected path
 		
 		# To be filled by the analysis
 		self.current_plan: scaffold_core.Plan | None = None
@@ -90,6 +91,9 @@ class ScaffoldApp:
 		# Bind window close event to save geometry
 		self.root.bind("<Destroy>", lambda event: self._save_window_geometry())
 
+		# Load last root path and update UI elements
+		self._load_last_root_path() # New call
+
 	def setup_styles(self):
 		"""Configure styles for Treeview and other widgets."""
 		self.style.map("Treeview", background=[('selected', '#0078D7')])
@@ -111,14 +115,24 @@ class ScaffoldApp:
 		# Folder Selection
 		folder_frame = ttk.LabelFrame(controls_frame, text="1. Select Target Root Folder")
 		folder_frame.grid(row=0, column=0, sticky="ew", pady=(0, 10))
-		folder_frame.columnconfigure(0, weight=1)
+		# Removed: folder_frame.columnconfigure(0, weight=1)
 		
-		self.folder_label = ttk.Label(folder_frame, textvariable=self.target_root_path, relief="sunken", padding=3)
+		path_buttons_frame = ttk.Frame(folder_frame)
+		path_buttons_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
+		path_buttons_frame.columnconfigure(1, weight=1) # Empty column to push buttons right
+
+		self.folder_label = ttk.Label(path_buttons_frame, textvariable=self.target_root_path, relief="sunken", padding=3, width=50) # Fixed width
 		self.target_root_path.set("No folder selected.")
-		self.folder_label.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
+		self.folder_label.grid(row=0, column=0, sticky="w", padx=(0, 5)) # Left-aligned, no expansion
 		
-		browse_button = ttk.Button(folder_frame, text="Browse...", command=self.on_browse_folder)
-		browse_button.grid(row=0, column=1, padx=5, pady=5)
+		self.browse_button = ttk.Button(path_buttons_frame, text="Browse...", command=self.on_browse_folder, width=8)
+		self.browse_button.grid(row=0, column=2, padx=(0, 5))
+
+		self.prev_dir_button = ttk.Button(path_buttons_frame, text="Prev", command=self.on_previous_folder, width=5, state=tk.DISABLED)
+		self.prev_dir_button.grid(row=0, column=3, padx=(0, 5))
+
+		self.clear_button = ttk.Button(path_buttons_frame, text="Clear", command=self.on_clear_data, width=5)
+		self.clear_button.grid(row=0, column=4)
 
 		# --- Editor Tabs ---
 		editor_tabs_frame = ttk.LabelFrame(self.left_frame, text="2. Define Scaffold Tree")
@@ -277,6 +291,7 @@ class ScaffoldApp:
 			self._clear_tree(self.after_tree)
 		else:
 			self.target_root_path.set(message) # message is the resolved path on success
+			self._save_last_root_path(message) # Save the successfully selected path
 			self.recompute_button.config(state=tk.NORMAL)
 			self._populate_before_tree(Path(message))
 			self._clear_tree(self.after_tree)
@@ -292,8 +307,8 @@ class ScaffoldApp:
 
 		root_path = Path(root_path_str)
 		
-		tree_input = self.tree_text.get("1.0", tk.END)
-		source_code_input = self.source_code_text.get("1.0", tk.END)
+		tree_input = self.tree_text.get("1.0", "end-1c")
+		source_code_input = self.source_code_text.get("1.0", "end-1c")
 		
 		# Combine the inputs as expected by scaffold_core.generate_plan
 		# The core logic expects the tree definition and then potentially content blocks
@@ -384,6 +399,12 @@ class ScaffoldApp:
 			msg += "Are you sure you want to proceed?"
 
 		if messagebox.askyesno(dialog_title, msg, icon=dialog_icon):
+			# Add an additional confirmation for overwrites if not in dry run
+			if not is_dry_run and num_overwrite_files > 0:
+				overwrite_msg = f"WARNING: {num_overwrite_files} existing file(s) will be OVERWRITTEN.\nThis action cannot be undone.\n\nAre you absolutely sure you want to proceed?"
+				if not messagebox.askyesno("Confirm Overwrite", overwrite_msg, icon=messagebox.WARNING):
+					return # User cancelled the overwrite confirmation
+				
 			self.notebook.select(1) # Switch to log tab
 			self.recompute_button.config(state=tk.DISABLED)
 			self.apply_button.config(state=tk.DISABLED)
@@ -485,6 +506,34 @@ class ScaffoldApp:
 			messagebox.showerror("Error Loading Data", f"An error occurred while loading test data: {e}")
 			self._log(f"Error loading test data: {e}", "error")
 
+	def on_clear_data(self):
+		"""Handles the 'Clear' button click to reset runtime data."""
+		self._log("Clearing all editor content and planned data...", "info")
+
+		# Reset configuration variables to defaults
+		self.dry_run.set(True)
+		self.enable_similarity_scan.set(True)
+		self.similarity_threshold.set(0.86)
+
+		# Clear text editors and reset to default template for tree_text
+		self.tree_text.delete("1.0", tk.END)
+		self.tree_text.insert("1.0", DEFAULT_TREE_TEMPLATE)
+		self.source_code_text.delete("1.0", tk.END)
+		self.content_text.delete("1.0", tk.END)
+
+		# Clear internal plan data
+		self.current_plan = None
+
+		# Clear Treeview widgets
+		self._clear_tree(self.before_tree)
+		self._clear_tree(self.after_tree)
+
+		# Disable action buttons
+		self.recompute_button.config(state=tk.DISABLED)
+		self.apply_button.config(state=tk.DISABLED)
+
+		self._log("Runtime data cleared.", "info")
+
 	# --- Helper Methods ---
 
 	def _load_window_geometry(self):
@@ -543,6 +592,69 @@ class ScaffoldApp:
 				json.dump(config, f, indent=4)
 		except Exception as e:
 			print(f"Error saving window geometry: {e}") # Print to console as GUI might be closing
+
+	def _load_last_root_path(self):
+		"""Loads the last selected root path from config.json and updates UI."""
+		config_path = Path.cwd() / CONFIG_FILE
+		self.last_root_path = None
+
+		if config_path.exists():
+			try:
+				with open(config_path, "r", encoding="utf-8") as f:
+					config = json.load(f)
+					if "last_root_path" in config:
+						path_str = config["last_root_path"]
+						if Path(path_str).is_dir(): # Only load if it's a valid directory
+							self.last_root_path = path_str
+			except Exception as e:
+				print(f"Error loading last root path from config: {e}")
+		
+		# Update button state based on whether a valid last path was loaded
+		if self.last_root_path:
+			self.prev_dir_button.config(state=tk.NORMAL)
+		else:
+			self.prev_dir_button.config(state=tk.DISABLED)
+
+	def _save_last_root_path(self, path: str):
+		"""Saves the given path as the last selected root path to config.json."""
+		config_path = Path.cwd() / CONFIG_FILE
+		try:
+			config = {}
+			if config_path.exists():
+				with open(config_path, "r", encoding="utf-8") as f:
+					config = json.load(f)
+			
+			config["last_root_path"] = path
+			
+			with open(config_path, "w", encoding="utf-8") as f:
+				json.dump(config, f, indent=4)
+			self.last_root_path = path # Update internal state
+			self.prev_dir_button.config(state=tk.NORMAL) # Enable button
+		except Exception as e:
+			print(f"Error saving last root path: {e}")
+
+	def on_previous_folder(self):
+		"""Handles the 'Prev' button click to use the last selected folder."""
+		if self.last_root_path and Path(self.last_root_path).is_dir():
+			# Validate the path first, similar to on_browse_folder
+			is_valid, message = self._validate_path(self.last_root_path)
+			if is_valid:
+				self.target_root_path.set(message)
+				self.recompute_button.config(state=tk.NORMAL)
+				self._populate_before_tree(Path(message))
+				self._clear_tree(self.after_tree)
+				self.apply_button.config(state=tk.DISABLED)
+			else:
+				messagebox.showerror("Invalid Folder", f"The previously saved folder is no longer valid: {message}")
+				self.last_root_path = None # Clear invalid path
+				self.prev_dir_button.config(state=tk.DISABLED)
+				self.target_root_path.set("No folder selected.")
+				self.recompute_button.config(state=tk.DISABLED)
+				self._clear_tree(self.before_tree)
+				self._clear_tree(self.after_tree)
+		else:
+			self.prev_dir_button.config(state=tk.DISABLED)
+			messagebox.showinfo("No Previous Folder", "No valid previous folder found.")
 
 	def _write_execution_log(self, stats: dict, is_dry_run: bool, captured_logs: list):
 		"""Writes a comprehensive execution log to a timestamped file."""
@@ -779,6 +891,45 @@ class ScaffoldApp:
 				# Open with "w" to create or overwrite.
 				# Use write_text for simplicity and correct encoding.
 				path.write_text(content or "", encoding='utf-8')
+				
+				# --- Hardcoded fix for the "2 newlines" bug (verbatim content post-processing) ---
+				# This section is specifically to address the user report that sometimes an extra newline
+				# appears in the final file output, even when the content written is identical.
+				# It is implemented to preserve the exact verbatim content from the parser,
+				# as requested by the user, while correcting for platform-specific implicit newline additions.
+				#
+				# DO NOT REMOVE. This is critical for the ".md 파일의 ### 블록 내용 처리 (Verbatim) 처리용"
+				# to ensure the final file on disk is perfectly identical to the parsed content,
+				# especially addressing the "\n 2줄 생기는 버그" (2 newlines appearing bug).
+				try:
+					# Read the file back in binary mode to accurately check line endings
+					written_binary_content = path.read_bytes()
+					# Convert original content to binary to compare line endings
+					original_binary_content = (content or "").encode('utf-8')
+
+					# Determine if an extra newline (LF or CRLF) was implicitly added
+					extra_newline_added = False
+					
+					if written_binary_content.endswith(b'\r\n') and not original_binary_content.endswith(b'\r\n'):
+						# File ends with CRLF, but original content did not.
+						# This means an extra CRLF was added.
+						extra_newline_added = True
+						truncate_bytes = 2 # For CRLF
+					elif written_binary_content.endswith(b'\n') and not original_binary_content.endswith(b'\n'):
+						# File ends with LF, but original content did not (and also not CRLF).
+						# This means an extra LF was added.
+						extra_newline_added = True
+						truncate_bytes = 1 # For LF
+					
+					if extra_newline_added:
+						# Truncate the file to remove the implicitly added newline
+						with open(path, 'wb') as f:
+							f.write(written_binary_content[:-truncate_bytes])
+						self._log(f"[FIX] Hardcoded: Removed implicit extra newline from {path}", "warn")
+
+				except Exception as fix_e:
+					self._log(f"[ERROR] Hardcoded newline fix failed for {path}: {fix_e}", "error")
+				# --- End hardcoded fix ---
 			except Exception as e:
 				self._log(f"[ERROR] write file failed: {path} | {e}", "error")
 				return False, False, False

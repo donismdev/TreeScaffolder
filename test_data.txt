@@ -1,9 +1,9 @@
-@@@FILE_BEGIN {{Root}}/MercenaryMode/MercenaryMode.Build.cs
+@@@FILE_BEGIN {{Root}}/FrontendUI/FrontendUI.Build.cs
 using UnrealBuildTool;
 
-public class MercenaryMode : ModuleRules
+public class FrontendUI : ModuleRules
 {
-	public MercenaryMode(ReadOnlyTargetRules Target) : base(Target)
+	public FrontendUI(ReadOnlyTargetRules Target) : base(Target)
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 
@@ -16,111 +16,110 @@ public class MercenaryMode : ModuleRules
 
 		PrivateDependencyModuleNames.AddRange(new string[]
 		{
-			"CDR",
-			"RegistryRuntime",
-			"GameplayCore",
+			"UMG",
+			"Slate",
+			"SlateCore",
 		});
 	}
 }
+
 @@@FILE_END
-@@@FILE_BEGIN {{Root}}/MercenaryMode/Public/MercenaryModeCore.h
+
+
+@@@FILE_BEGIN {{Root}}/FrontendUI/Public/UI/MainMenuWidget.h
 #pragma once
 
 #include "CoreMinimal.h"
-#include "UObject/Object.h"
-#include "MercenaryModeCore.generated.h"
+#include "Blueprint/UserWidget.h"
+#include "MainMenuWidget.generated.h"
+
+DECLARE_MULTICAST_DELEGATE_OneParam(FOnModeSelectedNative, FName);
+
+class UButton;
+class UVerticalBox;
 
 UCLASS()
-class UMercenaryModeCore final : public UObject
+class UMainMenuWidget final : public UUserWidget
 {
 	GENERATED_BODY()
 
 public:
-	UFUNCTION()
-	void Initialize();
+	FOnModeSelectedNative OnModeSelected;
 
-	UFUNCTION()
-	void Tick(const float DeltaSeconds);
-
-	UFUNCTION()
-	void Shutdown();
-};
-@@@FILE_END
-@@@FILE_BEGIN {{Root}}/MercenaryMode/Private/MercenaryModeCore.cpp
-#include "MercenaryModeCore.h"
-
-void UMercenaryModeCore::Initialize()
-{
-	// TODO: 보드만 있는 용병 룰 초기화
-}
-
-void UMercenaryModeCore::Tick(const float DeltaSeconds)
-{
-	(void)DeltaSeconds;
-}
-
-void UMercenaryModeCore::Shutdown()
-{
-}
-@@@FILE_END
-@@@FILE_BEGIN {{Root}}/MercenaryMode/Public/Presentation/MercenaryPresentation.h
-#pragma once
-
-#include "CoreMinimal.h"
-#include "Presentation/IPuzzlePresentation.h"
-
-class FMercenaryPresentation final : public IPuzzlePresentation
-{
-public:
-	virtual EPuzzlePresentationType GetType() const override;
-	virtual void Initialize(UWorld* WorldPtr) override;
-	virtual void Tick(const float DeltaSeconds) override;
-	virtual void Shutdown() override;
+protected:
+	virtual void NativeConstruct() override;
 
 private:
-	TWeakObjectPtr<UWorld> CachedWorld;
-};
-@@@FILE_END
-@@@FILE_BEGIN {{Root}}/MercenaryMode/Private/Presentation/MercenaryPresentation.cpp
-#include "Presentation/MercenaryPresentation.h"
+	UPROPERTY()
+	TObjectPtr<UVerticalBox> RootBox;
 
-EPuzzlePresentationType FMercenaryPresentation::GetType() const
-{
-	return EPuzzlePresentationType::Mercenary;
-}
+	UPROPERTY()
+	TObjectPtr<UButton> MercenaryButton;
 
-void FMercenaryPresentation::Initialize(UWorld* WorldPtr)
-{
-	CachedWorld = WorldPtr;
-
-	// TODO: 용병 레이아웃(보드만 강조), 카메라, 스폰 최소화
-}
-
-void FMercenaryPresentation::Tick(const float DeltaSeconds)
-{
-	(void)DeltaSeconds;
-}
-
-void FMercenaryPresentation::Shutdown()
-{
-	CachedWorld = nullptr;
-}
-@@@FILE_END
-@@@FILE_BEGIN {{Root}}/MercenaryMode/Private/MercenaryModeModule.cpp
-#include "Modules/ModuleManager.h"
-
-class FMercenaryModeModule final : public IModuleInterface
-{
+private:
+	UFUNCTION()
+	void HandleMercenaryClicked();
 };
 
-IMPLEMENT_MODULE(FMercenaryModeModule, MercenaryMode);
 @@@FILE_END
-@@@FILE_BEGIN {{Root}}/ScoreMode/ScoreMode.Build.cs
+
+
+@@@FILE_BEGIN {{Root}}/FrontendUI/Private/UI/MainMenuWidget.cpp
+#include "UI/MainMenuWidget.h"
+
+#include "Blueprint/WidgetTree.h"
+#include "Components/Button.h"
+#include "Components/TextBlock.h"
+#include "Components/VerticalBox.h"
+
+void UMainMenuWidget::NativeConstruct()
+{
+	Super::NativeConstruct();
+
+	if (WidgetTree == nullptr)
+	{
+		return;
+	}
+
+	RootBox = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
+	if (RootBox == nullptr)
+	{
+		return;
+	}
+
+	MercenaryButton = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass());
+	if (MercenaryButton == nullptr)
+	{
+		return;
+	}
+
+	UTextBlock* ButtonTextPtr = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+	if (ButtonTextPtr != nullptr)
+	{
+		ButtonTextPtr->SetText(FText::FromString(TEXT("Mercenary")));
+		MercenaryButton->AddChild(ButtonTextPtr);
+	}
+
+	RootBox->AddChild(MercenaryButton);
+	MercenaryButton->OnClicked.AddDynamic(this, &UMainMenuWidget::HandleMercenaryClicked);
+
+	WidgetTree->RootWidget = RootBox;
+}
+
+void UMainMenuWidget::HandleMercenaryClicked()
+{
+	OnModeSelected.Broadcast(FName(TEXT("Mercenary")));
+}
+
+@@@FILE_END
+
+
+@@@FILE_BEGIN {{Root}}/FrontendEntry/FrontendEntry.Build.cs
 using UnrealBuildTool;
 
-public class ScoreMode : ModuleRules
+public class FrontendEntry : ModuleRules
 {
-	public ScoreMode(ReadOnlyTargetRules Target) : base(Target)
+	public FrontendEntry(ReadOnlyTargetRules Target) : base(Target)
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 
@@ -133,271 +132,191 @@ public class ScoreMode : ModuleRules
 
 		PrivateDependencyModuleNames.AddRange(new string[]
 		{
-			"CDR",
-			"RegistryRuntime",
+			"FrontendUI",
 			"GameplayCore",
+			"CDR",
+
+			"UMG",
+			"Slate",
+			"SlateCore",
 		});
 	}
 }
+
 @@@FILE_END
-@@@FILE_BEGIN {{Root}}/ScoreMode/Public/ScoreModeCore.h
+
+
+@@@FILE_BEGIN {{Root}}/FrontendEntry/Public/Bootstrap/FrontendEntryGameMode.h
 #pragma once
 
 #include "CoreMinimal.h"
-#include "UObject/Object.h"
-#include "ScoreModeCore.generated.h"
+#include "GameFramework/GameModeBase.h"
+#include "FrontendEntryGameMode.generated.h"
+
+class UMainMenuWidget;
 
 UCLASS()
-class UScoreModeCore final : public UObject
+class AFrontendEntryGameMode final : public AGameModeBase
 {
 	GENERATED_BODY()
 
 public:
-	UFUNCTION()
-	void Initialize();
+	AFrontendEntryGameMode();
 
-	UFUNCTION()
-	void Tick(const float DeltaSeconds);
-
-	UFUNCTION()
-	void Shutdown();
-};
-@@@FILE_END
-@@@FILE_BEGIN {{Root}}/ScoreMode/Private/ScoreModeCore.cpp
-#include "ScoreModeCore.h"
-
-void UScoreModeCore::Initialize()
-{
-	// TODO: 스코어 모드 운영(오늘의 퍼즐/달력 퍼즐 선택 등)
-	// 룰 자체는 GameplayCore/Rules 쪽으로 위임
-}
-
-void UScoreModeCore::Tick(const float DeltaSeconds)
-{
-	(void)DeltaSeconds;
-}
-
-void UScoreModeCore::Shutdown()
-{
-}
-@@@FILE_END
-@@@FILE_BEGIN {{Root}}/ScoreMode/Public/Presentation/ScorePresentation.h
-#pragma once
-
-#include "CoreMinimal.h"
-#include "Presentation/IPuzzlePresentation.h"
-
-class FScorePresentation final : public IPuzzlePresentation
-{
-public:
-	virtual EPuzzlePresentationType GetType() const override;
-	virtual void Initialize(UWorld* WorldPtr) override;
-	virtual void Tick(const float DeltaSeconds) override;
-	virtual void Shutdown() override;
+	virtual void BeginPlay() override;
 
 private:
-	TWeakObjectPtr<UWorld> CachedWorld;
-};
-@@@FILE_END
-@@@FILE_BEGIN {{Root}}/ScoreMode/Private/Presentation/ScorePresentation.cpp
-#include "Presentation/ScorePresentation.h"
+	UPROPERTY()
+	TObjectPtr<UMainMenuWidget> MainMenuWidget;
 
-EPuzzlePresentationType FScorePresentation::GetType() const
-{
-	return EPuzzlePresentationType::Score;
-}
+private:
+	void HandleModeSelected(const FName SelectedModeIdValue);
 
-void FScorePresentation::Initialize(UWorld* WorldPtr)
-{
-	CachedWorld = WorldPtr;
-
-	// TODO: 스코어 레이아웃(스코어 UI/카메라/연출)
-}
-
-void FScorePresentation::Tick(const float DeltaSeconds)
-{
-	(void)DeltaSeconds;
-}
-
-void FScorePresentation::Shutdown()
-{
-	CachedWorld = nullptr;
-}
-@@@FILE_END
-@@@FILE_BEGIN {{Root}}/ScoreMode/Private/ScoreModeModule.cpp
-#include "Modules/ModuleManager.h"
-
-class FScoreModeModule final : public IModuleInterface
-{
+private:
+	static bool TryBuildStartContextFromModeId(const FName SelectedModeIdValue, struct FCDRStartContext& OutContextValue);
 };
 
-IMPLEMENT_MODULE(FScoreModeModule, ScoreMode);
 @@@FILE_END
-@@@FILE_BEGIN {{Root}}/PartyMode/PartyMode.Build.cs
-using UnrealBuildTool;
 
-public class PartyMode : ModuleRules
+
+@@@FILE_BEGIN {{Root}}/FrontendEntry/Private/Bootstrap/FrontendEntryGameMode.cpp
+#include "Bootstrap/FrontendEntryGameMode.h"
+
+#include "Bootstrap/FrontendEntryPlayerController.h"
+
+#include "UI/MainMenuWidget.h"
+
+#include "CDRGameInstance.h"
+#include "Flow/CDRStartContext.h"
+#include "Presentation/IPuzzlePresentation.h"
+
+#include "Engine/World.h"
+#include "GameFramework/PlayerController.h"
+
+AFrontendEntryGameMode::AFrontendEntryGameMode()
 {
-	public PartyMode(ReadOnlyTargetRules Target) : base(Target)
+	PlayerControllerClass = AFrontendEntryPlayerController::StaticClass();
+}
+
+void AFrontendEntryGameMode::BeginPlay()
+{
+	Super::BeginPlay();
+
+	UWorld* WorldPtr = GetWorld();
+	if (WorldPtr == nullptr)
 	{
-		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
+		return;
+	}
 
-		PublicDependencyModuleNames.AddRange(new string[]
-		{
-			"Core",
-			"CoreUObject",
-			"Engine",
-		});
+	APlayerController* PlayerControllerPtr = WorldPtr->GetFirstPlayerController();
+	if (PlayerControllerPtr == nullptr)
+	{
+		return;
+	}
 
-		PrivateDependencyModuleNames.AddRange(new string[]
-		{
-			"CDR",
-			"RegistryRuntime",
-			"GameplayCore",
-		});
+	MainMenuWidget = CreateWidget<UMainMenuWidget>(PlayerControllerPtr, UMainMenuWidget::StaticClass());
+	if (MainMenuWidget == nullptr)
+	{
+		return;
+	}
+
+	MainMenuWidget->OnModeSelected.AddUObject(this, &AFrontendEntryGameMode::HandleModeSelected);
+	MainMenuWidget->AddToViewport(0);
+
+	PlayerControllerPtr->SetInputMode(FInputModeUIOnly());
+	PlayerControllerPtr->bShowMouseCursor = true;
+}
+
+void AFrontendEntryGameMode::HandleModeSelected(const FName SelectedModeIdValue)
+{
+	UWorld* WorldPtr = GetWorld();
+	if (WorldPtr == nullptr)
+	{
+		return;
+	}
+
+	UCDRGameInstance* GameInstancePtr = Cast<UCDRGameInstance>(WorldPtr->GetGameInstance());
+	if (GameInstancePtr == nullptr)
+	{
+		return;
+	}
+
+	FCDRStartContext ContextValue;
+	if (TryBuildStartContextFromModeId(SelectedModeIdValue, ContextValue) == false)
+	{
+		return;
+	}
+
+	const bool bRequested = GameInstancePtr->RequestStartGame(ContextValue);
+	if (bRequested == false)
+	{
+		return;
 	}
 }
+
+bool AFrontendEntryGameMode::TryBuildStartContextFromModeId(const FName SelectedModeIdValue, FCDRStartContext& OutContextValue)
+{
+	OutContextValue.Reset();
+
+	if (SelectedModeIdValue == FName(TEXT("Mercenary")))
+	{
+		OutContextValue.PresentationType = EPuzzlePresentationType::Mercenary;
+		OutContextValue.Seed = 0;
+		return true;
+	}
+
+	return false;
+}
+
 @@@FILE_END
-@@@FILE_BEGIN {{Root}}/PartyMode/Public/PartyModeCore.h
+
+
+@@@FILE_BEGIN {{Root}}/FrontendEntry/Public/Bootstrap/FrontendEntryPlayerController.h
 #pragma once
 
 #include "CoreMinimal.h"
-#include "UObject/Object.h"
-#include "PartyModeCore.generated.h"
+#include "GameFramework/PlayerController.h"
+#include "FrontendEntryPlayerController.generated.h"
 
 UCLASS()
-class UPartyModeCore final : public UObject
+class AFrontendEntryPlayerController final : public APlayerController
 {
 	GENERATED_BODY()
 
 public:
-	UFUNCTION()
-	void Initialize();
-
-	UFUNCTION()
-	void Tick(const float DeltaSeconds);
-
-	UFUNCTION()
-	void Shutdown();
+	AFrontendEntryPlayerController();
 };
+
 @@@FILE_END
-@@@FILE_BEGIN {{Root}}/PartyMode/Private/PartyModeCore.cpp
-#include "PartyModeCore.h"
 
-void UPartyModeCore::Initialize()
+
+@@@FILE_BEGIN {{Root}}/FrontendEntry/Private/Bootstrap/FrontendEntryPlayerController.cpp
+#include "Bootstrap/FrontendEntryPlayerController.h"
+
+AFrontendEntryPlayerController::AFrontendEntryPlayerController()
 {
-	// TODO: 파티 기반 룰(파티 구성/스킬/패시브 적용 등)
+	bShowMouseCursor = true;
 }
 
-void UPartyModeCore::Tick(const float DeltaSeconds)
-{
-	(void)DeltaSeconds;
-}
-
-void UPartyModeCore::Shutdown()
-{
-}
 @@@FILE_END
-@@@FILE_BEGIN {{Root}}/PartyMode/Public/Presentation/PartyPresentation.h
-#pragma once
 
-#include "CoreMinimal.h"
-#include "Presentation/IPuzzlePresentation.h"
 
-class FPartyPresentation final : public IPuzzlePresentation
-{
-public:
-	virtual EPuzzlePresentationType GetType() const override;
-	virtual void Initialize(UWorld* WorldPtr) override;
-	virtual void Tick(const float DeltaSeconds) override;
-	virtual void Shutdown() override;
-
-private:
-	TWeakObjectPtr<UWorld> CachedWorld;
-};
-@@@FILE_END
-@@@FILE_BEGIN {{Root}}/PartyMode/Private/Presentation/PartyPresentation.cpp
-#include "Presentation/PartyPresentation.h"
-
-EPuzzlePresentationType FPartyPresentation::GetType() const
-{
-	return EPuzzlePresentationType::Party;
-}
-
-void FPartyPresentation::Initialize(UWorld* WorldPtr)
-{
-	CachedWorld = WorldPtr;
-
-	// TODO: 파티 레이아웃(무대/캐릭터/보드 배치/카메라/연출)
-}
-
-void FPartyPresentation::Tick(const float DeltaSeconds)
-{
-	(void)DeltaSeconds;
-}
-
-void FPartyPresentation::Shutdown()
-{
-	CachedWorld = nullptr;
-}
-@@@FILE_END
-@@@FILE_BEGIN {{Root}}/PartyMode/Private/PartyModeModule.cpp
+@@@FILE_BEGIN {{Root}}/FrontendEntry/Private/FrontendEntryModule.cpp
 #include "Modules/ModuleManager.h"
 
-class FPartyModeModule final : public IModuleInterface
-{
-};
-
-IMPLEMENT_MODULE(FPartyModeModule, PartyMode);
-@@@FILE_END
-@@@FILE_BEGIN {{Root}}/GameplayCore/Public/Presentation/IPuzzlePresentation.h
-#pragma once
-
-#include "CoreMinimal.h"
-
-enum class EPuzzlePresentationType : uint8
-{
-	Mercenary = 0,
-	Party,
-	Score,
-};
-
-class IPuzzlePresentation
+class FFrontendEntryModule final : public IModuleInterface
 {
 public:
-	virtual ~IPuzzlePresentation() = default;
+	virtual void StartupModule() override
+	{
+	}
 
-	virtual EPuzzlePresentationType GetType() const = 0;
-	virtual void Initialize(UWorld* WorldPtr) = 0;
-	virtual void Tick(const float DeltaSeconds) = 0;
-	virtual void Shutdown() = 0;
+	virtual void ShutdownModule() override
+	{
+	}
 };
+
+IMPLEMENT_MODULE(FFrontendEntryModule, FrontendEntry)
+
 @@@FILE_END
-@@@FILE_BEGIN {{Root}}/GameplayCore/Public/Rules/Calendar/CalendarPuzzleRules.h
-#pragma once
 
-#include "CoreMinimal.h"
-
-class FCalendarPuzzleRules final
-{
-public:
-	void Reset();
-	bool Validate() const;
-
-private:
-	int32 DummyValue = 0;
-};
-@@@FILE_END
-@@@FILE_BEGIN {{Root}}/GameplayCore/Private/Rules/Calendar/CalendarPuzzleRules.cpp
-#include "Rules/Calendar/CalendarPuzzleRules.h"
-
-void FCalendarPuzzleRules::Reset()
-{
-	DummyValue = 0;
-}
-
-bool FCalendarPuzzleRules::Validate() const
-{
-	return true;
-}
-@@@FILE_END

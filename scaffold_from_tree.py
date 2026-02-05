@@ -120,27 +120,28 @@ def _ensure_dir(path: Path) -> Tuple[bool, bool, bool]:
 			return False, False, False
 	return True, True, False
 
-def _ensure_file(path: Path) -> Tuple[bool, bool, bool]:
+def _ensure_file(path: Path, content: str = "") -> Tuple[bool, bool, bool]:
 	"""Returns: (ok, created, skipped)"""
 	if path.exists():
 		if path.is_file():
-			print(_dim(f"[SKIP FILE] {path}"))
-			return True, False, True
-		print(_red(f"[ERROR] Path exists but is a directory: {path}"))
-		return False, False, False
+			print(f"[OVERWRITE] {path}") # Changed from SKIP FILE
+			if not DRY_RUN:
+				try:
+					path.unlink() # Delete existing file
+				except Exception as e:
+					print(_red(f"[ERROR] delete file failed: {path} | {e}"))
+					return False, False, False
+		else: # Path exists but is a directory
+			print(_red(f"[ERROR] Path exists but is a directory: {path}"))
+			return False, False, False
 
 	print(f"[CREATE]    {path}")
 	if not DRY_RUN:
 		try:
 			# Ensure parent directory exists
 			path.parent.mkdir(parents=True, exist_ok=True)
-			# Exclusive create "xb" to prevent overwrites
-			with path.open("xb"):
-				pass
-		except FileExistsError:
-			# This can happen in a race condition. The file is there, so we skip.
-			print(_dim(f"[SKIP FILE] {path} (already exists)"))
-			return True, False, True
+			with path.open("w", encoding="utf-8") as f: # Changed to "w" for writing content
+				f.write(content)
 		except Exception as e:
 			print(_red(f"[ERROR] create file failed: {path} | {e}"))
 			return False, False, False
@@ -202,8 +203,10 @@ def main():
 
 	# Create files
 	for path in plan.planned_files:
-		if plan.path_states.get(path) == "new":
-			ok, created, skipped = _ensure_file(path)
+		file_content = plan.file_contents.get(path.resolve(), "") # Get content, default to empty string
+		# If the file exists and is in file_contents, we're overwriting (or creating if deleted)
+		if plan.path_states.get(path) == "new" or plan.path_states.get(path) == "overwrite":
+			ok, created, skipped = _ensure_file(path, file_content)
 			if ok:
 				if created: created_files += 1
 				if skipped: skipped_files += 1
@@ -211,6 +214,7 @@ def main():
 				error_files += 1
 				final_ok = False
 		elif plan.path_states.get(path) == "exists":
+			# This case means the file existed but was NOT part of V2 content, so we skip it.
 			skipped_files += 1
 
 	# 3. Print final summary and warnings
