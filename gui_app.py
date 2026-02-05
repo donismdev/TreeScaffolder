@@ -339,6 +339,12 @@ class ScaffoldApp:
 			self._log(f"- Planned new files: {num_new_files}", "info")
 			self._log(f"- Planned overwritten files: {num_overwrite_files}", "info")
 
+		# Log migration warnings if any
+		if self.current_plan.migration_warnings:
+			self._log("Content migration warnings:", "warn")
+			for warn in self.current_plan.migration_warnings:
+				self._log(f"- {warn}", "warn")
+
 		# --- UI Updates ---
 		self._populate_before_tree(root_path)
 		self._populate_after_tree(self.current_plan)

@@ -54,6 +54,7 @@ class Plan:
 	# Warnings
 	duplicate_warnings: Dict[Path, List[Path]] = field(default_factory=dict)
 	similarity_warnings: Dict[Path, List[Tuple[str, float, List[Path]]]] = field(default_factory=dict)
+	migration_warnings: List[str] = field(default_factory=list) # New field for migration messages
 	
 	# Errors
 	errors: List[str] = field(default_factory=list)
@@ -237,6 +238,62 @@ def generate_plan(root_path: Path, text_input: str, config: dict) -> Plan:
 					plan.planned_dirs.add(parent)
 	except V2ParserError as e:
 		plan.errors.append(f"V2 Patch Error: {e}")
+
+	# --- Smart Merge Logic for Mismatched Paths ---
+	# This section attempts to reconcile files planned by the tree structure
+	# with content provided by V2 patches at a different but similarly named path.
+	
+	# Store a temporary set of planned files from tree for easier lookup of original tree paths
+	# This is essentially plan.planned_files before any V2-specific additions to planned_files,
+	# but since plan.planned_files is a set and order is not guaranteed, we just track the
+	# paths from the tree parsing phase.
+	tree_only_planned_files = set(plan.planned_files) # Take a snapshot after tree parsing
+
+	# Copy file_contents items to avoid modifying while iterating
+	# Create a dictionary to hold content that needs to be moved
+	content_to_move: Dict[Path, str] = {}
+	paths_to_remove_from_file_contents: Set[Path] = set()
+	paths_to_remove_from_planned_files: Set[Path] = set()
+	
+	# Iterate over content entries from V2 parser
+	for data_path_resolved, content in plan.file_contents.items():
+		found_merge_target = False
+		# Check against files identified SOLELY by the tree parser
+		for tree_path in tree_only_planned_files:
+			# Ensure it's a file (not a directory) and that the names match but paths differ
+			if tree_path.name == data_path_resolved.name and \
+			   tree_path.resolve() != data_path_resolved:
+				
+				# If the tree_path doesn't already have content assigned directly from V2 patches
+				if tree_path.resolve() not in plan.file_contents or plan.file_contents[tree_path.resolve()] == "":
+					content_to_move[tree_path.resolve()] = content
+					paths_to_remove_from_file_contents.add(data_path_resolved)
+					
+					# Remove the original data_path from planned_files if it was implicitly added by V2 parser
+					# This prevents creating two files (one empty, one with content)
+					if data_path_resolved in plan.planned_files:
+						paths_to_remove_from_planned_files.add(data_path_resolved)
+					
+					plan.migration_warnings.append(f"Content for '{data_path_resolved.name}' at '{data_path_resolved.relative_to(root_path)}' migrated to '{tree_path.relative_to(root_path)}' due to tree structure precedence.")
+					found_merge_target = True
+					break # Move to the next content file
+
+		# If data_path_resolved could not be merged, ensure it is still part of the plan
+		# (this handles V2 files that have no matching tree-planned counterpart)
+		if not found_merge_target:
+			plan.planned_files.add(data_path_resolved) # Add it back in case it was temporary
+		
+	# Apply the moves
+	for old_path_resolved in paths_to_remove_from_file_contents:
+		if old_path_resolved in plan.file_contents:
+			del plan.file_contents[old_path_resolved]
+	
+	for new_path_resolved, content in content_to_move.items():
+		plan.file_contents[new_path_resolved] = content
+		
+	for removed_path in paths_to_remove_from_planned_files:
+		if removed_path in plan.planned_files:
+			plan.planned_files.remove(removed_path)
 
 	if not plan.planned_dirs and not plan.planned_files:
 		if not plan.errors:
