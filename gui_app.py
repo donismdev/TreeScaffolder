@@ -17,7 +17,6 @@ from tkinter import ttk, filedialog, messagebox, font
 import scaffold_core
 import re
 from file_classifier import FileTypeClassifier
-import v2_parser
 from v2_parser import V2ParserError
 
 # --- Constants ---
@@ -35,7 +34,6 @@ DEFAULT_TREE_TEMPLATE = """# ===================================================
 
 {{Root}}/
 """
-# No longer needed
 
 class ScaffoldApp:
 	"""The main application class for the Tree Scaffolder GUI."""
@@ -148,9 +146,6 @@ class ScaffoldApp:
 		tree_xscroller.grid(row=1, column=0, sticky="ew")
 		
 		self.tree_text.insert("1.0", DEFAULT_TREE_TEMPLATE)
-		
-		# Load example button
-# Load Example button removed
 
 		# --- Source Code Tab ---
 		source_code_frame = ttk.Frame(self.editor_notebook)
@@ -263,8 +258,6 @@ class ScaffoldApp:
 		
 	# --- Event Handlers ---
 
-# on_load_example method removed
-
 	def on_browse_folder(self):
 		"""Handles the 'Browse...' button click to select and validate a folder."""
 		path = filedialog.askdirectory(mustexist=True, title="Select a Target Root Folder")
@@ -298,7 +291,18 @@ class ScaffoldApp:
 		
 		# Get text from the currently active editor tab
 		active_tab_widget = self.root.nametowidget(self.editor_notebook.select())
-		text_widget = active_tab_widget.winfo_children()[0] # Relies on the Text widget being the first child
+		
+		# Find the text widget more robustly
+		text_widget = None
+		for child in active_tab_widget.winfo_children():
+			if isinstance(child, tk.Text):
+				text_widget = child
+				break
+		
+		if text_widget is None:
+			messagebox.showerror("Error", "Could not find a text editor in the active tab.")
+			return
+		
 		text_input = text_widget.get("1.0", tk.END)
 
 		if not text_input.strip():
@@ -370,7 +374,7 @@ class ScaffoldApp:
 		if is_dry_run:
 			msg = "This is a DRY RUN. No files will be written.\n\n"
 			msg += f"Action Summary:\n- Create: {num_dirs} directories, {num_new_files} files\n- Overwrite: {num_overwrite_files} files\n\n"
-			msg += "Proceed with logging the simulation? (드라이런이 켜져있습니다)"
+			msg += "Proceed with logging the simulation?"
 			dialog_icon = messagebox.WARNING # Red exclamation mark
 			dialog_title = "Confirm Apply (DRY RUN)"
 		else:
@@ -748,6 +752,7 @@ class ScaffoldApp:
 
 	def _validate_path(self, path: str) -> tuple[bool, str]:
 		"""Calls the external validator script and returns (is_valid, message)."""
+		process = None
 		try:
 			# Ensure python executable is the same one running this script
 			python_exe = sys.executable
@@ -786,8 +791,9 @@ class ScaffoldApp:
 			return False, f"Validator script failed: {e.stderr}"
 		except FileNotFoundError:
 			return False, "Python executable or validator script not found."
-		except json.JSONDecodeError:
-			return False, f"Could not parse response from validator script: {process.stdout}"
+		except json.JSONDecodeError as e:
+			stdout_str = process.stdout if (process and process.stdout) else "(no output)"
+			return False, f"Could not parse response from validator script. Output: {stdout_str}. Error: {str(e)}"
 		except Exception as e:
 			return False, f"An unexpected error occurred during validation: {e}"
 
@@ -865,6 +871,7 @@ class ScaffoldApp:
 				if p.is_dir():
 					all_dirs.add(p)
 		except Exception:
+			# Ignore errors from inaccessible directories
 			pass
 		for p in plan.planned_dirs:
 			all_dirs.add(p)
@@ -905,6 +912,7 @@ class ScaffoldApp:
 				if p.is_file():
 					all_files.add(p)
 		except Exception:
+			# Ignore errors from inaccessible files
 			pass
 		all_files.update(plan.planned_files)
 		
@@ -936,7 +944,7 @@ def main():
 	"""Main entry point for the GUI application."""
 	try:
 		root = tk.Tk()
-		app = ScaffoldApp(root)
+		ScaffoldApp(root)
 		root.mainloop()
 	except Exception as e:
 		messagebox.showerror("Fatal Error", f"An unhandled exception occurred: {e}")

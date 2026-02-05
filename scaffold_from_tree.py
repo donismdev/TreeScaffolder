@@ -11,10 +11,8 @@ It is designed to be run directly and has no external dependencies.
 """
 from __future__ import annotations
 
-import os
 import sys
 from pathlib import Path
-from typing import List, Tuple
 
 # Import the shared logic
 import scaffold_core
@@ -45,7 +43,7 @@ TREE_TEXT = r"""
 			NewModule.h
 		Private/
 			NewModule.cpp
-""".strip("")
+""".strip()
 
 # --- Script Settings ---
 
