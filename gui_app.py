@@ -14,10 +14,10 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, font
 
-import scaffold_core
+from Scripts.Core import scaffold_core
 import re
-from file_classifier import FileTypeClassifier
-from v2_parser import V2ParserError
+from Scripts.Utils import file_classifier
+from Scripts.Core.v2_parser import V2ParserError
 
 # --- Constants ---
 APP_TITLE = "Tree Scaffolder v1.1"
@@ -59,7 +59,7 @@ class ScaffoldApp:
 		
 		# To be filled by the analysis
 		self.current_plan: scaffold_core.Plan | None = None
-		self.classifier = FileTypeClassifier()
+		self.classifier = file_classifier.FileTypeClassifier()
 		self.tree_text = None # Initialized in setup_left_panel
 		self.source_code_text = None # Initialized in setup_left_panel
 		self.content_text = None # Initialized in setup_left_panel
@@ -991,7 +991,7 @@ class ScaffoldApp:
 			if sys.platform == 'win32' and python_exe.endswith('python.exe'):
 				python_exe = python_exe.replace("python.exe", "pythonw.exe")
 			
-			validator_script = Path(__file__).parent / "folder_selection_validator.py"
+			validator_script = Path(__file__).parent / "Scripts" / "Utils" / "folder_selection_validator.py"
 			
 			if not validator_script.exists():
 				return False, "folder_selection_validator.py not found in the script directory."

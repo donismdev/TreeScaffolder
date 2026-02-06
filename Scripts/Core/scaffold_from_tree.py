@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 
 # Import the shared logic
-import scaffold_core
+from . import scaffold_core
 
 # ==============================================================================
 # CONFIGURATION

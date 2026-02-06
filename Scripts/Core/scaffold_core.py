@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Dict, Tuple, Set, Optional
 
-from v2_parser import parse_v2_format, V2ParserError
+from .v2_parser import parse_v2_format, V2ParserError
 
 # ---------- Data Structures ----------
 
