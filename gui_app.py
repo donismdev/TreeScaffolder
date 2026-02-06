@@ -91,28 +91,34 @@ class ScaffoldApp:
         self.setup_right_panel()
 
         # Configure Treeview tags AFTER widgets are created
-        self.style.configure('new.Treeview', foreground='green')
-        self.style.configure('conflict.Treeview', foreground='red')
-        self.style.configure('warning.Treeview', foreground='#E59400')
-        self.before_tree.tag_configure('new', foreground='green')
-        self.after_tree.tag_configure('new', foreground='green')
-        self.after_tree.tag_configure('conflict', foreground='red', font=font.Font(weight='bold'))
-        self.after_tree.tag_configure('warning', foreground='#E59400')
-        self.after_tree.tag_configure('modified_parent', foreground='#DAA520')
-        self.after_tree.tag_configure('overwrite', foreground='#0078D7', font=font.Font(weight='bold'))
-        self.after_list.tag_configure('new', foreground='green')
-        self.after_list.tag_configure('conflict', foreground='red', font=font.Font(weight='bold'))
-        self.after_list.tag_configure('warning', foreground='#E59400')
-        self.after_list.tag_configure('modified_parent', foreground='#DAA520')
-        self.after_list.tag_configure('overwrite', foreground='#0078D7', font=font.Font(weight='bold'))
+        self.style.configure('new.Treeview', foreground='green', font=self.treeview_item_font)
+        self.style.configure('conflict.Treeview', foreground='red', font=self.treeview_item_font)
+        self.style.configure('warning.Treeview', foreground='#E59400', font=self.treeview_item_font)
+        self.before_tree.tag_configure('new', foreground='green', font=self.treeview_item_font)
+        self.after_tree.tag_configure('new', foreground='green', font=self.treeview_item_font)
+        self.after_tree.tag_configure('conflict', foreground='red', font=self.treeview_item_font)
+        self.after_tree.tag_configure('warning', foreground='#E59400', font=self.treeview_item_font)
+        self.after_tree.tag_configure('modified_parent', foreground='#DAA520', font=self.treeview_item_font)
+        self.after_tree.tag_configure('overwrite', foreground='#0078D7', font=self.treeview_item_font)
+        self.after_list.tag_configure('new', foreground='green', font=self.treeview_item_font)
+        self.after_list.tag_configure('conflict', foreground='red', font=self.treeview_item_font)
+        self.after_list.tag_configure('warning', foreground='#E59400', font=self.treeview_item_font)
+        self.after_list.tag_configure('modified_parent', foreground='#DAA520', font=self.treeview_item_font)
+        self.after_list.tag_configure('overwrite', foreground='#0078D7', font=self.treeview_item_font)
 
         self.root.bind("<Destroy>", lambda event: self._save_window_geometry())
         app_utils.load_last_root_path(self)
         print("DEBUG: ScaffoldApp.__init__ completed") # Debug print
 
     def setup_styles(self):
-        self.style.map("Treeview", background=[('selected', '#0078D7')])
+        # Custom Fonts
         self.editor_font = font.Font(family="Consolas", size=10)
+        self.app_button_font = font.Font(family="Segoe UI", size=9)
+        self.treeview_item_font = font.Font(family="Segoe UI", size=11)
+
+        # Style Configuration
+        self.style.map("Treeview", background=[('selected', '#0078D7')])
+        self.style.configure('TButton', font=self.app_button_font)
 
     def setup_left_panel(self):
         print("DEBUG: Calling create_left_panel") # Debug print
