@@ -63,6 +63,8 @@ class ScaffoldApp:
 		self.tree_text = None # Initialized in setup_left_panel
 		self.source_code_text = None # Initialized in setup_left_panel
 		self.content_text = None # Initialized in setup_left_panel
+		self.before_list = None
+		self.after_list = None
 
 		# --- Main Layout ---
 		self.main_paned_window = ttk.PanedWindow(self.root, orient=tk.HORIZONTAL)
@@ -234,21 +236,53 @@ class ScaffoldApp:
 		diff_paned = ttk.PanedWindow(diff_frame, orient=tk.HORIZONTAL)
 		diff_paned.grid(row=0, column=0, sticky="nsew")
 
-		before_frame = ttk.LabelFrame(diff_paned, text="Before (Current State)")
-		before_frame.rowconfigure(0, weight=1)
-		before_frame.columnconfigure(0, weight=1)
-		self.before_tree = self.create_treeview(before_frame)
-		diff_paned.add(before_frame, weight=1)
+		# --- Before Pane ---
+		before_pane_frame = ttk.LabelFrame(diff_paned, text="Before (Current State)")
+		before_pane_frame.rowconfigure(0, weight=1)
+		before_pane_frame.columnconfigure(0, weight=1)
+		diff_paned.add(before_pane_frame, weight=1)
+
+		before_notebook = ttk.Notebook(before_pane_frame)
+		before_notebook.grid(row=0, column=0, sticky="nsew", padx=2, pady=2)
 		
-		after_frame = ttk.LabelFrame(diff_paned, text="After (Planned State)")
-		after_frame.rowconfigure(0, weight=1)
-		after_frame.columnconfigure(0, weight=1)
-		self.after_tree = self.create_treeview(after_frame)
-		diff_paned.add(after_frame, weight=1)
+		before_tree_frame = ttk.Frame(before_notebook)
+		before_tree_frame.rowconfigure(0, weight=1)
+		before_tree_frame.columnconfigure(0, weight=1)
+		self.before_tree = self.create_treeview(before_tree_frame, show="tree")
+		before_notebook.add(before_tree_frame, text="Tree")
+		
+		before_list_frame = ttk.Frame(before_notebook)
+		before_list_frame.rowconfigure(0, weight=1)
+		before_list_frame.columnconfigure(0, weight=1)
+		self.before_list = self.create_treeview(before_list_frame, show="tree") # Keep 'tree' for icons
+		before_notebook.add(before_list_frame, text="List")
+
+		# --- After Pane ---
+		after_pane_frame = ttk.LabelFrame(diff_paned, text="After (Planned State)")
+		after_pane_frame.rowconfigure(0, weight=1)
+		after_pane_frame.columnconfigure(0, weight=1)
+		diff_paned.add(after_pane_frame, weight=1)
+		
+		after_notebook = ttk.Notebook(after_pane_frame)
+		after_notebook.grid(row=0, column=0, sticky="nsew", padx=2, pady=2)
+
+		after_tree_frame = ttk.Frame(after_notebook)
+		after_tree_frame.rowconfigure(0, weight=1)
+		after_tree_frame.columnconfigure(0, weight=1)
+		self.after_tree = self.create_treeview(after_tree_frame, show="tree")
+		after_notebook.add(after_tree_frame, text="Tree")
+
+		after_list_frame = ttk.Frame(after_notebook)
+		after_list_frame.rowconfigure(0, weight=1)
+		after_list_frame.columnconfigure(0, weight=1)
+		self.after_list = self.create_treeview(after_list_frame, show="tree") # Keep 'tree' for icons
+		after_notebook.add(after_list_frame, text="List")
 
 		# Bind selection event
 		self.before_tree.bind("<<TreeviewSelect>>", self.on_tree_select)
 		self.after_tree.bind("<<TreeviewSelect>>", self.on_tree_select)
+		self.before_list.bind("<<TreeviewSelect>>", self.on_tree_select)
+		self.after_list.bind("<<TreeviewSelect>>", self.on_tree_select)
 
 		# --- Log View ---
 		log_frame = ttk.Frame(self.notebook, padding=5)
@@ -262,9 +296,9 @@ class ScaffoldApp:
 		log_scrollbar.grid(row=0, column=1, sticky="ns")
 		self.log_text.config(yscrollcommand=log_scrollbar.set)
 	
-	def create_treeview(self, parent: ttk.Frame) -> ttk.Treeview:
+	def create_treeview(self, parent: ttk.Frame, show: str = "tree") -> ttk.Treeview:
 		"""Helper to create and configure a Treeview widget."""
-		tree = ttk.Treeview(parent, show="tree")
+		tree = ttk.Treeview(parent, show=show)
 		tree.grid(row=0, column=0, sticky="nsew")
 		
 		scrollbar = ttk.Scrollbar(parent, orient=tk.VERTICAL, command=tree.yview)
@@ -289,12 +323,15 @@ class ScaffoldApp:
 			self.recompute_button.config(state=tk.DISABLED)
 			self._clear_tree(self.before_tree)
 			self._clear_tree(self.after_tree)
+			self._clear_tree(self.before_list)
+			self._clear_tree(self.after_list)
 		else:
 			self.target_root_path.set(message) # message is the resolved path on success
 			self._save_last_root_path(message) # Save the successfully selected path
 			self.recompute_button.config(state=tk.NORMAL)
 			self._populate_before_tree(Path(message))
 			self._clear_tree(self.after_tree)
+			self._clear_tree(self.after_list)
 			self.apply_button.config(state=tk.DISABLED)
 
 
@@ -527,6 +564,8 @@ class ScaffoldApp:
 		# Clear Treeview widgets
 		self._clear_tree(self.before_tree)
 		self._clear_tree(self.after_tree)
+		self._clear_tree(self.before_list)
+		self._clear_tree(self.after_list)
 
 		# Disable action buttons
 		self.recompute_button.config(state=tk.DISABLED)
@@ -990,6 +1029,7 @@ class ScaffoldApp:
 	def _populate_before_tree(self, root_path: Path):
 		"""Fills the 'Before' treeview with the contents of the root_path."""
 		self._clear_tree(self.before_tree)
+		self._clear_tree(self.before_list)
 		
 		# Insert the root directory
 		icon = self.classifier.classify_path(root_path)
@@ -1011,6 +1051,7 @@ class ScaffoldApp:
 		all_paths.sort(key=lambda p: (len(p.parts), p.name.lower()))
 
 		for path in all_paths:
+			# Populate Tree View
 			parent_path_str = str(path.parent)
 			parent_node_id = dir_nodes.get(parent_path_str)
 			
@@ -1023,10 +1064,14 @@ class ScaffoldApp:
 				dir_nodes[str(path)] = node
 			else:
 				self.before_tree.insert(parent_node_id, "end", text=f"{icon} {path.name}", values=[str(path)])
+				# Populate List View (only files)
+				relative_path = path.relative_to(root_path)
+				self.before_list.insert("", "end", text=f"{icon} {relative_path}", values=[str(path)])
 
 	def _populate_after_tree(self, plan: scaffold_core.Plan):
-		"""Renders the generated plan in the 'After' treeview."""
+		"""Renders the generated plan in the 'After' treeview and listview."""
 		self._clear_tree(self.after_tree)
+		self._clear_tree(self.after_list)
 		if not plan:
 			return
 		root_path = plan.root_path
@@ -1057,7 +1102,6 @@ class ScaffoldApp:
 					all_dirs.add(p)
 		except Exception:
 			# Silently ignore filesystem errors (permission denied, broken symlinks, etc.)
-			# The planned directories will still be added below and shown in the tree
 			pass
 		for p in plan.planned_dirs:
 			all_dirs.add(p)
@@ -1090,6 +1134,11 @@ class ScaffoldApp:
 			
 			node_id = self.after_tree.insert(parent_id, "end", text=f"{icon} {dir_path.name}", open=True, tags=tags, values=[str(dir_path)])
 			dir_nodes[dir_path] = node_id
+			
+			# Populate List View for changed directories
+			if state in ('new', 'conflict_file'):
+				relative_path = dir_path.relative_to(root_path)
+				self.after_list.insert("", "end", text=f"{icon} {relative_path}", tags=tags, values=[str(dir_path)])
 
 		# 4. Get all file paths: existing and planned
 		all_files = set()
@@ -1098,18 +1147,14 @@ class ScaffoldApp:
 				if p.is_file():
 					all_files.add(p)
 		except Exception:
-			# Silently ignore filesystem errors (permission denied, broken symlinks, etc.)
-			# The planned files will still be added below and shown in the tree
 			pass
 		all_files.update(plan.planned_files)
 		
-		# 5. Insert all file nodes into the treeview
+		# 5. Insert all file nodes into the treeview and listview
 		sorted_files = sorted(list(all_files), key=lambda p: (len(p.parts), p.name.lower()))
 		for file_path in sorted_files:
 			parent_id = dir_nodes.get(file_path.parent)
 			if not parent_id:
-				# This can happen if a file is in a dir that we couldn't list/create.
-				# The error should be caught elsewhere, but we prevent a crash here.
 				continue
 			
 			tags = []
@@ -1122,7 +1167,13 @@ class ScaffoldApp:
 				tags.append('conflict')
 			
 			icon = self.classifier.classify_path(file_path)
+			# Insert into tree view
 			self.after_tree.insert(parent_id, "end", text=f"{icon} {file_path.name}", tags=tags, values=[str(file_path)])
+			
+			# Populate List View for changed files
+			if state in ('new', 'overwrite', 'conflict_dir'):
+				relative_path = file_path.relative_to(root_path)
+				self.after_list.insert("", "end", text=f"{icon} {relative_path}", tags=tags, values=[str(file_path)])
 
 
 
