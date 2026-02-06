@@ -90,6 +90,13 @@ class ScaffoldApp:
 		self.after_tree.tag_configure('modified_parent', foreground='#DAA520')
 		self.after_tree.tag_configure('overwrite', foreground='#0078D7', font=font.Font(weight='bold'))
 
+		# Configure Treeview tags for the after_list as well
+		self.after_list.tag_configure('new', foreground='green')
+		self.after_list.tag_configure('conflict', foreground='red', font=font.Font(weight='bold'))
+		self.after_list.tag_configure('warning', foreground='#E59400')
+		self.after_list.tag_configure('modified_parent', foreground='#DAA520')
+		self.after_list.tag_configure('overwrite', foreground='#0078D7', font=font.Font(weight='bold'))
+
 		# Bind window close event to save geometry
 		self.root.bind("<Destroy>", lambda event: self._save_window_geometry())
 
@@ -276,7 +283,7 @@ class ScaffoldApp:
 		after_list_frame.rowconfigure(0, weight=1)
 		after_list_frame.columnconfigure(0, weight=1)
 		self.after_list = self.create_treeview(after_list_frame, show="tree") # Keep 'tree' for icons
-		after_notebook.add(after_list_frame, text="List")
+		after_notebook.add(after_list_frame, text="Apply Tree")
 
 		# Bind selection event
 		self.before_tree.bind("<<TreeviewSelect>>", self.on_tree_select)
@@ -1076,104 +1083,118 @@ class ScaffoldApp:
 			return
 		root_path = plan.root_path
 
-		dir_nodes = {}
-
+		# Calculate modified parent directories (for coloring)
+		# This needs to be done once before populating both treeviews
 		modified_parent_dirs = set()
-		all_planned_paths = plan.planned_dirs.union(plan.planned_files)
-		for p in all_planned_paths:
+		all_relevant_planned_paths = plan.planned_dirs.union(plan.planned_files)
+		for p in all_relevant_planned_paths:
 			state = plan.path_states.get(p)
-			if state in ('new', 'overwrite'):
+			if state in ('new', 'overwrite', 'conflict_file', 'conflict_dir'):
 				current_parent = p.parent
 				while current_parent != root_path and current_parent.is_relative_to(root_path):
-					if plan.path_states.get(current_parent) not in ('new', 'conflict_file', 'conflict_dir'):
+					# If parent itself is not directly a new/overwrite/conflict, but contains one, mark it.
+					if plan.path_states.get(current_parent) not in ('new', 'conflict_file', 'conflict_dir', 'exists'): # Also include 'exists' to not override explicit states
 						modified_parent_dirs.add(current_parent)
 					current_parent = current_parent.parent
 
-		# 1. Insert the root node
-		icon = self.classifier.classify_path(root_path)
-		root_node_id = self.after_tree.insert("", "end", text=f"{icon} {root_path.name}", open=True, values=[str(root_path)])
-		dir_nodes[root_path] = root_node_id
 
-		# 2. Get all directory paths: existing and planned
-		all_dirs = set()
-		try:
-			for p in root_path.rglob('*'):
-				if p.is_dir():
-					all_dirs.add(p)
-		except Exception:
-			# Silently ignore filesystem errors (permission denied, broken symlinks, etc.)
-			pass
-		for p in plan.planned_dirs:
-			all_dirs.add(p)
-			for parent in p.parents:
-				if parent != root_path and parent.is_relative_to(root_path):
-					all_dirs.add(parent)
-				if parent == root_path:
-					break
-
-		# 3. Create all directory nodes in the treeview first
-		sorted_dirs = sorted(list(all_dirs), key=lambda p: (len(p.parts), p.name.lower()))
-		for dir_path in sorted_dirs:
-			if dir_path == root_path:
-				continue
-			
-			parent_id = dir_nodes.get(dir_path.parent)
-			if not parent_id:
-				continue
-
-			tags = []
-			state = plan.path_states.get(dir_path)
-			if state == 'new':
-				tags.append('new')
-			elif state == 'conflict_file':
-				tags.append('conflict')
-			elif dir_path in modified_parent_dirs:
-				tags.append('modified_parent')
-			
-			icon = self.classifier.classify_path(dir_path, is_planned_dir=dir_path in plan.planned_dirs)
-			
-			node_id = self.after_tree.insert(parent_id, "end", text=f"{icon} {dir_path.name}", open=True, tags=tags, values=[str(dir_path)])
-			dir_nodes[dir_path] = node_id
-			
-			# Populate List View for changed directories
-			if state in ('new', 'conflict_file'):
-				relative_path = dir_path.relative_to(root_path)
-				self.after_list.insert("", "end", text=f"{icon} {relative_path}", tags=tags, values=[str(dir_path)])
-
-		# 4. Get all file paths: existing and planned
-		all_files = set()
-		try:
-			for p in root_path.rglob('*'):
-				if p.is_file():
-					all_files.add(p)
-		except Exception:
-			pass
-		all_files.update(plan.planned_files)
+		# Populate the main 'After (Planned State)' tree
+		self._populate_treeview_from_plan(self.after_tree, plan, root_path, 
+										  lambda p, plan_obj, mpd: True, modified_parent_dirs, auto_open_modified=True)
 		
-		# 5. Insert all file nodes into the treeview and listview
-		sorted_files = sorted(list(all_files), key=lambda p: (len(p.parts), p.name.lower()))
-		for file_path in sorted_files:
-			parent_id = dir_nodes.get(file_path.parent)
-			if not parent_id:
+		# Populate the 'Apply Tree' (after_list)
+		self._populate_treeview_from_plan(self.after_list, plan, root_path, 
+										  lambda p, plan_obj, mpd: plan_obj.path_states.get(p) in ('new', 'overwrite', 'conflict_file', 'conflict_dir') or p in mpd, modified_parent_dirs, auto_open_modified=True)
+
+
+	def _populate_treeview_from_plan(self, tree_widget: ttk.Treeview, plan_obj: scaffold_core.Plan, root_path_param: Path, filter_func, modified_parent_dirs: set, auto_open_modified: bool):
+		dir_nodes = {}
+
+		# 1. Insert the root node
+		icon = self.classifier.classify_path(root_path_param)
+		root_node_id = tree_widget.insert("", "end", text=f"{icon} {root_path_param.name}", open=True, values=[str(root_path_param)])
+		dir_nodes[root_path_param] = root_node_id
+
+		# Gather all relevant paths (directories and files) from the plan and filesystem
+		all_paths_to_consider = set(plan_obj.planned_dirs).union(plan_obj.planned_files)
+		try:
+			for p in root_path_param.rglob('*'):
+				all_paths_to_consider.add(p)
+		except Exception:
+			pass # Ignore filesystem errors
+
+		# Sort paths to ensure parents are processed before children
+		sorted_paths = sorted(list(all_paths_to_consider), key=lambda p: (len(p.parts), p.name.lower()))
+		
+		# Filtered set of paths that actually get inserted into the treeview
+		inserted_paths = set()
+
+		for path in sorted_paths:
+			# Skip root, already handled
+			if path == root_path_param:
 				continue
 			
-			tags = []
-			state = plan.path_states.get(file_path)
-			if state == 'new':
-				tags.append('new')
-			elif state == 'overwrite':
-				tags.append('overwrite')
-			elif state == 'conflict_dir':
-				tags.append('conflict')
-			
-			icon = self.classifier.classify_path(file_path)
-			# Insert into tree view
-			self.after_tree.insert(parent_id, "end", text=f"{icon} {file_path.name}", tags=tags, values=[str(file_path)])
-			
-			# Populate List View for changed files
-			if state in ('new', 'overwrite', 'conflict_dir'):
-				relative_path = file_path.relative_to(root_path)
-				self.after_list.insert("", "end", text=f"{icon} {relative_path}", tags=tags, values=[str(file_path)])
+			# Determine if this path should be included based on the filter
+			should_include = filter_func(path, plan_obj, modified_parent_dirs)
+
+			if should_include:
+				# Ensure all ancestors of this 'should_include' path are in the treeview and opened
+				ancestors_to_process = []
+				p_check = path.parent
+				while p_check != root_path_param:
+					if p_check in dir_nodes: # Found an ancestor already in our map, break and process collected ancestors
+						break
+					ancestors_to_process.append(p_check)
+					p_check = p_check.parent
+				ancestors_to_process.reverse() # Process from root towards child
+
+				for ancestor_path in ancestors_to_process:
+					parent_of_ancestor_id = dir_nodes.get(ancestor_path.parent)
+					if parent_of_ancestor_id is None:
+						parent_of_ancestor_id = root_node_id # Fallback to root if parent not yet processed
+
+					intermediate_icon = self.classifier.classify_path(ancestor_path, is_planned_dir=ancestor_path.is_dir() or ancestor_path in plan_obj.planned_dirs)
+					intermediate_tags = []
+					# Tagging parents if they contain modified items
+					if ancestor_path in modified_parent_dirs:
+						intermediate_tags.append('modified_parent')
+					
+					# If ancestor not in dir_nodes, insert it, always opened if auto_open_modified
+					if ancestor_path not in dir_nodes:
+						node = tree_widget.insert(parent_of_ancestor_id, "end", text=f"{intermediate_icon} {ancestor_path.name}", open=auto_open_modified, tags=intermediate_tags, values=[str(ancestor_path)])
+						dir_nodes[ancestor_path] = node
+					else: # If ancestor already exists, ensure it's open if auto_open_modified
+						if auto_open_modified:
+							tree_widget.item(dir_nodes[ancestor_path], open=True)
+				
+				# After ensuring all ancestors are inserted/opened, insert the actual item
+				parent_node_id = dir_nodes.get(path.parent)
+				if not parent_node_id:
+					parent_node_id = root_node_id # Should not happen with the ancestor processing above, but for safety
+
+				tags = []
+				state = plan_obj.path_states.get(path)
+				if state == 'new': tags.append('new')
+				elif state == 'overwrite': tags.append('overwrite')
+				elif state == 'conflict_file': tags.append('conflict')
+				elif state == 'conflict_dir': tags.append('conflict')
+				# Apply modified_parent tag if applicable to the item itself
+				if path in modified_parent_dirs: tags.append('modified_parent')
+				
+				icon = self.classifier.classify_path(path, is_planned_dir=path.is_dir() or path in plan_obj.planned_dirs)
+				
+				# Determine if the current item (if it's a directory) should be opened
+				item_is_directory = path.is_dir() or path in plan_obj.planned_dirs
+				should_open_this_item = auto_open_modified and item_is_directory
+				
+				tree_widget.insert(parent_node_id, "end", text=f"{icon} {path.name}", tags=tags, values=[str(path)], open=should_open_this_item)
+				
+				if item_is_directory:
+					dir_nodes[path] = tree_widget.get_children(parent_node_id)[-1]
+				# inserted_paths.add(path) # No longer needed with new parent handling
+
+
+
 
 
 
