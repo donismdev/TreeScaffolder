@@ -1,7 +1,8 @@
 {
-    "geometry": "1428x687+48+32",
+    "geometry": "1200x700+26+26",
     "DEFAULT_TREE_TEMPLATE": "# =========================================================\n# - Use @ROOT to define the logical root marker.\n# - The first node must be that marker, ending with a '/'.\n# - Indent with TABS or 4-SPACES.\n# =========================================================\n\n @ROOT {{Root}}\n\n{{Root}}/",
-    "last_root_path": "C:\\Users\\azuli\\Documents\\Unreal Projects\\CDR\\Programming\\Source",
+    "last_root_path": "C:\\Users\\azuli\\Desktop\\\uc0c8 \ud3f4\ub354 (5)",
     "main_sash_pos": 0,
-    "diff_sash_pos": 0
+    "diff_sash_pos": 0,
+    "OPEN_FOLDER_AFTER_APPLY": true
 }

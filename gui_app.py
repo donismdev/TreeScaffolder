@@ -65,6 +65,7 @@ class ScaffoldApp:
         # --- Member Variables ---
         self.target_root_path = tk.StringVar()
         self.dry_run = tk.BooleanVar(value=True)
+        self.open_folder_after_apply = tk.BooleanVar(value=False)
         self.enable_similarity_scan = tk.BooleanVar(value=True)
         self.similarity_threshold = tk.DoubleVar(value=0.86)
         self.last_root_path = None

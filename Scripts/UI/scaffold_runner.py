@@ -5,6 +5,9 @@ scaffold_runner.py
 Scaffolding execution logic for the Tree Scaffolder GUI application.
 """
 import datetime
+import os
+import sys
+import subprocess
 from pathlib import Path
 from Scripts.UI import app_utils # Import app_utils for logging
 
@@ -84,6 +87,18 @@ def execute_scaffold(app):
         app._log("Operation finished with errors.", "error")
     else:
         app._log("Operation finished successfully.", "success")
+        if app.open_folder_after_apply.get():
+            try:
+                app._log(f"Opening folder: {plan.root_path}", "info")
+                # Cross-platform way to open the file explorer
+                if sys.platform == "win32":
+                    os.startfile(plan.root_path)
+                elif sys.platform == "darwin": # macOS
+                    subprocess.Popen(["open", plan.root_path])
+                else: # Linux and other UNIX-like
+                    subprocess.Popen(["xdg-open", plan.root_path])
+            except Exception as e:
+                app._log(f"Failed to open folder: {e}", "error")
 
     _write_execution_log(app, stats, is_dry_run, captured_logs, original_log_method)
         

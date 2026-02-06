@@ -108,10 +108,12 @@ def create_left_panel(app):
 
     ttk.Label(settings_frame, text="Similarity Ratio:").grid(row=2, column=0, sticky="w", padx=5, pady=2)
     ttk.Scale(settings_frame, from_=0.5, to=1.0, variable=app.similarity_threshold, orient=tk.HORIZONTAL).grid(row=2, column=1, sticky="ew", padx=5)
+
+    ttk.Checkbutton(settings_frame, text="Open folder after Apply Scaffold", variable=app.open_folder_after_apply).grid(row=3, column=0, columnspan=2, sticky="w", padx=5)
     
     # Action Buttons
     actions_subframe = ttk.Frame(settings_frame)
-    actions_subframe.grid(row=3, column=0, columnspan=2, sticky="ew", pady=5)
+    actions_subframe.grid(row=4, column=0, columnspan=2, sticky="ew", pady=5)
     actions_subframe.columnconfigure((0, 1), weight=1)
 
     app.recompute_button = ttk.Button(actions_subframe, text="Compute Diff", command=app.on_recompute, state=tk.DISABLED)

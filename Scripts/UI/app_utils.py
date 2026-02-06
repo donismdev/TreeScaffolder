@@ -46,6 +46,7 @@ def load_window_geometry(app):
     """Loads window geometry from config.json if available, with validation."""
     config_path = Path.cwd() / app.CONFIG_FILE
     loaded_geometry = None
+    open_folder_after_apply = False # Default value
 
     if config_path.exists():
         try:
@@ -53,8 +54,12 @@ def load_window_geometry(app):
                 config = json.load(f)
                 if "geometry" in config:
                     loaded_geometry = config["geometry"]
+                if "OPEN_FOLDER_AFTER_APPLY" in config:
+                    open_folder_after_apply = config["OPEN_FOLDER_AFTER_APPLY"]
         except Exception as e:
             print(f"Error loading window geometry from config: {e}")
+
+    app.open_folder_after_apply.set(open_folder_after_apply)
 
     if loaded_geometry:
         try:
@@ -85,6 +90,7 @@ def save_window_geometry(app):
                 config = json.load(f)
         
         config["geometry"] = app.root.geometry()
+        config["OPEN_FOLDER_AFTER_APPLY"] = app.open_folder_after_apply.get()
         
         with open(config_path, "w", encoding="utf-8") as f:
             json.dump(config, f, indent=4)
