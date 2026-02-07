@@ -157,20 +157,20 @@ def create_right_panel(app):
     before_pane_frame.columnconfigure(0, weight=1)
     diff_paned.add(before_pane_frame, weight=1)
 
-    before_notebook = ttk.Notebook(before_pane_frame)
-    before_notebook.grid(row=0, column=0, sticky="nsew", padx=2, pady=2)
+    app.before_notebook = ttk.Notebook(before_pane_frame)
+    app.before_notebook.grid(row=0, column=0, sticky="nsew", padx=2, pady=2)
     
-    before_tree_frame = ttk.Frame(before_notebook)
+    before_tree_frame = ttk.Frame(app.before_notebook)
     before_tree_frame.rowconfigure(0, weight=1)
     before_tree_frame.columnconfigure(0, weight=1)
     app.before_tree = create_treeview(before_tree_frame, show="tree")
-    before_notebook.add(before_tree_frame, text="Tree")
+    app.before_notebook.add(before_tree_frame, text="Tree")
     
-    before_list_frame = ttk.Frame(before_notebook)
+    before_list_frame = ttk.Frame(app.before_notebook)
     before_list_frame.rowconfigure(0, weight=1)
     before_list_frame.columnconfigure(0, weight=1)
     app.before_list = create_treeview(before_list_frame, show="tree")
-    before_notebook.add(before_list_frame, text="List")
+    app.before_notebook.add(before_list_frame, text="List")
 
     # --- After Pane ---
     after_pane_frame = ttk.LabelFrame(diff_paned, text="After (Planned State)")
@@ -178,20 +178,20 @@ def create_right_panel(app):
     after_pane_frame.columnconfigure(0, weight=1)
     diff_paned.add(after_pane_frame, weight=1)
     
-    after_notebook = ttk.Notebook(after_pane_frame)
-    after_notebook.grid(row=0, column=0, sticky="nsew", padx=2, pady=2)
+    app.after_notebook = ttk.Notebook(after_pane_frame)
+    app.after_notebook.grid(row=0, column=0, sticky="nsew", padx=2, pady=2)
 
-    after_tree_frame = ttk.Frame(after_notebook)
+    after_tree_frame = ttk.Frame(app.after_notebook)
     after_tree_frame.rowconfigure(0, weight=1)
     after_tree_frame.columnconfigure(0, weight=1)
     app.after_tree = create_treeview(after_tree_frame, show="tree")
-    after_notebook.add(after_tree_frame, text="Tree")
+    app.after_notebook.add(after_tree_frame, text="Tree")
 
-    after_list_frame = ttk.Frame(after_notebook)
+    after_list_frame = ttk.Frame(app.after_notebook)
     after_list_frame.rowconfigure(0, weight=1)
     after_list_frame.columnconfigure(0, weight=1)
     app.after_list = create_treeview(after_list_frame, show="tree")
-    after_notebook.add(after_list_frame, text="Apply Tree")
+    app.after_notebook.add(after_list_frame, text="Apply Tree")
 
     # Bind selection event
     app.before_tree.bind("<<TreeviewSelect>>", app.on_tree_select)

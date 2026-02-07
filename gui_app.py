@@ -106,6 +106,8 @@ class ScaffoldApp:
         self.content_text = None
         self.before_list = None
         self.after_list = None
+        self.before_notebook = None
+        self.after_notebook = None
 
         # --- Main Layout ---
         self.main_paned_window = ttk.PanedWindow(self.root, orient=tk.HORIZONTAL)
