@@ -41,6 +41,33 @@ DEFAULT_TREE_TEMPLATE = """# ===================================================
 {{Root}}/
 """
 
+# ... (after imports) ...
+
+# Global variable to hold loggers
+console_logger_instance = None
+editor_logger_instance = None
+
+
+class StreamToLogger(object):
+    """
+    Fake file-like stream object that redirects writes to a logger instance.
+    """
+    def __init__(self, logger, log_level=logging.INFO):
+        self.logger = logger
+        self.log_level = log_level
+        self.linebuf = ''
+
+    def write(self, buf):
+        # Filter out Tkinter messages or empty lines from print()
+        if buf.strip() and "Tkinter is no longer supported" not in buf:
+            for line in buf.rstrip().splitlines():
+                if line:
+                    self.logger.log(self.log_level, line)
+
+    def flush(self):
+        pass
+
+
 class ScaffoldApp:
     """The main application class for the Tree Scaffolder GUI."""
 
@@ -315,6 +342,7 @@ class ScaffoldApp:
     def _populate_after_tree(self, plan: scaffold_core.Plan): populate_after_tree(self, plan)
 
 def setup_runtime_logging():
+    global console_logger_instance, editor_logger_instance
     """Reads config and sets up a file logger if enabled."""
     print("DEBUG: setup_runtime_logging started.")
     try:
@@ -329,17 +357,28 @@ def setup_runtime_logging():
             log_path_dir.mkdir(exist_ok=True)
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             runtime_log_filename = log_path_dir / f"runtime_{timestamp}.log"
-            print(f"DEBUG: Runtime logging enabled in config. Log file will be: {runtime_log_filename}")
 
-            logging.basicConfig(
-                level=logging.DEBUG,
-                format='%(asctime)s - %(levelname)s - %(message)s',
-                filename=runtime_log_filename,
-                filemode='w',
-                encoding='utf-8'
-            )
-            logging.info(f"Runtime logging enabled, log file: {runtime_log_filename}")
-            print("DEBUG: logging.basicConfig called successfully.")
+            # --- Setup Console Logger ---
+            console_logger_instance = logging.getLogger('console_output')
+            console_logger_instance.setLevel(logging.DEBUG)
+            console_file_handler = logging.FileHandler(runtime_log_filename, mode='w', encoding='utf-8')
+            console_file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+            console_logger_instance.addHandler(console_file_handler)
+            console_logger_instance.propagate = False # Prevent messages from going to root logger
+
+            # --- Setup Editor Logger ---
+            editor_logger_instance = logging.getLogger('editor_output')
+            editor_logger_instance.setLevel(logging.DEBUG)
+            editor_file_handler = logging.FileHandler(runtime_log_filename, mode='a', encoding='utf-8') # Append to the same file
+            editor_file_handler.setFormatter(logging.Formatter('--- editor log ---\n%(asctime)s - %(levelname)s - %(message)s'))
+            editor_logger_instance.addHandler(editor_file_handler)
+            editor_logger_instance.propagate = False # Prevent messages from going to root logger
+
+            # Redirect stdout and stderr
+            sys.stdout = StreamToLogger(console_logger_instance, logging.INFO)
+            sys.stderr = StreamToLogger(console_logger_instance, logging.ERROR)
+
+            console_logger_instance.info(f"--- console ---\nRuntime logging enabled, log file: {runtime_log_filename}")
         else:
             print("DEBUG: Runtime logging disabled in config.")
     except (FileNotFoundError, json.JSONDecodeError) as e:
@@ -349,20 +388,16 @@ def setup_runtime_logging():
     print("DEBUG: setup_runtime_logging completed.")
 
 def main():
-    # Keep existing debug prints for initial setup diagnostics
-    print("DEBUG: main started")
     setup_runtime_logging() # Set up the logger first
     try:
         root = tk.Tk()
-        print("DEBUG: Tk() instance created")
         ScaffoldApp(root)
-        print("DEBUG: ScaffoldApp instance created")
         root.mainloop()
-        print("DEBUG: mainloop exited")
     except Exception as e:
-        # Also log fatal errors to the runtime log if it's set up
-        logging.critical(f"Caught unhandled exception in main: {e}", exc_info=True)
-        print(f"DEBUG: Caught unhandled exception in main: {e}")
+        if console_logger_instance: # Check if console logger was successfully set up
+            console_logger_instance.critical(f"FATAL: Caught unhandled exception in main: {e}", exc_info=True)
+        else:
+            print(f"FATAL: Caught unhandled exception in main (logger not initialized): {e}")
         messagebox.showerror("Fatal Error", f"An unhandled exception occurred: {e}")
 
 if __name__ == "__main__":

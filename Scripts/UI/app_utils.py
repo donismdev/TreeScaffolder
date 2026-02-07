@@ -16,15 +16,19 @@ from tkinter import ttk, messagebox
 
 def log_message(app, message: str, level: str = "info", buffer_list: list = None):
     """Appends a message to the log widget, a buffer list, and the runtime log file."""
-    # Log to the runtime log file first
-    if level == "error":
-        logging.error(message)
-    elif level == "warn":
-        logging.warning(message)
-    elif level == "debug":
-        logging.debug(message)
-    else: # "info", "success", "skip", etc.
-        logging.info(message)
+    # Log to the dedicated editor runtime log file
+    editor_logger = logging.getLogger('editor_output')
+    if editor_logger.handlers: # Check if the logger has handlers (i.e., is configured)
+        if level == "error":
+            editor_logger.error(message)
+        elif level == "warn":
+            editor_logger.warning(message)
+        elif level == "debug":
+            editor_logger.debug(message)
+        else: # "info", "success", "skip", etc.
+            editor_logger.info(message)
+    # If editor_logger is not configured, messages won't go to runtime.log here.
+    # They will still go to app.log_text below.
 
     if buffer_list is not None:
         buffer_list.append((message, level))
