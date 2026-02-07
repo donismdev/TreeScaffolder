@@ -104,15 +104,33 @@ def execute_scaffold(app):
                         actual_content = path.read_text(encoding='utf-8', errors='replace')
                         planned_content = plan.file_contents.get(path.resolve())
                         
-                        # Normalize line endings (CRLF to LF) and handle None vs empty string
+                        # Normalize line endings (CRLF to LF)
                         norm_actual = (actual_content or "").replace('\r\n', '\n')
                         norm_planned = (planned_content or "").replace('\r\n', '\n')
+
+                        # Additional Robust Normalization:
+                        # 1. Strip trailing whitespace from each line
+                        # 2. Remove all empty lines from the end
+                        norm_actual_lines = [line.rstrip() for line in norm_actual.splitlines()]
+                        norm_planned_lines = [line.rstrip() for line in norm_planned.splitlines()]
+
+                        # Remove trailing empty lines
+                        while norm_actual_lines and not norm_actual_lines[-1]:
+                            norm_actual_lines.pop()
+                        while norm_planned_lines and not norm_planned_lines[-1]:
+                            norm_planned_lines.pop()
                         
-                        if norm_actual == norm_planned:
+                        # Rejoin and compare
+                        final_norm_actual = "\n".join(norm_actual_lines)
+                        final_norm_planned = "\n".join(norm_planned_lines)
+
+                        if final_norm_actual == final_norm_planned:
                             plan.path_states[path] = 'exists'
-                            app._log(f"Successfully verified content for {path}. State set to 'exists'. Current state: {plan.path_states.get(path)}", "debug")
+                            app._log(f"Successfully verified content for {path}. State set to 'exists'.", "debug")
                         else:
                             app._log(f"Content verification failed for {path}. State not updated. Current state: {plan.path_states.get(path)}", "warn")
+                            app._log(f"  - Actual (normalized): '{final_norm_actual}'", "debug")
+                            app._log(f"  - Planned (normalized): '{final_norm_planned}'", "debug")
                             
                     except Exception as e:
                         app._log(f"Could not verify file content for {path}: {e}", "error")

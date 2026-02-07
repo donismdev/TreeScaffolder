@@ -90,7 +90,7 @@ def populate_after_tree(app, plan):
     
     # Populate the 'Apply Tree' (after_list)
     _populate_treeview_from_plan(app, app.after_list, plan, root_path, 
-                                     lambda p, plan_obj, mpd: plan_obj.path_states.get(p) in ('new', 'overwrite', 'conflict_file', 'conflict_dir') or p in mpd, modified_parent_dirs, auto_open_modified=True)
+                                     lambda p, plan_obj, mpd: plan_obj.path_states.get(p) in ('new', 'overwrite', 'conflict_file', 'conflict_dir', 'exists') or p in mpd, modified_parent_dirs, auto_open_modified=True)
 
 def _populate_treeview_from_plan(app, tree_widget: ttk.Treeview, plan_obj, root_path_param: Path, filter_func, modified_parent_dirs: set, auto_open_modified: bool):
     dir_nodes = {}
