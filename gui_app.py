@@ -22,6 +22,7 @@ from Scripts.UI.panels import create_left_panel, create_right_panel
 from Scripts.UI.tree_populator import populate_before_tree, populate_after_tree
 from Scripts.UI import app_utils
 from Scripts.UI import scaffold_runner
+from Scripts.UI import key_bindings
 from Scripts.UI.tree_populator import _clear_tree as clear_tree_function # Import as different name
 
 # --- Constants ---
@@ -110,6 +111,11 @@ class ScaffoldApp:
 
         self.root.bind("<Destroy>", lambda event: self._save_window_geometry())
         app_utils.load_last_root_path(self)
+        key_bindings.setup_key_bindings(self)
+        
+        # Original request was to prevent text widgets from auto-focusing.
+        # Removing explicit focus setting here.
+        
         print("DEBUG: ScaffoldApp.__init__ completed") # Debug print
 
     def setup_styles(self):
@@ -289,6 +295,12 @@ class ScaffoldApp:
         else:
             messagebox.showinfo("No Previous Folder", "No valid previous folder found.")
         print("DEBUG: on_previous_folder completed") # Debug print
+
+    def on_escape_pressed(self, event=None):
+        """Resets focus to the root window, effectively taking focus away from specific widgets."""
+        print("DEBUG: on_escape_pressed called, resetting focus.")
+        self.root.focus_set()
+        return "break" # Prevent further propagation of the Escape key
 
     # --- Helper Method Stubs ---
     def _load_window_geometry(self): app_utils.load_window_geometry(self)
