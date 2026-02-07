@@ -4,5 +4,6 @@
     "last_root_path": "C:\\Users\\azuli\\Desktop\\\uc0c8 \ud3f4\ub354 (5)",
     "main_sash_pos": 0,
     "diff_sash_pos": 0,
-    "OPEN_FOLDER_AFTER_APPLY": true
+    "OPEN_FOLDER_AFTER_APPLY": false,
+    "enable_runtime_logging": true
 }

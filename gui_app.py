@@ -8,6 +8,7 @@ and logging. Built with tkinter and ttk.
 """
 import datetime
 import json
+import logging
 import subprocess
 import sys
 from pathlib import Path
@@ -301,17 +302,55 @@ class ScaffoldApp:
     def _populate_before_tree(self, root_path: Path): populate_before_tree(self, root_path)
     def _populate_after_tree(self, plan: scaffold_core.Plan): populate_after_tree(self, plan)
 
+def setup_runtime_logging():
+    """Reads config and sets up a file logger if enabled."""
+    print("DEBUG: setup_runtime_logging started.")
+    try:
+        config_file_path = Path.cwd() / CONFIG_FILE
+        print(f"DEBUG: Attempting to open config file: {config_file_path}")
+        with open(config_file_path, "r") as f:
+            config = json.load(f)
+        print(f"DEBUG: Config loaded successfully. enable_runtime_logging: {config.get('enable_runtime_logging', False)}")
+        
+        if config.get("enable_runtime_logging", False):
+            log_path_dir = Path.cwd() / LOG_DIR
+            log_path_dir.mkdir(exist_ok=True)
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            runtime_log_filename = log_path_dir / f"runtime_{timestamp}.log"
+            print(f"DEBUG: Runtime logging enabled in config. Log file will be: {runtime_log_filename}")
+
+            logging.basicConfig(
+                level=logging.DEBUG,
+                format='%(asctime)s - %(levelname)s - %(message)s',
+                filename=runtime_log_filename,
+                filemode='w',
+                encoding='utf-8'
+            )
+            logging.info(f"Runtime logging enabled, log file: {runtime_log_filename}")
+            print("DEBUG: logging.basicConfig called successfully.")
+        else:
+            print("DEBUG: Runtime logging disabled in config.")
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        print(f"DEBUG: Could not set up runtime logger: {e} (FileNotFoundError or JSONDecodeError)")
+    except Exception as e:
+        print(f"DEBUG: An unexpected error occurred during runtime logger setup: {e}")
+    print("DEBUG: setup_runtime_logging completed.")
+
 def main():
-    print("DEBUG: main started") # Debug print
+    # Keep existing debug prints for initial setup diagnostics
+    print("DEBUG: main started")
+    setup_runtime_logging() # Set up the logger first
     try:
         root = tk.Tk()
-        print("DEBUG: Tk() instance created") # Debug print
+        print("DEBUG: Tk() instance created")
         ScaffoldApp(root)
-        print("DEBUG: ScaffoldApp instance created") # Debug print
+        print("DEBUG: ScaffoldApp instance created")
         root.mainloop()
-        print("DEBUG: mainloop exited") # Debug print
+        print("DEBUG: mainloop exited")
     except Exception as e:
-        print(f"DEBUG: Caught unhandled exception in main: {e}") # Debug print
+        # Also log fatal errors to the runtime log if it's set up
+        logging.critical(f"Caught unhandled exception in main: {e}", exc_info=True)
+        print(f"DEBUG: Caught unhandled exception in main: {e}")
         messagebox.showerror("Fatal Error", f"An unhandled exception occurred: {e}")
 
 if __name__ == "__main__":

@@ -6,6 +6,7 @@ Utility functions for the Tree Scaffolder GUI application, including logging,
 window geometry management, and path validation.
 """
 import json
+import logging
 import re
 import sys
 import subprocess
@@ -14,7 +15,17 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 
 def log_message(app, message: str, level: str = "info", buffer_list: list = None):
-    """Appends a message to the log widget or a buffer list."""
+    """Appends a message to the log widget, a buffer list, and the runtime log file."""
+    # Log to the runtime log file first
+    if level == "error":
+        logging.error(message)
+    elif level == "warn":
+        logging.warning(message)
+    elif level == "debug":
+        logging.debug(message)
+    else: # "info", "success", "skip", etc.
+        logging.info(message)
+
     if buffer_list is not None:
         buffer_list.append((message, level))
         return
@@ -35,6 +46,7 @@ def log_message(app, message: str, level: str = "info", buffer_list: list = None
         elif level == "warn": color = "#E59400"
         elif level == "success": color = "green"
         elif level == "skip": color = "gray"
+        elif level == "debug": color = "purple" # Add debug color for GUI
         app.log_text.tag_configure(tag, foreground=color)
 
     app.log_text.insert(tk.END, message + '\n', tag)

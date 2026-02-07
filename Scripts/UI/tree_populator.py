@@ -64,15 +64,25 @@ def populate_after_tree(app, plan):
 
     # Calculate modified parent directories (for coloring)
     modified_parent_dirs = set()
-    all_relevant_planned_paths = plan.planned_dirs.union(plan.planned_files)
-    for p in all_relevant_planned_paths:
-        state = plan.path_states.get(p)
+    # Get all unique paths that are part of the plan, including those with content
+    all_involved_paths = set(plan.planned_dirs).union(plan.planned_files)
+    all_involved_paths.update(plan.file_contents.keys()) # Include files from file_contents
+
+    for p_obj in all_involved_paths:
+        # Ensure p_obj is a Path object for consistency
+        p_path = p_obj if isinstance(p_obj, Path) else Path(p_obj)
+
+        state = plan.path_states.get(p_path)
+        
+        # A path contributes to modified parents if its current state is 'new', 'overwrite', or 'conflict'
         if state in ('new', 'overwrite', 'conflict_file', 'conflict_dir'):
-            current_parent = p.parent
+            current_parent = p_path.parent
             while current_parent != root_path and current_parent.is_relative_to(root_path):
-                if plan.path_states.get(current_parent) not in ('new', 'conflict_file', 'conflict_dir', 'exists'):
-                    modified_parent_dirs.add(current_parent)
+                modified_parent_dirs.add(current_parent)
                 current_parent = current_parent.parent
+            # Also add the root_path itself if it's an ancestor and contains modified children
+            if root_path in p_path.parents:
+                modified_parent_dirs.add(root_path)
 
     # Populate the main 'After (Planned State)' tree
     _populate_treeview_from_plan(app, app.after_tree, plan, root_path, 

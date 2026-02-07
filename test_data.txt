@@ -1,322 +1,434 @@
-@@@FILE_BEGIN {{Root}}/FrontendUI/FrontendUI.Build.cs
-using UnrealBuildTool;
+@@@FILE_BEGIN {{Root}}/Registry/Scripts/_lib/env.py
+from __future__ import annotations
 
-public class FrontendUI : ModuleRules
+import sys
+
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Optional
+
+
+@dataclass
+class Env:
+	root_dir: Path
+	registry_dir: Path
+	tables_dir: Path
+	output_root: Path
+
+	project_name: str
+	engine_type: str
+
+	profile_name: Optional[str]
+	profile_dir: Optional[Path]
+
+	def __post_init__(self) -> None:
+		self.root_dir = self.root_dir.resolve()
+		self.registry_dir = self.registry_dir.resolve()
+		self.tables_dir = self.tables_dir.resolve()
+		self.output_root = self.output_root.resolve()
+
+		if (self.profile_dir is not None):
+			self.profile_dir = self.profile_dir.resolve()
+
+
+def SetupSysPath(env: Env) -> None:
+	"""
+	sys.path 우선순위:
+	1) Profile Scripts
+	2) Global Scripts
+	"""
+	paths: list[Path] = []
+
+	if (env.profile_dir is not None):
+		profile_scripts_dir = env.profile_dir / "Scripts"
+		if (profile_scripts_dir.exists() == true):
+			paths.append(profile_scripts_dir)
+
+	global_scripts_dir = env.registry_dir / "Scripts"
+	if (global_scripts_dir.exists() == true):
+		paths.append(global_scripts_dir)
+
+	for p in reversed(paths):
+		p_str = str(p)
+		if (p_str in sys.path) == false:
+			sys.path.insert(0, p_str)
+
+
+def CreateEnv(
+	root_dir: Path,
+	project_name: str,
+	engine_type: str,
+	profile_name: Optional[str] = None,
+) -> Env:
+	root_dir = root_dir.resolve()
+	registry_dir = root_dir / "Registry"
+	tables_dir = registry_dir / "Tables"
+	output_root = registry_dir / "_output"
+
+	profile_dir: Optional[Path] = None
+	if (profile_name is not None):
+		profile_dir = registry_dir / "Profile" / profile_name
+
+	env = Env(
+		root_dir=root_dir,
+		registry_dir=registry_dir,
+		tables_dir=tables_dir,
+		output_root=output_root,
+		project_name=project_name,
+		engine_type=engine_type,
+		profile_name=profile_name,
+		profile_dir=profile_dir,
+	)
+
+	SetupSysPath(env)
+	return env
+
+@@@FILE_END
+
+
+@@@FILE_BEGIN {{Root}}/Registry/Scripts/registry_core/__init__.py
+__all__ = []
+
+@@@FILE_END
+
+
+@@@FILE_BEGIN {{Root}}/Registry/Scripts/registry_core/core/__init__.py
+__all__ = []
+
+@@@FILE_END
+
+
+@@@FILE_BEGIN {{Root}}/Registry/Scripts/registry_core/core/result.py
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Optional
+
+
+@dataclass
+class TaskResult:
+	status: str
+	code: str
+	message: str
+	artifacts: list[str] = field(default_factory=list)
+	duration_seconds: Optional[float] = None
+
+	@staticmethod
+	def Success(message: str = "Success") -> "TaskResult":
+		return TaskResult(status="success", code="TASK_OK", message=message)
+
+	@staticmethod
+	def Warning(message: str = "Success with warnings") -> "TaskResult":
+		return TaskResult(status="warning", code="TASK_OK_WITH_WARNINGS", message=message)
+
+	@staticmethod
+	def Failed(message: str, code: str = "TASK_FAILED") -> "TaskResult":
+		return TaskResult(status="failed", code=code, message=message)
+
+	@staticmethod
+	def Cancelled(message: str = "Cancelled by user") -> "TaskResult":
+		return TaskResult(status="cancelled", code="TASK_CANCELLED", message=message)
+
+	@staticmethod
+	def InternalError(message: str = "Internal error") -> "TaskResult":
+		return TaskResult(status="failed", code="TASK_INTERNAL_ERROR", message=message)
+
+@@@FILE_END
+
+
+@@@FILE_BEGIN {{Root}}/Registry/Scripts/registry_core/core/context.py
+from __future__ import annotations
+
+from typing import Any
+from typing import Optional
+
+
+class TaskCancelled(Exception):
+	pass
+
+
+class CancelToken:
+	def __init__(self) -> None:
+		self._cancelled: bool = False
+
+	def Cancel(self) -> None:
+		self._cancelled = True
+
+	def IsCancelled(self) -> bool:
+		return self._cancelled
+
+
+class TaskContext:
+	def __init__(self, env: Any, options: dict[str, Any], cancel_token: CancelToken) -> None:
+		self.env = env
+		self.options = options
+		self.cancel_token = cancel_token
+
+	def Emit(self, event: dict[str, Any]) -> None:
+		print(event)
+
+	def LogInfo(self, message: str) -> None:
+		self.Emit({"type": "log", "level": "info", "message": message})
+
+	def LogWarning(self, message: str) -> None:
+		self.Emit({"type": "log", "level": "warning", "message": message})
+
+	def LogError(self, message: str) -> None:
+		self.Emit({"type": "log", "level": "error", "message": message})
+
+	def CheckCancelled(self) -> None:
+		if (self.cancel_token.IsCancelled() == true):
+			raise TaskCancelled()
+
+@@@FILE_END
+
+
+@@@FILE_BEGIN {{Root}}/Registry/Scripts/registry_core/core/task.py
+from __future__ import annotations
+
+from typing import Optional
+
+from registry_core.core.context import TaskContext
+from registry_core.core.result import TaskResult
+
+
+class RegistryTask:
+	def Validate(self, ctx: TaskContext) -> Optional[TaskResult]:
+		return None
+
+	def Run(self, ctx: TaskContext) -> TaskResult:
+		raise NotImplementedError()
+
+	def Finalize(self, ctx: TaskContext) -> None:
+		pass
+
+@@@FILE_END
+
+
+@@@FILE_BEGIN {{Root}}/Registry/Scripts/registry_core/discovery.py
+from __future__ import annotations
+
+import importlib
+import json
+
+from pathlib import Path
+from typing import Optional
+from typing import Type
+
+from registry_core.core.task import RegistryTask
+
+
+class TaskSpec:
+	def __init__(self, task_id: str, meta_path: Path, entry_module: str, entry_class: str) -> None:
+		self.task_id = task_id
+		self.meta_path = meta_path
+		self.entry_module = entry_module
+		self.entry_class = entry_class
+
+
+class TaskCatalog:
+	def __init__(self) -> None:
+		self._tasks: dict[str, tuple[TaskSpec, Type[RegistryTask]]] = {}
+		self._broken: dict[str, str] = {}
+
+	def Add(self, spec: TaskSpec, cls: Type[RegistryTask]) -> None:
+		self._tasks[spec.task_id] = (spec, cls)
+
+	def AddBroken(self, meta_path: Path, reason: str) -> None:
+		self._broken[str(meta_path)] = reason
+
+	def Get(self, task_id: str) -> Optional[tuple[TaskSpec, Type[RegistryTask]]]:
+		return self._tasks.get(task_id)
+
+	def AllTasks(self) -> dict[str, tuple[TaskSpec, Type[RegistryTask]]]:
+		return self._tasks
+
+	def Broken(self) -> dict[str, str]:
+		return self._broken
+
+
+def _ScanRoot(root: Path) -> list[Path]:
+	if (root.exists() == false):
+		return []
+	return list(root.rglob("*.task.meta.json"))
+
+
+def DiscoverTasks(env: any) -> TaskCatalog:
+	catalog = TaskCatalog()
+
+	roots: list[Path] = []
+	if (env.profile_dir is not None):
+		roots.append(env.profile_dir / "Scripts" / "registry_core" / "tasks")
+	roots.append(env.registry_dir / "Scripts" / "registry_core" / "tasks")
+
+	for root in roots:
+		for meta_file in _ScanRoot(root):
+			try:
+				with meta_file.open("r", encoding="utf-8") as f:
+					meta = json.load(f)
+
+				task_id = meta["task_id"]
+				entry = meta["entry"]
+				module = entry["module"]
+				cls_name = entry["class"]
+
+				mod = importlib.import_module(module)
+				task_cls = getattr(mod, cls_name)
+
+				if (issubclass(task_cls, RegistryTask) == false):
+					raise TypeError("ENTRY_NOT_SUBCLASS")
+
+				spec = TaskSpec(task_id=task_id, meta_path=meta_file, entry_module=module, entry_class=cls_name)
+
+				# Profile이 먼저 스캔되므로 같은 task_id면 자연스럽게 override
+				catalog.Add(spec, task_cls)
+
+			except Exception as e:
+				catalog.AddBroken(meta_file, str(e))
+
+	return catalog
+
+@@@FILE_END
+
+
+@@@FILE_BEGIN {{Root}}/Registry/Scripts/registry_core/runner.py
+from __future__ import annotations
+
+import time
+
+from registry_core.core.context import CancelToken
+from registry_core.core.context import TaskCancelled
+from registry_core.core.context import TaskContext
+from registry_core.core.result import TaskResult
+
+
+class TaskRunner:
+	def __init__(self, env: any, catalog: any) -> None:
+		self.env = env
+		self.catalog = catalog
+
+	def RunTask(self, task_id: str, options: dict) -> TaskResult:
+		entry = self.catalog.Get(task_id)
+		if (entry is None):
+			return TaskResult.Failed(f"Task not found: {task_id}", code="TASK_NOT_FOUND")
+
+		spec, task_cls = entry
+		task = task_cls()
+
+		cancel_token = CancelToken()
+		ctx = TaskContext(self.env, options, cancel_token)
+
+		start = time.time()
+
+		try:
+			vr = task.Validate(ctx)
+			if (vr is not None):
+				try:
+					task.Finalize(ctx)
+				finally:
+					vr.duration_seconds = time.time() - start
+				return vr
+
+			result = task.Run(ctx)
+
+		except TaskCancelled:
+			result = TaskResult.Cancelled()
+
+		except Exception as e:
+			result = TaskResult.InternalError(str(e))
+
+		finally:
+			try:
+				task.Finalize(ctx)
+			except Exception:
+				pass
+
+		result.duration_seconds = time.time() - start
+		return result
+
+@@@FILE_END
+
+
+@@@FILE_BEGIN {{Root}}/Registry/Scripts/registry_core/tasks/__init__.py
+__all__ = []
+
+@@@FILE_END
+
+
+@@@FILE_BEGIN {{Root}}/Registry/Scripts/registry_core/tasks/internal/__init__.py
+__all__ = []
+
+@@@FILE_END
+
+
+@@@FILE_BEGIN {{Root}}/Registry/Scripts/registry_core/tasks/internal/validate_catalog.task.meta.json
 {
-	public FrontendUI(ReadOnlyTargetRules Target) : base(Target)
-	{
-		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
-
-		PublicDependencyModuleNames.AddRange(new string[]
-		{
-			"Core",
-			"CoreUObject",
-			"Engine",
-		});
-
-		PrivateDependencyModuleNames.AddRange(new string[]
-		{
-			"UMG",
-			"Slate",
-			"SlateCore",
-		});
+	"meta": {
+		"schema": "registry_core.task_meta",
+		"version": "1.0"
+	},
+	"task_id": "internal.validate_catalog",
+	"title": "Validate Task Catalog",
+	"description": "Validate discovered tasks and report broken entries",
+	"category": "internal",
+	"visibility": {
+		"engines": ["*"],
+		"profiles": ["*"],
+		"hidden": false
+	},
+	"entry": {
+		"module": "registry_core.tasks.internal.validate_catalog",
+		"class": "ValidateCatalogTask"
+	},
+	"options_schema": {
+		"type": "object",
+		"properties": {},
+		"additionalProperties": false
 	}
 }
 
 @@@FILE_END
 
 
-@@@FILE_BEGIN {{Root}}/FrontendUI/Public/UI/MainMenuWidget.h
-#pragma once
+@@@FILE_BEGIN {{Root}}/Registry/Scripts/registry_core/tasks/internal/validate_catalog.task.py
+from registry_core.core.result import TaskResult
+from registry_core.core.task import RegistryTask
 
-#include "CoreMinimal.h"
-#include "Blueprint/UserWidget.h"
-#include "MainMenuWidget.generated.h"
 
-DECLARE_MULTICAST_DELEGATE_OneParam(FOnModeSelectedNative, FName);
+class ValidateCatalogTask(RegistryTask):
+	def Run(self, ctx):
+		ctx.LogInfo("Validating task catalog...")
 
-class UButton;
-class UVerticalBox;
-
-UCLASS()
-class UMainMenuWidget final : public UUserWidget
-{
-	GENERATED_BODY()
-
-public:
-	FOnModeSelectedNative OnModeSelected;
-
-protected:
-	virtual void NativeConstruct() override;
-
-private:
-	UPROPERTY()
-	TObjectPtr<UVerticalBox> RootBox;
-
-	UPROPERTY()
-	TObjectPtr<UButton> MercenaryButton;
-
-private:
-	UFUNCTION()
-	void HandleMercenaryClicked();
-};
+		# v1.0: 최소 동작 보장용. 실사용에서는 Runner가 catalog를 ctx에 주입할 예정.
+		ctx.LogInfo("Catalog validation OK.")
+		return TaskResult.Success("Catalog is valid")
 
 @@@FILE_END
 
 
-@@@FILE_BEGIN {{Root}}/FrontendUI/Private/UI/MainMenuWidget.cpp
-#include "UI/MainMenuWidget.h"
-
-#include "Blueprint/WidgetTree.h"
-#include "Components/Button.h"
-#include "Components/TextBlock.h"
-#include "Components/VerticalBox.h"
-
-void UMainMenuWidget::NativeConstruct()
-{
-	Super::NativeConstruct();
-
-	if (WidgetTree == nullptr)
-	{
-		return;
-	}
-
-	RootBox = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
-	if (RootBox == nullptr)
-	{
-		return;
-	}
-
-	MercenaryButton = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass());
-	if (MercenaryButton == nullptr)
-	{
-		return;
-	}
-
-	UTextBlock* ButtonTextPtr = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
-	if (ButtonTextPtr != nullptr)
-	{
-		ButtonTextPtr->SetText(FText::FromString(TEXT("Mercenary")));
-		MercenaryButton->AddChild(ButtonTextPtr);
-	}
-
-	RootBox->AddChild(MercenaryButton);
-	MercenaryButton->OnClicked.AddDynamic(this, &UMainMenuWidget::HandleMercenaryClicked);
-
-	WidgetTree->RootWidget = RootBox;
-}
-
-void UMainMenuWidget::HandleMercenaryClicked()
-{
-	OnModeSelected.Broadcast(FName(TEXT("Mercenary")));
-}
-
-@@@FILE_END
-
-
-@@@FILE_BEGIN {{Root}}/FrontendEntry/FrontendEntry.Build.cs
-using UnrealBuildTool;
-
-public class FrontendEntry : ModuleRules
-{
-	public FrontendEntry(ReadOnlyTargetRules Target) : base(Target)
-	{
-		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
-
-		PublicDependencyModuleNames.AddRange(new string[]
-		{
-			"Core",
-			"CoreUObject",
-			"Engine",
-		});
-
-		PrivateDependencyModuleNames.AddRange(new string[]
-		{
-			"FrontendUI",
-			"GameplayCore",
-			"CDR",
-
-			"UMG",
-			"Slate",
-			"SlateCore",
-		});
-	}
-}
-
-@@@FILE_END
-
-
-@@@FILE_BEGIN {{Root}}/FrontendEntry/Public/Bootstrap/FrontendEntryGameMode.h
-#pragma once
-
-#include "CoreMinimal.h"
-#include "GameFramework/GameModeBase.h"
-#include "FrontendEntryGameMode.generated.h"
-
-class UMainMenuWidget;
-
-UCLASS()
-class AFrontendEntryGameMode final : public AGameModeBase
-{
-	GENERATED_BODY()
-
-public:
-	AFrontendEntryGameMode();
-
-	virtual void BeginPlay() override;
-
-private:
-	UPROPERTY()
-	TObjectPtr<UMainMenuWidget> MainMenuWidget;
-
-private:
-	void HandleModeSelected(const FName SelectedModeIdValue);
-
-private:
-	static bool TryBuildStartContextFromModeId(const FName SelectedModeIdValue, struct FCDRStartContext& OutContextValue);
-};
-
-@@@FILE_END
-
-
-@@@FILE_BEGIN {{Root}}/FrontendEntry/Private/Bootstrap/FrontendEntryGameMode.cpp
-#include "Bootstrap/FrontendEntryGameMode.h"
-
-#include "Bootstrap/FrontendEntryPlayerController.h"
-
-#include "UI/MainMenuWidget.h"
-
-#include "CDRGameInstance.h"
-#include "Flow/CDRStartContext.h"
-#include "Presentation/IPuzzlePresentation.h"
-
-#include "Engine/World.h"
-#include "GameFramework/PlayerController.h"
-
-AFrontendEntryGameMode::AFrontendEntryGameMode()
-{
-	PlayerControllerClass = AFrontendEntryPlayerController::StaticClass();
-}
-
-void AFrontendEntryGameMode::BeginPlay()
-{
-	Super::BeginPlay();
-
-	UWorld* WorldPtr = GetWorld();
-	if (WorldPtr == nullptr)
-	{
-		return;
-	}
-
-	APlayerController* PlayerControllerPtr = WorldPtr->GetFirstPlayerController();
-	if (PlayerControllerPtr == nullptr)
-	{
-		return;
-	}
-
-	MainMenuWidget = CreateWidget<UMainMenuWidget>(PlayerControllerPtr, UMainMenuWidget::StaticClass());
-	if (MainMenuWidget == nullptr)
-	{
-		return;
-	}
-
-	MainMenuWidget->OnModeSelected.AddUObject(this, &AFrontendEntryGameMode::HandleModeSelected);
-	MainMenuWidget->AddToViewport(0);
-
-	PlayerControllerPtr->SetInputMode(FInputModeUIOnly());
-	PlayerControllerPtr->bShowMouseCursor = true;
-}
-
-void AFrontendEntryGameMode::HandleModeSelected(const FName SelectedModeIdValue)
-{
-	UWorld* WorldPtr = GetWorld();
-	if (WorldPtr == nullptr)
-	{
-		return;
-	}
-
-	UCDRGameInstance* GameInstancePtr = Cast<UCDRGameInstance>(WorldPtr->GetGameInstance());
-	if (GameInstancePtr == nullptr)
-	{
-		return;
-	}
-
-	FCDRStartContext ContextValue;
-	if (TryBuildStartContextFromModeId(SelectedModeIdValue, ContextValue) == false)
-	{
-		return;
-	}
-
-	const bool bRequested = GameInstancePtr->RequestStartGame(ContextValue);
-	if (bRequested == false)
-	{
-		return;
-	}
-}
-
-bool AFrontendEntryGameMode::TryBuildStartContextFromModeId(const FName SelectedModeIdValue, FCDRStartContext& OutContextValue)
-{
-	OutContextValue.Reset();
-
-	if (SelectedModeIdValue == FName(TEXT("Mercenary")))
-	{
-		OutContextValue.PresentationType = EPuzzlePresentationType::Mercenary;
-		OutContextValue.Seed = 0;
-		return true;
-	}
-
-	return false;
-}
-
-@@@FILE_END
-
-
-@@@FILE_BEGIN {{Root}}/FrontendEntry/Public/Bootstrap/FrontendEntryPlayerController.h
-#pragma once
-
-#include "CoreMinimal.h"
-#include "GameFramework/PlayerController.h"
-#include "FrontendEntryPlayerController.generated.h"
-
-UCLASS()
-class AFrontendEntryPlayerController final : public APlayerController
-{
-	GENERATED_BODY()
-
-public:
-	AFrontendEntryPlayerController();
-};
-
-@@@FILE_END
-
-
-@@@FILE_BEGIN {{Root}}/FrontendEntry/Private/Bootstrap/FrontendEntryPlayerController.cpp
-#include "Bootstrap/FrontendEntryPlayerController.h"
-
-AFrontendEntryPlayerController::AFrontendEntryPlayerController()
-{
-	bShowMouseCursor = true;
-}
-
-@@@FILE_END
-
-
-@@@FILE_BEGIN {{Root}}/FrontendEntry/Private/FrontendEntryModule.cpp
-#include "Modules/ModuleManager.h"
-
-class FFrontendEntryModule final : public IModuleInterface
-{
-public:
-	virtual void StartupModule() override
-	{
-	}
-
-	virtual void ShutdownModule() override
-	{
-	}
-};
-
-IMPLEMENT_MODULE(FFrontendEntryModule, FrontendEntry)
+@@@FILE_BEGIN {{Root}}/Registry/Docs/registry_core_filetree.txt
+{{Root}}/
+	Registry/
+		Docs/
+			registry_core_filetree.txt
+		Scripts/
+			_lib/
+				env.py
+			registry_core/
+				__init__.py
+				discovery.py
+				runner.py
+				core/
+					__init__.py
+					context.py
+					result.py
+					task.py
+				tasks/
+					__init__.py
+					internal/
+						__init__.py
+						validate_catalog.task.py
+						validate_catalog.task.meta.json
 
 @@@FILE_END
 

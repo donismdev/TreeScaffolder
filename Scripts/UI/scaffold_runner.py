@@ -42,13 +42,16 @@ def execute_scaffold(app):
     app._log("="*60)
 
     stats = {"dirs_created": 0, "dirs_skipped": 0, "dirs_error": 0, "files_created": 0, "files_overwritten": 0, "files_skipped": 0, "files_error": 0}
+    successful_paths = []
 
     for path in sorted(list(plan.planned_dirs), key=lambda p: len(p.parts)):
         state = plan.path_states.get(path)
         if state == "new":
-            ok, created, skipped = _ensure_dir(app, path, is_dry_run)
+            ok, created, skipped = _ensure_dir(app, path, is_dry_run, successful_paths)
             if ok:
-                if created: stats["dirs_created"] += 1
+                if created:
+                    stats["dirs_created"] += 1
+                    successful_paths.append(path)
                 if skipped: stats["dirs_skipped"] += 1
             else:
                 stats["dirs_error"] += 1
@@ -62,10 +65,14 @@ def execute_scaffold(app):
 
         if state == "new" or state == "overwrite":
             is_overwrite = state == "overwrite"
-            ok, created, skipped = _ensure_file(app, path, is_dry_run, content, is_overwrite)
+            ok, created, skipped = _ensure_file(app, path, is_dry_run, content, is_overwrite, successful_paths)
             if ok:
-                if created and not is_overwrite: stats["files_created"] += 1
-                if created and is_overwrite: stats["files_overwritten"] += 1
+                if created and not is_overwrite:
+                    stats["files_created"] += 1
+                    successful_paths.append(path)
+                if created and is_overwrite:
+                    stats["files_overwritten"] += 1
+                    successful_paths.append(path)
                 if skipped: stats["files_skipped"] += 1
             else:
                 stats["files_error"] += 1
@@ -87,6 +94,29 @@ def execute_scaffold(app):
         app._log("Operation finished with errors.", "error")
     else:
         app._log("Operation finished successfully.", "success")
+        # If it was a real run, update the plan's state to reflect what was written
+        if not is_dry_run:
+            for path in successful_paths:
+                if path.is_dir():
+                    plan.path_states[path] = 'exists'
+                elif path.is_file():
+                    try:
+                        actual_content = path.read_text(encoding='utf-8', errors='replace')
+                        planned_content = plan.file_contents.get(path.resolve())
+                        
+                        # Normalize line endings (CRLF to LF) and handle None vs empty string
+                        norm_actual = (actual_content or "").replace('\r\n', '\n')
+                        norm_planned = (planned_content or "").replace('\r\n', '\n')
+                        
+                        if norm_actual == norm_planned:
+                            plan.path_states[path] = 'exists'
+                            app._log(f"Successfully verified content for {path}. State set to 'exists'. Current state: {plan.path_states.get(path)}", "debug")
+                        else:
+                            app._log(f"Content verification failed for {path}. State not updated. Current state: {plan.path_states.get(path)}", "warn")
+                            
+                    except Exception as e:
+                        app._log(f"Could not verify file content for {path}: {e}", "error")
+
         if app.open_folder_after_apply.get():
             try:
                 app._log(f"Opening folder: {plan.root_path}", "info")
@@ -183,7 +213,7 @@ def _write_execution_log(app, stats: dict, is_dry_run: bool, captured_logs: list
     except Exception as e:
         original_log_method(f"Error writing execution log: {e}", "error")
 
-def _ensure_dir(app, path: Path, dry_run: bool) -> tuple[bool, bool, bool]:
+def _ensure_dir(app, path: Path, dry_run: bool, successful_paths: list) -> tuple[bool, bool, bool]:
     """(ok, created, skipped)"""
     if path.exists():
         app._log(f"[SKIP DIR]  {path}", "skip")
@@ -198,7 +228,7 @@ def _ensure_dir(app, path: Path, dry_run: bool) -> tuple[bool, bool, bool]:
             return False, False, False
     return True, True, False
 
-def _ensure_file(app, path: Path, dry_run: bool, content: str | None, is_overwrite: bool) -> tuple[bool, bool, bool]:
+def _ensure_file(app, path: Path, dry_run: bool, content: str | None, is_overwrite: bool, successful_paths: list) -> tuple[bool, bool, bool]:
     """(ok, created, skipped)"""
     verb = "[OVERWRITE]" if is_overwrite else "[CREATE]"
     

@@ -130,3 +130,13 @@ public class NewModule : ModuleRules
 ### 블록 내용 처리 (Verbatim)
 
 -   **규칙**: `v2_parser.py`는 `@@@<KEYWORD>_BEGIN`과 `@@@<KEYWORD>_END` 태그 사이의 내용을 어떤 수정(예: 줄바꿈 제거, 공백 다듬기) 없이 **있는 그대로(verbatim)** 추출합니다. 따라서 V2 포맷에 입력된 줄바꿈, 공백 문자는 최종 결과물에 그대로 반영됩니다.
+
+---
+
+## 6. 환경 설정 (`config.json`)
+
+애플리케이션의 동작을 제어하는 설정 파일입니다.
+
+-   `enable_runtime_logging` (boolean)
+    -   **`true`**: 애플리케이션 실행 시, 모든 동작과 오류를 기록하는 `runtime.log` 파일을 생성합니다. 이 로그는 GUI의 로그 패널보다 더 상세하며, 문제 해결에 유용합니다.
+    -   **`false`**: `runtime.log` 파일을 생성하지 않습니다.
