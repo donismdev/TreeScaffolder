@@ -31,12 +31,15 @@ def create_left_panel(app):
     
     app.browse_button = ttk.Button(path_buttons_frame, text="Browse...", command=app.on_browse_folder, width=8)
     app.browse_button.grid(row=0, column=2, padx=(0, 5))
+    app.widget_map["on_browse_folder"] = app.browse_button
 
     app.prev_dir_button = ttk.Button(path_buttons_frame, text="Prev", command=app.on_previous_folder, width=5, state=tk.DISABLED)
     app.prev_dir_button.grid(row=0, column=3, padx=(0, 5))
+    app.widget_map["on_previous_folder"] = app.prev_dir_button
 
     app.clear_button = ttk.Button(path_buttons_frame, text="Clear", command=app.on_clear_data, width=5)
     app.clear_button.grid(row=0, column=4)
+    app.widget_map["on_clear_data"] = app.clear_button
 
     # --- Editor Tabs ---
     editor_tabs_frame = ttk.LabelFrame(app.left_frame, text="2. Define Scaffold Tree")
@@ -118,12 +121,15 @@ def create_left_panel(app):
 
     app.recompute_button = ttk.Button(actions_subframe, text="Compute Diff", command=app.on_recompute, state=tk.DISABLED)
     app.recompute_button.grid(row=0, column=0, padx=2, sticky="ew")
+    app.widget_map["on_recompute"] = app.recompute_button
 
     app.apply_button = ttk.Button(actions_subframe, text="Apply Scaffold", command=app.on_apply, state=tk.DISABLED)
     app.apply_button.grid(row=0, column=1, padx=2, sticky="ew")
+    app.widget_map["on_apply"] = app.apply_button
 
     app.load_test_data_button = ttk.Button(actions_subframe, text="Load Test Data", command=app.on_load_test_data)
     app.load_test_data_button.grid(row=1, column=0, columnspan=2, padx=2, pady=(5,0), sticky="ew")
+    app.widget_map["on_load_test_data_conditional"] = app.load_test_data_button
 
 
 def create_treeview(parent: ttk.Frame, show: str = "tree") -> ttk.Treeview:

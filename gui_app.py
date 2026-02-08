@@ -23,6 +23,7 @@ from Scripts.UI.tree_populator import populate_before_tree, populate_after_tree
 from Scripts.UI import app_utils
 from Scripts.UI import scaffold_runner
 from Scripts.UI import key_bindings
+from Scripts.UI import shortcut_hints # Added import
 from Scripts.UI.tree_populator import _clear_tree as clear_tree_function # Import as different name
 
 # --- Constants ---
@@ -84,8 +85,6 @@ class ScaffoldApp:
         self.DEFAULT_GEOMETRY = DEFAULT_GEOMETRY
         self.DEFAULT_TREE_TEMPLATE = DEFAULT_TREE_TEMPLATE
 
-        # app_utils.load_window_geometry(self)
-
         # --- Style Configuration ---
         self.style = ttk.Style()
         self.style.theme_use('vista')
@@ -108,6 +107,9 @@ class ScaffoldApp:
         self.after_list = None
         self.before_notebook = None
         self.after_notebook = None
+        
+        self.widget_map = {} # Map action names to UI widgets for shortcut hints
+        self.key_bindings_map = key_bindings._load_key_bindings_config() # Load keybindings for hint manager
 
         # --- Main Layout ---
         self.main_paned_window = ttk.PanedWindow(self.root, orient=tk.HORIZONTAL)
@@ -142,9 +144,13 @@ class ScaffoldApp:
         app_utils.load_last_root_path(self)
         key_bindings.setup_key_bindings(self)
         
-        # Original request was to prevent text widgets from auto-focusing.
-        # Removing explicit focus setting here.
-        
+        # --- Shortcut Hint Setup ---
+        self.hint_manager = shortcut_hints.ShortcutHintManager(self)
+        self.root.bind("<KeyPress-Alt_L>", self.hint_manager.show_hints)
+        self.root.bind("<KeyPress-Alt_R>", self.hint_manager.show_hints)
+        self.root.bind("<KeyRelease-Alt_L>", self.hint_manager.hide_hints)
+        self.root.bind("<KeyRelease-Alt_R>", self.hint_manager.hide_hints)
+
         print("DEBUG: ScaffoldApp.__init__ completed") # Debug print
 
     def setup_styles(self):
