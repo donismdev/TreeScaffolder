@@ -4,5 +4,10 @@
     "Grave": { "action": "cycle_notebook", "target_notebook": "notebook" },
     "1": { "action": "cycle_notebook", "target_notebook": "before_notebook" },
     "2": { "action": "cycle_notebook", "target_notebook": "after_notebook" },
-    "3": { "action": "cycle_notebook", "target_notebook": "editor_notebook" }
+    "3": { "action": "cycle_notebook", "target_notebook": "editor_notebook" },
+    "v": { "action": "on_previous_folder" },
+    "b": { "action": "on_browse_folder" },
+    "c": { "action": "on_clear_data" },
+    "d": { "action": "on_recompute" },
+    "f": { "action": "on_apply" }
 }

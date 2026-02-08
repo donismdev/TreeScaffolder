@@ -15,15 +15,23 @@ KEYBINDINGS_CONFIG_FILE = "Resources/key_bindings_map.json"
 
 # --- Helper Functions for Actions ---
 
+# Helper to call methods based on whether they expect an event object
+def _call_method_with_event(method, event):
+    return method(event)
+
+def _call_method_without_event(method, event):
+    # 'event' is received from Tkinter bind, but the method doesn't need it.
+    return method()
+
 def _on_load_test_data_conditional(app, event):
     """
     Handles the Spacebar press event.
     Triggers on_load_test_data if focus is NOT on a text/entry widget.
     """
-    app._log("Attempting to load test data...", "info") # Added log
+    app._log("Attempting to load test data...", "info")
     focused_widget = app.root.focus_get()
     if isinstance(focused_widget, (tk.Text, tk.Entry)):
-        app._log("Load test data skipped: Text/Entry widget focused.", "info") # Added log
+        app._log("Load test data skipped: Text/Entry widget focused.", "info")
         return # Do not trigger if focus is on a text input widget
     app.on_load_test_data()
     return "break" # Prevent default spacebar behavior (e.g., scrolling)
@@ -38,16 +46,16 @@ def _on_cycle_notebook(app, event, target_notebook_name):
         event: The Tkinter event object.
         target_notebook_name (str): The name of the notebook widget attribute on the app instance.
     """
-    app._log(f"Attempting to cycle notebook '{target_notebook_name}'...", "info") # Added log
+    app._log(f"Attempting to cycle notebook '{target_notebook_name}'...", "info")
     focused_widget = app.root.focus_get()
     if isinstance(focused_widget, (tk.Text, tk.Entry)):
-        app._log(f"Cycle notebook '{target_notebook_name}' skipped: Text/Entry widget focused.", "info") # Added log
+        app._log(f"Cycle notebook '{target_notebook_name}' skipped: Text/Entry widget focused.", "info")
         return # Do not trigger if focus is on a text input widget
         
     try:
         notebook = getattr(app, target_notebook_name)
         if not notebook:
-            app._log(f"Notebook '{target_notebook_name}' not found or is None. Skipping cycle.", "warning") # Added log
+            app._log(f"Notebook '{target_notebook_name}' not found or is None. Skipping cycle.", "warning")
             return
             
         current_tab_index = notebook.index(notebook.select())
@@ -56,9 +64,9 @@ def _on_cycle_notebook(app, event, target_notebook_name):
         if num_tabs > 0:
             next_tab_index = (current_tab_index + 1) % num_tabs
             notebook.select(next_tab_index)
-            app._log(f"Successfully cycled notebook '{target_notebook_name}' to tab {next_tab_index}.", "info") # Added log
+            app._log(f"Successfully cycled notebook '{target_notebook_name}' to tab {next_tab_index}.", "info")
         else:
-            app._log(f"Notebook '{target_notebook_name}' has no tabs. Skipping cycle.", "info") # Added log
+            app._log(f"Notebook '{target_notebook_name}' has no tabs. Skipping cycle.", "info")
         
     except (AttributeError, tk.TclError) as e:
         # Handle cases where the widget doesn't exist or has no tabs
@@ -99,9 +107,13 @@ def setup_key_bindings(app):
     # Map action names from JSON to actual functions/methods
     action_handlers = {
         "on_load_test_data_conditional": _on_load_test_data_conditional,
-        "on_escape_pressed": app.on_escape_pressed,
+        "on_escape_pressed": lambda event: _call_method_with_event(app.on_escape_pressed, event),
         "cycle_notebook": _on_cycle_notebook,
-        # Add other direct app methods here if needed
+        "on_previous_folder": lambda event: _call_method_without_event(app.on_previous_folder, event),
+        "on_browse_folder": lambda event: _call_method_without_event(app.on_browse_folder, event),
+        "on_clear_data": lambda event: _call_method_without_event(app.on_clear_data, event),
+        "on_recompute": lambda event: _call_method_without_event(app.on_recompute, event),
+        "on_apply": lambda event: _call_method_without_event(app.on_apply, event),
     }
 
     for key_sequence, binding_config in bindings_map.items():
@@ -119,7 +131,7 @@ def setup_key_bindings(app):
                     print(f"WARNING: 'target_notebook' missing for cycle_notebook action for key {key_sequence}")
             elif action_name == "on_load_test_data_conditional":
                 app.root.bind(tk_key_sequence, lambda event, h=handler: h(app, event))
-            else: # Direct method call or simple handler
+            else: # Direct method call or simple handler (now always wrapped to handle event argument)
                 app.root.bind(tk_key_sequence, lambda event, h=handler: h(event))
         else:
             print(f"WARNING: No handler found for action '{action_name}' for key '{key_sequence}'.")
