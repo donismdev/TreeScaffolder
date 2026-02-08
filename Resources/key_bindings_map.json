@@ -1,0 +1,8 @@
+{
+    "Space": { "action": "on_load_test_data_conditional" },
+    "Escape": { "action": "on_escape_pressed" },
+    "Grave": { "action": "cycle_notebook", "target_notebook": "notebook" },
+    "1": { "action": "cycle_notebook", "target_notebook": "before_notebook" },
+    "2": { "action": "cycle_notebook", "target_notebook": "after_notebook" },
+    "3": { "action": "cycle_notebook", "target_notebook": "editor_notebook" }
+}
