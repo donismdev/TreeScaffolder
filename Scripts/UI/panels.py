@@ -49,6 +49,7 @@ def create_left_panel(app):
 
     app.editor_notebook = ttk.Notebook(editor_tabs_frame)
     app.editor_notebook.grid(row=0, column=0, sticky="nsew")
+    app.widget_map["cycle_notebook_editor_notebook"] = app.editor_notebook
 
     # --- Scaffold Tree Tab ---
     scaffold_tree_frame = ttk.Frame(app.editor_notebook)
@@ -147,6 +148,7 @@ def create_right_panel(app):
     """Creates the notebook for showing diffs and logs."""
     app.notebook = ttk.Notebook(app.right_frame)
     app.notebook.pack(fill=tk.BOTH, expand=True)
+    app.widget_map["cycle_notebook_notebook"] = app.notebook
 
     # --- Diff View ---
     diff_frame = ttk.Frame(app.notebook, padding=5)
@@ -165,6 +167,7 @@ def create_right_panel(app):
 
     app.before_notebook = ttk.Notebook(before_pane_frame)
     app.before_notebook.grid(row=0, column=0, sticky="nsew", padx=2, pady=2)
+    app.widget_map["cycle_notebook_before_notebook"] = app.before_notebook
     
     before_tree_frame = ttk.Frame(app.before_notebook)
     before_tree_frame.rowconfigure(0, weight=1)
@@ -186,6 +189,7 @@ def create_right_panel(app):
     
     app.after_notebook = ttk.Notebook(after_pane_frame)
     app.after_notebook.grid(row=0, column=0, sticky="nsew", padx=2, pady=2)
+    app.widget_map["cycle_notebook_after_notebook"] = app.after_notebook
 
     after_tree_frame = ttk.Frame(app.after_notebook)
     after_tree_frame.rowconfigure(0, weight=1)

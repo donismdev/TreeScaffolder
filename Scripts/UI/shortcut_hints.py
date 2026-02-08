@@ -33,7 +33,14 @@ class ShortcutHintManager:
 
         for key_sequence, binding_config in self._key_bindings.items():
             action_name = binding_config.get("action")
-            widget = self.app.widget_map.get(action_name)
+            
+            map_key = action_name
+            if action_name == "cycle_notebook":
+                target_notebook = binding_config.get("target_notebook")
+                if target_notebook:
+                    map_key = f"{action_name}_{target_notebook}"
+
+            widget = self.app.widget_map.get(map_key)
 
             if widget and widget.winfo_ismapped():
                 # Get the widget's absolute screen coordinates
