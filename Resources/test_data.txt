@@ -1,0 +1,1824 @@
+@@@FILE_BEGIN Codex/Packages/GameDevelopment/codex.meta.json
+{
+	"codex_name": "GameDevelopment",
+	"codex_uid": "uid:codex:game_development",
+	"version": "1.73",
+	"status": "current",
+	"description": "Domain codex authority package for GameDevelopment. Defines content coordinate grammar (Major/Segment/Schema), StringId category grammar, and binding grammar for Task/Script/Table.",
+	"entry_kinds_supported": [
+		"DomainEntry",
+		"MajorEntry",
+		"SegmentEntry",
+		"SchemaEntry",
+		"ArtifactTypeEntry",
+		"RuleSetEntry",
+		"CategoryEntry",
+		"AllowedMatrixRule"
+	],
+	"requires_universal_id_spec": "1.x",
+	"binding_grammar_spec": "CodexBindingGrammar.v0.1",
+	"notes": [
+		"This codex is operated as a live 'current' codex. Historical versions are tracked by VCS, not by caching multiple package copies."
+	]
+}
+
+@@@FILE_END
+
+
+@@@FILE_BEGIN Codex/Packages/GameDevelopment/Entries/Domain/domain_entry.json
+{
+	"uid": "uid:codex_entry:game_development:domain",
+	"kind": "DomainEntry",
+	"domain": "GameDevelopment",
+	"codex_uid": "uid:codex:game_development",
+	"title": "GameDevelopment Domain",
+	"summary": "Domain root entry for GameDevelopment codex package v1.73.",
+	"status": "Active",
+	"entry_kinds_supported": [
+		"MajorEntry",
+		"SegmentEntry",
+		"SchemaEntry",
+		"ArtifactTypeEntry",
+		"RuleSetEntry",
+		"CategoryEntry",
+		"AllowedMatrixRule"
+	],
+	"governance": {
+		"authority": "Codex",
+		"overlay_supported": true,
+		"effective_codex_required_for_execution": true,
+		"uid_first": true,
+		"breaking_change_policy": [
+			"Any change that alters meaning of an entry.",
+			"Any change that changes Allowed Matrix verdicts.",
+			"Any change that changes interpretation of Major/Segment/Schema coordinate grammar.",
+			"Any change that changes StringId bit layout or category meaning."
+		]
+	}
+}
+
+@@@FILE_END
+
+
+@@@FILE_BEGIN Codex/Packages/GameDevelopment/Entries/Majors/majors.json
+{
+	"uid": "uid:codex_entry:game_development:majors",
+	"kind": "MajorCatalog",
+	"domain": "GameDevelopment",
+	"codex_uid": "uid:codex:game_development",
+	"title": "Major Catalog",
+	"summary": "Major boundaries and cognitive order mapping. Includes reserved ranges and core domain map.",
+	"status": "Active",
+	"major_ranges": [
+		{
+			"uid": "uid:codex_entry:game_development:major_range:invalid",
+			"major_min": 0,
+			"major_max": 0,
+			"label": "Invalid",
+			"summary": "Invalid major."
+		},
+		{
+			"uid": "uid:codex_entry:game_development:major_range:system_constants",
+			"major_min": 1,
+			"major_max": 9,
+			"label": "SystemConstants",
+			"summary": "System constants."
+		},
+		{
+			"uid": "uid:codex_entry:game_development:major_range:project_core",
+			"major_min": 10,
+			"major_max": 159,
+			"label": "ProjectContentCore",
+			"summary": "Project content core."
+		},
+		{
+			"uid": "uid:codex_entry:game_development:major_range:project_extension_buffer",
+			"major_min": 160,
+			"major_max": 175,
+			"label": "ProjectExtensionBuffer",
+			"summary": "Project extension buffer for schema overflow."
+		},
+		{
+			"uid": "uid:codex_entry:game_development:major_range:experimental_buffer",
+			"major_min": 176,
+			"major_max": 191,
+			"label": "ExperimentalBuffer",
+			"summary": "Experimental buffer."
+		},
+		{
+			"uid": "uid:codex_entry:game_development:major_range:support_tooling",
+			"major_min": 192,
+			"major_max": 223,
+			"label": "SupportTooling",
+			"summary": "Support/tooling."
+		},
+		{
+			"uid": "uid:codex_entry:game_development:major_range:reserved_meta",
+			"major_min": 224,
+			"major_max": 255,
+			"label": "ReservedMeta",
+			"summary": "Reserved/meta."
+		}
+	],
+	"core_domain_map": [
+		{
+			"uid": "uid:codex_entry:game_development:major_group:actor_entity",
+			"major_min": 10,
+			"major_max": 29,
+			"domain_alias": "Actor",
+			"cognitive_question": "Who",
+			"summary": "Who exists."
+		},
+		{
+			"uid": "uid:codex_entry:game_development:major_group:item_inventory",
+			"major_min": 30,
+			"major_max": 49,
+			"domain_alias": "Item",
+			"cognitive_question": "What",
+			"summary": "What is used."
+		},
+		{
+			"uid": "uid:codex_entry:game_development:major_group:ability_combat",
+			"major_min": 50,
+			"major_max": 69,
+			"domain_alias": "Ability",
+			"cognitive_question": "How",
+			"summary": "How actions happen."
+		},
+		{
+			"uid": "uid:codex_entry:game_development:major_group:world_space",
+			"major_min": 70,
+			"major_max": 89,
+			"domain_alias": "World",
+			"cognitive_question": "Where",
+			"summary": "Where it happens."
+		},
+		{
+			"uid": "uid:codex_entry:game_development:major_group:progression_narrative",
+			"major_min": 90,
+			"major_max": 109,
+			"domain_alias": "Progression",
+			"cognitive_question": "Why",
+			"summary": "Why the player plays."
+		},
+		{
+			"uid": "uid:codex_entry:game_development:major_group:economy_meta",
+			"major_min": 110,
+			"major_max": 129,
+			"domain_alias": "Economy",
+			"cognitive_question": "Value",
+			"summary": "Rewards and costs."
+		},
+		{
+			"uid": "uid:codex_entry:game_development:major_group:presentation_view",
+			"major_min": 130,
+			"major_max": 149,
+			"domain_alias": "Presentation",
+			"cognitive_question": "View",
+			"summary": "How it looks and feels."
+		},
+		{
+			"uid": "uid:codex_entry:game_development:major_group:live_ops",
+			"major_min": 150,
+			"major_max": 159,
+			"domain_alias": "Live",
+			"cognitive_question": "Live",
+			"summary": "Time-layered operations."
+		}
+	],
+	"majors": [
+		{
+			"uid": "uid:codex_entry:game_development:major:system_constants",
+			"kind": "MajorEntry",
+			"major_min": 1,
+			"major_max": 9,
+			"major_key": "SystemConstants",
+			"title": "System Constants",
+			"summary": "System constants major range.",
+			"meaning_boundary": [
+				"System-wide constants and tables used by tooling/runtime.",
+				"Not gameplay content."
+			],
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:major:actor_entity",
+			"kind": "MajorEntry",
+			"major_min": 10,
+			"major_max": 29,
+			"major_key": "ActorEntity",
+			"title": "Actor / Entity",
+			"summary": "Who exists.",
+			"meaning_boundary": [
+				"Actors, entities, NPCs, monsters, and existence definitions.",
+				"Variants/skins/states are classifiers, not new segments."
+			],
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:major:item_inventory",
+			"kind": "MajorEntry",
+			"major_min": 30,
+			"major_max": 49,
+			"major_key": "ItemInventory",
+			"title": "Item / Inventory",
+			"summary": "What is used.",
+			"meaning_boundary": [
+				"Items, equipment rules, inventory rules.",
+				"Weapon/armor/tool are classifiers on EquipableItem."
+			],
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:major:ability_combat",
+			"kind": "MajorEntry",
+			"major_min": 50,
+			"major_max": 69,
+			"major_key": "AbilityCombat",
+			"title": "Ability / Combat",
+			"summary": "How actions happen.",
+			"meaning_boundary": [
+				"Abilities, passive abilities, status effects, combat formulas.",
+				"Flow: action -> judgment -> result."
+			],
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:major:world_space",
+			"kind": "MajorEntry",
+			"major_min": 70,
+			"major_max": 89,
+			"major_key": "WorldSpace",
+			"title": "World / Space",
+			"summary": "Where it happens.",
+			"meaning_boundary": [
+				"World, zone, level/map, grid, environment rules.",
+				"World is a stage, not the rule itself."
+			],
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:major:progression_narrative",
+			"kind": "MajorEntry",
+			"major_min": 90,
+			"major_max": 109,
+			"major_key": "ProgressionNarrative",
+			"title": "Progression / Narrative",
+			"summary": "Why the player plays.",
+			"meaning_boundary": [
+				"Quest, dialogue, narrative events, achievements, onboarding.",
+				"Meta progression is separate from economy value."
+			],
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:major:economy_meta",
+			"kind": "MajorEntry",
+			"major_min": 110,
+			"major_max": 129,
+			"major_key": "EconomyMeta",
+			"title": "Economy / Meta",
+			"summary": "Value layer.",
+			"meaning_boundary": [
+				"Currency, recipe, loot, shop, price rules, exchange.",
+				"Meta value layer, not presentation."
+			],
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:major:presentation_view",
+			"kind": "MajorEntry",
+			"major_min": 130,
+			"major_max": 149,
+			"major_key": "PresentationView",
+			"title": "Presentation / View",
+			"summary": "How it looks and feels.",
+			"meaning_boundary": [
+				"UI scenes, sound, VFX, animations, camera effects.",
+				"Presentation is replaceable shell."
+			],
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:major:live_ops",
+			"kind": "MajorEntry",
+			"major_min": 150,
+			"major_max": 159,
+			"major_key": "LiveOps",
+			"title": "Live / Event / Ops",
+			"summary": "Time-layered operations.",
+			"meaning_boundary": [
+				"Events, seasons, schedules, banners, patch notes.",
+				"Overlays existing structure with time layer."
+			],
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:major:project_extension_buffer",
+			"kind": "MajorEntry",
+			"major_min": 160,
+			"major_max": 175,
+			"major_key": "ProjectExtensionBuffer",
+			"title": "Project Extension Buffer",
+			"summary": "Overflow majors for schema exhaustion.",
+			"meaning_boundary": [
+				"Used only when a core major approaches schema exhaustion (recommended threshold: schema >= 200).",
+				"Tooling may merge core+overflow majors logically through major alias mapping."
+			],
+			"status": "Active"
+		}
+	]
+}
+
+@@@FILE_END
+
+
+@@@FILE_BEGIN Codex/Packages/GameDevelopment/Entries/Segments/segments.json
+{
+	"uid": "uid:codex_entry:game_development:segments",
+	"kind": "SegmentCatalog",
+	"domain": "GameDevelopment",
+	"codex_uid": "uid:codex:game_development",
+	"title": "Segment Catalog",
+	"summary": "Segment slot address definitions within majors. Segment is not a subcategory; it is an address slot.",
+	"status": "Active",
+	"segments": [
+		{
+			"uid": "uid:codex_entry:game_development:segment:001_string_table",
+			"kind": "SegmentEntry",
+			"segment_id": 1,
+			"segment_key": "StringTable",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:system_constants",
+			"title": "StringTable",
+			"summary": "System constants segment for string tables.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:002_localization",
+			"kind": "SegmentEntry",
+			"segment_id": 2,
+			"segment_key": "Localization",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:system_constants",
+			"title": "Localization",
+			"summary": "System constants segment for localization.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:003_global_config",
+			"kind": "SegmentEntry",
+			"segment_id": 3,
+			"segment_key": "GlobalConfig",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:system_constants",
+			"title": "GlobalConfig",
+			"summary": "System constants segment for global config.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:004_metadata_base",
+			"kind": "SegmentEntry",
+			"segment_id": 4,
+			"segment_key": "MetadataBase",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:system_constants",
+			"title": "MetadataBase",
+			"summary": "System constants segment for metadata base tables.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:005_system",
+			"kind": "SegmentEntry",
+			"segment_id": 5,
+			"segment_key": "System",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:system_constants",
+			"title": "System",
+			"summary": "System constants segment for system definitions.",
+			"status": "Active"
+		},
+
+		{
+			"uid": "uid:codex_entry:game_development:segment:010_actor_base",
+			"kind": "SegmentEntry",
+			"segment_id": 10,
+			"segment_key": "ActorBase",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:actor_entity",
+			"title": "ActorBase",
+			"summary": "Base actor definitions.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:011_player_definition",
+			"kind": "SegmentEntry",
+			"segment_id": 11,
+			"segment_key": "PlayerDefinition",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:actor_entity",
+			"title": "PlayerDefinition",
+			"summary": "Player definitions.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:012_monster",
+			"kind": "SegmentEntry",
+			"segment_id": 12,
+			"segment_key": "Monster",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:actor_entity",
+			"title": "Monster",
+			"summary": "Monster definitions.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:013_boss",
+			"kind": "SegmentEntry",
+			"segment_id": 13,
+			"segment_key": "Boss",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:actor_entity",
+			"title": "Boss",
+			"summary": "Boss definitions.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:014_npc",
+			"kind": "SegmentEntry",
+			"segment_id": 14,
+			"segment_key": "NPC",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:actor_entity",
+			"title": "NPC",
+			"summary": "NPC definitions.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:015_companion",
+			"kind": "SegmentEntry",
+			"segment_id": 15,
+			"segment_key": "Companion",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:actor_entity",
+			"title": "Companion",
+			"summary": "Companion definitions.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:016_summon",
+			"kind": "SegmentEntry",
+			"segment_id": 16,
+			"segment_key": "Summon",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:actor_entity",
+			"title": "Summon",
+			"summary": "Summon definitions.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:017_vehicle",
+			"kind": "SegmentEntry",
+			"segment_id": 17,
+			"segment_key": "Vehicle",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:actor_entity",
+			"title": "Vehicle",
+			"summary": "Vehicle definitions.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:018_structure",
+			"kind": "SegmentEntry",
+			"segment_id": 18,
+			"segment_key": "Structure",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:actor_entity",
+			"title": "Structure",
+			"summary": "Structure definitions.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:019_actor_ext",
+			"kind": "SegmentEntry",
+			"segment_id": 19,
+			"segment_key": "ActorExt",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:actor_entity",
+			"title": "ActorExt",
+			"summary": "Actor extension slot.",
+			"status": "Active"
+		},
+
+		{
+			"uid": "uid:codex_entry:game_development:segment:030_item_base",
+			"kind": "SegmentEntry",
+			"segment_id": 30,
+			"segment_key": "ItemBase",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:item_inventory",
+			"title": "ItemBase",
+			"summary": "Base item definitions.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:031_equipment_rule",
+			"kind": "SegmentEntry",
+			"segment_id": 31,
+			"segment_key": "EquipmentRule",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:item_inventory",
+			"title": "EquipmentRule",
+			"summary": "Equipment rule tables.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:032_equipable_item",
+			"kind": "SegmentEntry",
+			"segment_id": 32,
+			"segment_key": "EquipableItem",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:item_inventory",
+			"title": "EquipableItem",
+			"summary": "Equipable item definitions.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:033_consumable",
+			"kind": "SegmentEntry",
+			"segment_id": 33,
+			"segment_key": "Consumable",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:item_inventory",
+			"title": "Consumable",
+			"summary": "Consumable item definitions.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:034_material",
+			"kind": "SegmentEntry",
+			"segment_id": 34,
+			"segment_key": "Material",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:item_inventory",
+			"title": "Material",
+			"summary": "Material definitions.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:035_inventory_rule",
+			"kind": "SegmentEntry",
+			"segment_id": 35,
+			"segment_key": "InventoryRule",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:item_inventory",
+			"title": "InventoryRule",
+			"summary": "Inventory rules.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:036_inventory_bag",
+			"kind": "SegmentEntry",
+			"segment_id": 36,
+			"segment_key": "InventoryBag",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:item_inventory",
+			"title": "InventoryBag",
+			"summary": "Inventory bag definitions.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:037_item_set",
+			"kind": "SegmentEntry",
+			"segment_id": 37,
+			"segment_key": "ItemSet",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:item_inventory",
+			"title": "ItemSet",
+			"summary": "Item set definitions.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:038_item_modifier",
+			"kind": "SegmentEntry",
+			"segment_id": 38,
+			"segment_key": "ItemModifier",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:item_inventory",
+			"title": "ItemModifier",
+			"summary": "Item modifier definitions.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:039_item_ext",
+			"kind": "SegmentEntry",
+			"segment_id": 39,
+			"segment_key": "ItemExt",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:item_inventory",
+			"title": "ItemExt",
+			"summary": "Item extension slot.",
+			"status": "Active"
+		},
+
+		{
+			"uid": "uid:codex_entry:game_development:segment:050_ability",
+			"kind": "SegmentEntry",
+			"segment_id": 50,
+			"segment_key": "Ability",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:ability_combat",
+			"title": "Ability",
+			"summary": "Ability definitions.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:051_passive_ability",
+			"kind": "SegmentEntry",
+			"segment_id": 51,
+			"segment_key": "PassiveAbility",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:ability_combat",
+			"title": "PassiveAbility",
+			"summary": "Passive ability definitions.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:052_status_effect",
+			"kind": "SegmentEntry",
+			"segment_id": 52,
+			"segment_key": "StatusEffect",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:ability_combat",
+			"title": "StatusEffect",
+			"summary": "Status effect definitions.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:053_projectile",
+			"kind": "SegmentEntry",
+			"segment_id": 53,
+			"segment_key": "Projectile",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:ability_combat",
+			"title": "Projectile",
+			"summary": "Projectile definitions.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:054_hit_rule",
+			"kind": "SegmentEntry",
+			"segment_id": 54,
+			"segment_key": "HitRule",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:ability_combat",
+			"title": "HitRule",
+			"summary": "Hit rule tables.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:055_damage_type",
+			"kind": "SegmentEntry",
+			"segment_id": 55,
+			"segment_key": "DamageType",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:ability_combat",
+			"title": "DamageType",
+			"summary": "Damage type tables.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:056_combat_formula",
+			"kind": "SegmentEntry",
+			"segment_id": 56,
+			"segment_key": "CombatFormula",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:ability_combat",
+			"title": "CombatFormula",
+			"summary": "Combat formula tables.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:057_ai_behavior_profile",
+			"kind": "SegmentEntry",
+			"segment_id": 57,
+			"segment_key": "AIBehaviorProfile",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:ability_combat",
+			"title": "AIBehaviorProfile",
+			"summary": "AI behavior profile tables.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:058_cooldown_group",
+			"kind": "SegmentEntry",
+			"segment_id": 58,
+			"segment_key": "CooldownGroup",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:ability_combat",
+			"title": "CooldownGroup",
+			"summary": "Cooldown group tables.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:059_combat_ext",
+			"kind": "SegmentEntry",
+			"segment_id": 59,
+			"segment_key": "CombatExt",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:ability_combat",
+			"title": "CombatExt",
+			"summary": "Combat extension slot.",
+			"status": "Active"
+		},
+
+		{
+			"uid": "uid:codex_entry:game_development:segment:070_world",
+			"kind": "SegmentEntry",
+			"segment_id": 70,
+			"segment_key": "World",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:world_space",
+			"title": "World",
+			"summary": "World definitions.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:071_zone",
+			"kind": "SegmentEntry",
+			"segment_id": 71,
+			"segment_key": "Zone",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:world_space",
+			"title": "Zone",
+			"summary": "Zone definitions.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:072_level_map",
+			"kind": "SegmentEntry",
+			"segment_id": 72,
+			"segment_key": "LevelMap",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:world_space",
+			"title": "Level / Map",
+			"summary": "Level/map definitions.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:073_tile_grid",
+			"kind": "SegmentEntry",
+			"segment_id": 73,
+			"segment_key": "TileGrid",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:world_space",
+			"title": "Tile / Grid",
+			"summary": "Tile/grid definitions.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:074_world_object",
+			"kind": "SegmentEntry",
+			"segment_id": 74,
+			"segment_key": "WorldObject",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:world_space",
+			"title": "WorldObject",
+			"summary": "World object definitions.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:075_spawn_rule",
+			"kind": "SegmentEntry",
+			"segment_id": 75,
+			"segment_key": "SpawnRule",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:world_space",
+			"title": "SpawnRule",
+			"summary": "Spawn rule tables.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:076_environment_rule",
+			"kind": "SegmentEntry",
+			"segment_id": 76,
+			"segment_key": "EnvironmentRule",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:world_space",
+			"title": "EnvironmentRule",
+			"summary": "Environment rule tables.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:077_weather",
+			"kind": "SegmentEntry",
+			"segment_id": 77,
+			"segment_key": "Weather",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:world_space",
+			"title": "Weather",
+			"summary": "Weather definitions.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:078_time_rule",
+			"kind": "SegmentEntry",
+			"segment_id": 78,
+			"segment_key": "TimeRule",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:world_space",
+			"title": "TimeRule",
+			"summary": "Time rule tables.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:079_world_ext",
+			"kind": "SegmentEntry",
+			"segment_id": 79,
+			"segment_key": "WorldExt",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:world_space",
+			"title": "WorldExt",
+			"summary": "World extension slot.",
+			"status": "Active"
+		},
+
+		{
+			"uid": "uid:codex_entry:game_development:segment:090_quest",
+			"kind": "SegmentEntry",
+			"segment_id": 90,
+			"segment_key": "Quest",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:progression_narrative",
+			"title": "Quest",
+			"summary": "Quest definitions.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:091_quest_step",
+			"kind": "SegmentEntry",
+			"segment_id": 91,
+			"segment_key": "QuestStep",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:progression_narrative",
+			"title": "QuestStep",
+			"summary": "Quest step definitions.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:092_dialogue",
+			"kind": "SegmentEntry",
+			"segment_id": 92,
+			"segment_key": "Dialogue",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:progression_narrative",
+			"title": "Dialogue",
+			"summary": "Dialogue definitions.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:093_narrative_event",
+			"kind": "SegmentEntry",
+			"segment_id": 93,
+			"segment_key": "NarrativeEvent",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:progression_narrative",
+			"title": "NarrativeEvent",
+			"summary": "Narrative event definitions.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:094_achievement",
+			"kind": "SegmentEntry",
+			"segment_id": 94,
+			"segment_key": "Achievement",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:progression_narrative",
+			"title": "Achievement",
+			"summary": "Achievement definitions.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:095_onboarding_flow",
+			"kind": "SegmentEntry",
+			"segment_id": 95,
+			"segment_key": "OnboardingFlow",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:progression_narrative",
+			"title": "OnboardingFlow",
+			"summary": "Onboarding flow definitions.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:096_progression_rule",
+			"kind": "SegmentEntry",
+			"segment_id": 96,
+			"segment_key": "ProgressionRule",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:progression_narrative",
+			"title": "ProgressionRule",
+			"summary": "Progression rule tables.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:097_meta_progress",
+			"kind": "SegmentEntry",
+			"segment_id": 97,
+			"segment_key": "MetaProgress",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:progression_narrative",
+			"title": "MetaProgress",
+			"summary": "Meta progression definitions.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:098_trigger_condition",
+			"kind": "SegmentEntry",
+			"segment_id": 98,
+			"segment_key": "TriggerCondition",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:progression_narrative",
+			"title": "TriggerCondition",
+			"summary": "Trigger condition tables.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:099_narrative_ext",
+			"kind": "SegmentEntry",
+			"segment_id": 99,
+			"segment_key": "NarrativeExt",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:progression_narrative",
+			"title": "NarrativeExt",
+			"summary": "Narrative extension slot.",
+			"status": "Active"
+		},
+
+		{
+			"uid": "uid:codex_entry:game_development:segment:110_currency",
+			"kind": "SegmentEntry",
+			"segment_id": 110,
+			"segment_key": "Currency",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:economy_meta",
+			"title": "Currency",
+			"summary": "Currency definitions.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:111_recipe",
+			"kind": "SegmentEntry",
+			"segment_id": 111,
+			"segment_key": "Recipe",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:economy_meta",
+			"title": "Recipe",
+			"summary": "Recipe definitions.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:112_loot_table",
+			"kind": "SegmentEntry",
+			"segment_id": 112,
+			"segment_key": "LootTable",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:economy_meta",
+			"title": "LootTable",
+			"summary": "Loot table definitions.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:113_drop_rule",
+			"kind": "SegmentEntry",
+			"segment_id": 113,
+			"segment_key": "DropRule",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:economy_meta",
+			"title": "DropRule",
+			"summary": "Drop rule definitions.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:114_shop",
+			"kind": "SegmentEntry",
+			"segment_id": 114,
+			"segment_key": "Shop",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:economy_meta",
+			"title": "Shop",
+			"summary": "Shop definitions.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:115_gacha",
+			"kind": "SegmentEntry",
+			"segment_id": 115,
+			"segment_key": "Gacha",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:economy_meta",
+			"title": "Gacha",
+			"summary": "Gacha definitions.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:116_price_rule",
+			"kind": "SegmentEntry",
+			"segment_id": 116,
+			"segment_key": "PriceRule",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:economy_meta",
+			"title": "PriceRule",
+			"summary": "Price rule definitions.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:117_exchange",
+			"kind": "SegmentEntry",
+			"segment_id": 117,
+			"segment_key": "Exchange",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:economy_meta",
+			"title": "Exchange",
+			"summary": "Exchange definitions.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:118_pass_definition",
+			"kind": "SegmentEntry",
+			"segment_id": 118,
+			"segment_key": "PassDefinition",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:economy_meta",
+			"title": "PassDefinition",
+			"summary": "Pass definitions.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:119_economy_ext",
+			"kind": "SegmentEntry",
+			"segment_id": 119,
+			"segment_key": "EconomyExt",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:economy_meta",
+			"title": "EconomyExt",
+			"summary": "Economy extension slot.",
+			"status": "Active"
+		},
+
+		{
+			"uid": "uid:codex_entry:game_development:segment:130_ui_scene",
+			"kind": "SegmentEntry",
+			"segment_id": 130,
+			"segment_key": "UIScene",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:presentation_view",
+			"title": "UIScene",
+			"summary": "UI scene definitions.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:131_sprite_atlas",
+			"kind": "SegmentEntry",
+			"segment_id": 131,
+			"segment_key": "SpriteAtlas",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:presentation_view",
+			"title": "SpriteAtlas",
+			"summary": "Sprite atlas definitions.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:132_ux_feedback",
+			"kind": "SegmentEntry",
+			"segment_id": 132,
+			"segment_key": "UXFeedback",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:presentation_view",
+			"title": "UXFeedback",
+			"summary": "UX feedback definitions.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:133_sound_resource",
+			"kind": "SegmentEntry",
+			"segment_id": 133,
+			"segment_key": "SoundResource",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:presentation_view",
+			"title": "SoundResource",
+			"summary": "Sound resource definitions.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:134_character_model",
+			"kind": "SegmentEntry",
+			"segment_id": 134,
+			"segment_key": "CharacterModel",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:presentation_view",
+			"title": "CharacterModel",
+			"summary": "Character model definitions.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:135_vfx",
+			"kind": "SegmentEntry",
+			"segment_id": 135,
+			"segment_key": "VFX",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:presentation_view",
+			"title": "VFX",
+			"summary": "VFX definitions.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:136_animation",
+			"kind": "SegmentEntry",
+			"segment_id": 136,
+			"segment_key": "Animation",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:presentation_view",
+			"title": "Animation",
+			"summary": "Animation definitions.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:137_camera_effect",
+			"kind": "SegmentEntry",
+			"segment_id": 137,
+			"segment_key": "CameraEffect",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:presentation_view",
+			"title": "CameraEffect",
+			"summary": "Camera effect definitions.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:138_input_feedback",
+			"kind": "SegmentEntry",
+			"segment_id": 138,
+			"segment_key": "InputFeedback",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:presentation_view",
+			"title": "InputFeedback",
+			"summary": "Input feedback definitions.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:139_presentation_ext",
+			"kind": "SegmentEntry",
+			"segment_id": 139,
+			"segment_key": "PresentationExt",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:presentation_view",
+			"title": "PresentationExt",
+			"summary": "Presentation extension slot.",
+			"status": "Active"
+		},
+
+		{
+			"uid": "uid:codex_entry:game_development:segment:150_event_definition",
+			"kind": "SegmentEntry",
+			"segment_id": 150,
+			"segment_key": "EventDefinition",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:live_ops",
+			"title": "EventDefinition",
+			"summary": "Event definition tables.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:151_season",
+			"kind": "SegmentEntry",
+			"segment_id": 151,
+			"segment_key": "Season",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:live_ops",
+			"title": "Season",
+			"summary": "Season tables.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:152_time_schedule",
+			"kind": "SegmentEntry",
+			"segment_id": 152,
+			"segment_key": "TimeSchedule",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:live_ops",
+			"title": "TimeSchedule",
+			"summary": "Time schedule tables.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:153_trigger",
+			"kind": "SegmentEntry",
+			"segment_id": 153,
+			"segment_key": "Trigger",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:live_ops",
+			"title": "Trigger",
+			"summary": "Trigger tables.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:154_event_reward",
+			"kind": "SegmentEntry",
+			"segment_id": 154,
+			"segment_key": "EventReward",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:live_ops",
+			"title": "EventReward",
+			"summary": "Event reward tables.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:155_live_config",
+			"kind": "SegmentEntry",
+			"segment_id": 155,
+			"segment_key": "LiveConfig",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:live_ops",
+			"title": "LiveConfig",
+			"summary": "Live config tables.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:156_banner",
+			"kind": "SegmentEntry",
+			"segment_id": 156,
+			"segment_key": "Banner",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:live_ops",
+			"title": "Banner",
+			"summary": "Banner tables.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:157_patch_note",
+			"kind": "SegmentEntry",
+			"segment_id": 157,
+			"segment_key": "PatchNote",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:live_ops",
+			"title": "PatchNote",
+			"summary": "Patch note tables.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:158_community_event",
+			"kind": "SegmentEntry",
+			"segment_id": 158,
+			"segment_key": "CommunityEvent",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:live_ops",
+			"title": "CommunityEvent",
+			"summary": "Community event tables.",
+			"status": "Active"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:segment:159_live_ext",
+			"kind": "SegmentEntry",
+			"segment_id": 159,
+			"segment_key": "LiveExt",
+			"parent_major_range_uid": "uid:codex_entry:game_development:major:live_ops",
+			"title": "LiveExt",
+			"summary": "Live extension slot.",
+			"status": "Active"
+		}
+	]
+}
+
+@@@FILE_END
+
+
+@@@FILE_BEGIN Codex/Packages/GameDevelopment/Entries/Schemas/schemas.json
+{
+	"uid": "uid:codex_entry:game_development:schemas",
+	"kind": "SchemaCatalog",
+	"domain": "GameDevelopment",
+	"codex_uid": "uid:codex:game_development",
+	"title": "Schema Catalog",
+	"summary": "Schema structural contracts and validation rules. Schema is a table-structure unit, not a meaning category.",
+	"status": "Active",
+	"schemas": [
+		{
+			"uid": "uid:codex_entry:game_development:schema:registry_table_csv",
+			"kind": "SchemaEntry",
+			"schema_key": "RegistryTableCsv",
+			"title": "Registry Table CSV",
+			"summary": "CSV table content file for registry tables.",
+			"status": "Active",
+			"structural_contract": [
+				"File extension must be .csv",
+				"First row is header row and is not treated as data row for validation rules that apply to table records.",
+				"CSV must have a companion meta file with the same base name: <SchemaName>.csv.meta.json"
+			],
+			"validation_rules": [
+				"CSV must be readable as UTF-8.",
+				"Row column count must be consistent per row (excluding header parsing rules)."
+			]
+		},
+		{
+			"uid": "uid:codex_entry:game_development:schema:registry_table_meta_json",
+			"kind": "SchemaEntry",
+			"schema_key": "RegistryTableCsvMetaJson",
+			"title": "Registry Table CSV Meta JSON",
+			"summary": "Meta file for a CSV registry table.",
+			"status": "Active",
+			"structural_contract": [
+				"File extension must be .csv.meta.json",
+				"Must exist for any registry table CSV that is consumed by runtime/editor/tool chain.",
+				"Meta defines schema/columns/validation intents and binds table to codex entries when applicable."
+			],
+			"validation_rules": [
+				"Meta must be valid JSON.",
+				"Meta must include explicit codex binding or explicit codex-free declaration."
+			]
+		},
+		{
+			"uid": "uid:codex_entry:game_development:schema:generated_major_header",
+			"kind": "SchemaEntry",
+			"schema_key": "GeneratedMajorHeader",
+			"title": "Generated Major Header",
+			"summary": "Generated C++ header aggregating table row structs by major.",
+			"status": "Active",
+			"structural_contract": [
+				"Header filename follows <ProjectPrefix>_TableStructs__<MM>_<DomainAlias>.h",
+				"External include is always the major header.",
+				"Internal segmentation is allowed only as implementation detail."
+			],
+			"validation_rules": [
+				"Generated output must be deterministic given same inputs.",
+				"Direct include of segment headers from external code is discouraged."
+			]
+		},
+		{
+			"uid": "uid:codex_entry:game_development:schema:generated_segment_header",
+			"kind": "SchemaEntry",
+			"schema_key": "GeneratedSegmentHeader",
+			"title": "Generated Segment Header",
+			"summary": "Generated C++ header containing row structs for a single segment (internal implementation detail).",
+			"status": "Active",
+			"structural_contract": [
+				"Header filename follows <ProjectPrefix>_TableStructs__<MM>_<DomainAlias>__<SSS>_<SegmentName>.h",
+				"Segment headers are included by the major header aggregator."
+			],
+			"validation_rules": [
+				"Segment headers are not included directly by external code (recommended)."
+			]
+		}
+	]
+}
+
+@@@FILE_END
+
+
+@@@FILE_BEGIN Codex/Packages/GameDevelopment/Entries/ArtifactTypes/artifact_types.json
+{
+	"uid": "uid:codex_entry:game_development:artifact_types",
+	"kind": "ArtifactTypeCatalog",
+	"domain": "GameDevelopment",
+	"codex_uid": "uid:codex:game_development",
+	"title": "ArtifactType Catalog",
+	"summary": "Semantic artifact types for inputs/outputs/assets referenced by tasks/scripts/tables.",
+	"status": "Active",
+	"artifact_types": [
+		{
+			"uid": "uid:codex_entry:game_development:artifact_type:registry_table_csv",
+			"kind": "ArtifactTypeEntry",
+			"type_key": "RegistryTableCsv",
+			"title": "Registry Table CSV",
+			"summary": "CSV file containing registry table data.",
+			"status": "Active",
+			"semantic_definition": "A registry table data asset stored as CSV. Meaning is defined by its codex-bound schema and coordinate binding.",
+			"physical_forms": [
+				"file:csv"
+			],
+			"primary_use": "Input/SourceOfTruth"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:artifact_type:registry_table_meta",
+			"kind": "ArtifactTypeEntry",
+			"type_key": "RegistryTableCsvMetaJson",
+			"title": "Registry Table CSV Meta JSON",
+			"summary": "Meta file describing a registry table CSV.",
+			"status": "Active",
+			"semantic_definition": "A meta asset that binds a CSV table to codex entries and declares validation/interpretation rules.",
+			"physical_forms": [
+				"file:json"
+			],
+			"primary_use": "Input/Contract"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:artifact_type:generated_major_header",
+			"kind": "ArtifactTypeEntry",
+			"type_key": "GeneratedMajorHeader",
+			"title": "Generated Major Header",
+			"summary": "Generated header aggregating row structs for a major.",
+			"status": "Active",
+			"semantic_definition": "A generated C++ header that represents table schemas as row structs. External include surface is fixed to this header.",
+			"physical_forms": [
+				"file:h"
+			],
+			"primary_use": "Output/Generated"
+		},
+		{
+			"uid": "uid:codex_entry:game_development:artifact_type:generated_segment_header",
+			"kind": "ArtifactTypeEntry",
+			"type_key": "GeneratedSegmentHeader",
+			"title": "Generated Segment Header",
+			"summary": "Generated header for a segment (internal detail).",
+			"status": "Active",
+			"semantic_definition": "A generated C++ header with row structs for a segment, intended to be included by the major header aggregator.",
+			"physical_forms": [
+				"file:h"
+			],
+			"primary_use": "Output/Generated"
+		}
+	]
+}
+
+@@@FILE_END
+
+
+@@@FILE_BEGIN Codex/Packages/GameDevelopment/Entries/RuleSets/rulesets.json
+{
+	"uid": "uid:codex_entry:game_development:rulesets",
+	"kind": "RuleSetCatalog",
+	"domain": "GameDevelopment",
+	"codex_uid": "uid:codex:game_development",
+	"title": "RuleSet Catalog",
+	"summary": "Normative rules referenced by tasks/scripts/tables. Includes coordinate grammar, binding grammar, and registry foldering conventions.",
+	"status": "Active",
+	"rulesets": [
+		{
+			"uid": "uid:codex_entry:game_development:ruleset:content_coordinate_grammar",
+			"kind": "RuleSetEntry",
+			"ruleset_key": "ContentCoordinateGrammar",
+			"title": "Content Coordinate Grammar (Major/Segment/Schema)",
+			"summary": "Human-centric content coordinate system rules (v1.73).",
+			"status": "Active",
+			"applies_to_scope": [
+				"Domain",
+				"RegistryTable"
+			],
+			"rules": [
+				{
+					"uid": "uid:codex_rule:content_coordinate:schema_is_structure_unit",
+					"severity": "Error",
+					"title": "Schema is a structure unit",
+					"statement": "Schema is a data-table structure unit and must not be used as a meaning category."
+				},
+				{
+					"uid": "uid:codex_rule:content_coordinate:segment_is_slot_not_inheritance",
+					"severity": "Error",
+					"title": "Segment is a slot address",
+					"statement": "Segment is a concept slot address inside a domain; it is not inheritance and not a subcategory."
+				},
+				{
+					"uid": "uid:codex_rule:content_coordinate:no_schema_split_by_mode",
+					"severity": "Error",
+					"title": "No schema split by mode/variant",
+					"statement": "Do not split schema by mode/season/BM/multiplayer; represent those by classifiers/metadata/activation."
+				},
+				{
+					"uid": "uid:codex_rule:content_coordinate:single_schema_single_csv",
+					"severity": "Error",
+					"title": "Single schema single CSV",
+					"statement": "If schema is the same, do not split. A schema must map 1:1 to a single CSV table."
+				},
+				{
+					"uid": "uid:codex_rule:content_coordinate:schema_split_only_by_column_responsibility",
+					"severity": "Error",
+					"title": "Schema split only by column responsibility",
+					"statement": "Schema split is allowed only when column responsibility differs; feature/variant reasons are forbidden."
+				},
+				{
+					"uid": "uid:codex_rule:content_coordinate:schema_id_range_0_255_within_major",
+					"severity": "Error",
+					"title": "Schema numeric range within major",
+					"statement": "Schema numeric id within a major uses 0..255 only."
+				},
+				{
+					"uid": "uid:codex_rule:content_coordinate:overflow_to_extension_major",
+					"severity": "Error",
+					"title": "Overflow to extension major",
+					"statement": "When a major approaches schema exhaustion (recommended threshold: schema >= 200), overflow schemas must move to Project Extension Buffer majors (160..175) using a pre-defined overflow mapping."
+				}
+			],
+			"conflict_policy": {
+				"principle": "More specific scope wins",
+				"tie_breaker": "Explicit override must include justification"
+			}
+		},
+		{
+			"uid": "uid:codex_entry:game_development:ruleset:registry_table_foldering",
+			"kind": "RuleSetEntry",
+			"ruleset_key": "RegistryTableFolderingConvention",
+			"title": "Registry Table Foldering Convention",
+			"summary": "Physical projection of logical coordinates to Registry/Tables (v1.73).",
+			"status": "Active",
+			"applies_to_scope": [
+				"RegistryTable"
+			],
+			"rules": [
+				{
+					"uid": "uid:codex_rule:foldering:root_is_registry_tables",
+					"severity": "Error",
+					"title": "Root is Registry/Tables",
+					"statement": "All registry tables live under Registry/Tables as a single root."
+				},
+				{
+					"uid": "uid:codex_rule:foldering:major_folder_mm_alias",
+					"severity": "Error",
+					"title": "Major folder naming",
+					"statement": "Major folder name must be <MM>_<DomainAlias>, where MM is major id modulo 100 as 2 digits."
+				},
+				{
+					"uid": "uid:codex_rule:foldering:segment_folder_sss_name",
+					"severity": "Error",
+					"title": "Segment folder naming",
+					"statement": "Segment folder name must be <SSS>_<SegmentName>, where SSS is 3-digit zero padded (or longer if >=100)."
+				},
+				{
+					"uid": "uid:codex_rule:foldering:no_nested_subfolders",
+					"severity": "Error",
+					"title": "No nested subfolders under segment",
+					"statement": "Do not create nested subfolders like Segment/Schema/Variant. CSV files must live directly under the segment folder."
+				},
+				{
+					"uid": "uid:codex_rule:foldering:csv_and_meta_side_by_side",
+					"severity": "Error",
+					"title": "CSV and meta side-by-side",
+					"statement": "A registry table CSV must have its companion meta file in the same segment folder: <SchemaName>.csv and <SchemaName>.csv.meta.json."
+				},
+				{
+					"uid": "uid:codex_rule:foldering:alias_dictionary_required",
+					"severity": "Warning",
+					"title": "Major alias mapping required",
+					"statement": "DomainAlias must follow the major alias mapping. Tooling may merge core+overflow majors logically through alias mapping."
+				}
+			],
+			"conflict_policy": {
+				"principle": "More specific scope wins",
+				"tie_breaker": "Prefer rules that preserve coordinate readability"
+			}
+		},
+		{
+			"uid": "uid:codex_entry:game_development:ruleset:generated_code_foldering",
+			"kind": "RuleSetEntry",
+			"ruleset_key": "GeneratedCodeFolderingConvention",
+			"title": "Source Code Foldering & Generated Header Convention",
+			"summary": "Major-only flattening for generated code and stable external include surface (v1.73).",
+			"status": "Active",
+			"applies_to_scope": [
+				"GeneratedCode"
+			],
+			"rules": [
+				{
+					"uid": "uid:codex_rule:gen:major_only_flattening",
+					"severity": "Error",
+					"title": "Major-only flattening",
+					"statement": "Generated source code foldering does not split by segment; it splits by major only."
+				},
+				{
+					"uid": "uid:codex_rule:gen:major_header_naming",
+					"severity": "Error",
+					"title": "Major header naming",
+					"statement": "Generated major header file name must be <ProjectPrefix>_TableStructs__<MM>_<DomainAlias>.h."
+				},
+				{
+					"uid": "uid:codex_rule:gen:row_struct_1_to_1_schema",
+					"severity": "Error",
+					"title": "Row struct 1:1 schema",
+					"statement": "Row struct types must map 1:1 to schema tables. Segment/domain/mode names must not be directly embedded in type names."
+				},
+				{
+					"uid": "uid:codex_rule:gen:segment_split_trigger",
+					"severity": "Warning",
+					"title": "Segment split trigger",
+					"statement": "If a major generated header exceeds a fixed line threshold (recommended: 15000..30000), internal segment split may be used as implementation detail."
+				},
+				{
+					"uid": "uid:codex_rule:gen:external_include_stable",
+					"severity": "Error",
+					"title": "External include stable",
+					"statement": "External include surface must remain major header only; internal segment headers are included by the major header aggregator."
+				},
+				{
+					"uid": "uid:codex_rule:gen:no_direct_segment_include_recommended",
+					"severity": "Warning",
+					"title": "No direct segment include (recommended)",
+					"statement": "Direct include of segment headers from external code is discouraged to keep transitions between split/merge zero-impact."
+				}
+			],
+			"conflict_policy": {
+				"principle": "More specific scope wins",
+				"tie_breaker": "Prefer stability of external include surface"
+			}
+		},
+		{
+			"uid": "uid:codex_entry:game_development:ruleset:codex_binding_grammar",
+			"kind": "RuleSetEntry",
+			"ruleset_key": "CodexBindingGrammar",
+			"title": "Codex Binding Grammar",
+			"summary": "Strong binding between Task/Script/Table and codex entries; codex-free requires explicit declaration.",
+			"status": "Active",
+			"applies_to_scope": [
+				"Task",
+				"Script",
+				"RegistryTable"
+			],
+			"rules": [
+				{
+					"uid": "uid:codex_rule:binding:default_is_codex_bound",
+					"severity": "Error",
+					"title": "Default is Codex-Bound",
+					"statement": "Task/Script/Table is Codex-Bound by default and must declare Domain binding and Codex pin binding."
+				},
+				{
+					"uid": "uid:codex_rule:binding:entry_binding_required_when_applicable",
+					"severity": "Error",
+					"title": "Entry binding required when applicable",
+					"statement": "When the asset meaning depends on schema/artifact type/rules, it must bind to the corresponding codex entry uid(s)."
+				},
+				{
+					"uid": "uid:codex_rule:binding:codex_free_must_be_explicit",
+					"severity": "Error",
+					"title": "Codex-Free must be explicit",
+					"statement": "Codex-Free is not inferred by omission. Codex-Free requires explicit declaration and justification."
+				},
+				{
+					"uid": "uid:codex_rule:binding:codex_free_requires_scope",
+					"severity": "Error",
+					"title": "Codex-Free requires scope",
+					"statement": "Codex-Free assets must declare scope (project-only) and justification for auditability."
+				},
+				{
+					"uid": "uid:codex_rule:binding:effective_codex_is_execution_reference",
+					"severity": "Error",
+					"title": "Effective codex is execution reference",
+					"statement": "Validation/execution must use the Effective Codex (codex + overlays) selected by ProjectEnv."
+				}
+			],
+			"conflict_policy": {
+				"principle": "More specific scope wins",
+				"tie_breaker": "Prefer codex-bound interpretation"
+			}
+		},
+		{
+			"uid": "uid:codex_entry:game_development:ruleset:string_id_grammar",
+			"kind": "RuleSetEntry",
+			"ruleset_key": "StringIdCategoryStandard",
+			"title": "Universal StringId Category Standard",
+			"summary": "StringId is a 32-bit identity with [Surface][Domain][Index] = 8.8.16. Surface is presentation contract, Domain is content meaning domain.",
+			"status": "Active",
+			"applies_to_scope": [
+				"StringId"
+			],
+			"rules": [
+				{
+					"uid": "uid:codex_rule:stringid:bit_layout_8_8_16",
+					"severity": "Error",
+					"title": "Bit layout is 8.8.16",
+					"statement": "StringId layout is [Surface 8bit][Domain 8bit][Index 16bit]. Stored as uint32."
+				},
+				{
+					"uid": "uid:codex_rule:stringid:no_major_sub_terms",
+					"severity": "Error",
+					"title": "No Major/Sub terms in StringId context",
+					"statement": "Do not use Major/Sub terminology for StringId to avoid conflicts with content coordinate systems."
+				},
+				{
+					"uid": "uid:codex_rule:stringid:surface_is_presentation_contract",
+					"severity": "Error",
+					"title": "Surface is presentation contract",
+					"statement": "Surface defines output contract (tone/length/format constraints) and is independent from content meaning domain."
+				},
+				{
+					"uid": "uid:codex_rule:stringid:domain_is_meaning_domain",
+					"severity": "Error",
+					"title": "Domain is meaning domain",
+					"statement": "Domain defines meaning domain aligned with the content cognitive domain map ranges."
+				},
+				{
+					"uid": "uid:codex_rule:stringid:index_is_immutable",
+					"severity": "Error",
+					"title": "Index is immutable and not reused",
+					"statement": "Index is a unique serial within (Surface, Domain), never reused after deletion, and 0 is reserved for invalid."
+				},
+				{
+					"uid": "uid:codex_rule:stringid:format_template_policy",
+					"severity": "Error",
+					"title": "Format template policy (Surface=15)",
+					"statement": "Token-based template strings must use Surface=15 (Format_Template). Template itself has no output position; output contract is chosen by caller."
+				}
+			],
+			"conflict_policy": {
+				"principle": "More specific scope wins",
+				"tie_breaker": "Prefer stable identity guarantees"
+			}
+		}
+	]
+}
+
+@@@FILE_END
+
+
+@@@FILE_BEGIN Codex/Packages/GameDevelopment/Entries/Categories/categories.json
+{
+	"uid": "uid:codex_entry:game_development:categories",
+	"kind": "CategoryCatalog",
+	"domain": "GameDevelopment",
+	"codex_uid": "uid:codex:game_development",
+	"title": "Category Catalog",
+	"summary": "Category definitions separated from schema catalogs. Includes StringId Surface set and related identity categories.",
+	"status": "Active",
+	"categories": [
+		{
+			"uid": "uid:codex_entry:game_development:category:stringid_surface",
+			"kind": "CategoryEntry",
+			"category_key": "StringId.Surface",
+			"title": "StringId Surface (Presentation Contract)",
+			"summary": "Surface is an output contract and is independent of content meaning domain.",
+			"status": "Active",
+			"items": [
+				{ "value": 0, "key": "Invalid", "summary": "Invalid value." },
+				{ "value": 1, "key": "UI_Text", "summary": "Fixed UI text (menu, tab, section title, field name)." },
+				{ "value": 2, "key": "UI_Action", "summary": "User action text (buttons: confirm, cancel, apply)." },
+				{ "value": 3, "key": "UI_Help", "summary": "Short help/hint/tooltip." },
+				{ "value": 4, "key": "System_Notice", "summary": "Notice/warning/toast/confirm message." },
+				{ "value": 5, "key": "Narrative_Text", "summary": "Quest/goal/narrative description." },
+				{ "value": 6, "key": "Dialogue_Line", "summary": "Dialogue line (utterance unit)." },
+				{ "value": 7, "key": "Content_Name", "summary": "Content name (item/skill/character/area etc.)." },
+				{ "value": 8, "key": "Content_Desc", "summary": "Content description." },
+				{ "value": 9, "key": "Combat_Feedback", "summary": "Combat feedback text." },
+				{ "value": 10, "key": "Dev_Log", "summary": "Developer log/debug message." },
+				{ "value": 11, "key": "Tutorial_Guide", "summary": "Tutorial/onboarding instruction." },
+				{ "value": 12, "key": "Meta_Text", "summary": "Achievement/challenge/meta phrase." },
+				{ "value": 13, "key": "Error_Text", "summary": "Error/save/network messages." },
+				{ "value": 14, "key": "Legal_Credits", "summary": "Credits/legal notice." },
+				{ "value": 15, "key": "Format_Template", "summary": "Token-based format template." }
+			],
+			"constraints": [
+				"Target-specific surfaces (e.g., Item_Text, Skill_Text) are forbidden.",
+				"Name/Desc are always Surface=7/8 regardless of target."
+			]
+		}
+	]
+}
+
+@@@FILE_END
+
+
+@@@FILE_BEGIN Codex/Packages/GameDevelopment/Matrix/allowed_matrix.json
+{
+	"uid": "uid:codex_entry:game_development:allowed_matrix",
+	"kind": "AllowedMatrix",
+	"domain": "GameDevelopment",
+	"codex_uid": "uid:codex:game_development",
+	"title": "Allowed Matrix",
+	"summary": "Domain grammar for (Major, Segment, Schema, ArtifactType) combinations. Rules are declarative and UID-first.",
+	"status": "Active",
+	"rules": [
+		{
+			"uid": "uid:codex_entry:game_development:matrix_rule:registry_table_csv_valid",
+			"kind": "AllowedMatrixRule",
+			"pattern": {
+				"major_range_uid": "uid:codex_entry:game_development:major_range:project_core",
+				"segment_uid": "*",
+				"schema_uid": "uid:codex_entry:game_development:schema:registry_table_csv",
+				"artifact_type_uid": "uid:codex_entry:game_development:artifact_type:registry_table_csv"
+			},
+			"verdict": "Valid",
+			"rationale": "Registry table CSV is valid for project core majors and any defined segment slot, bound by schema and artifact type."
+		},
+		{
+			"uid": "uid:codex_entry:game_development:matrix_rule:registry_table_meta_valid",
+			"kind": "AllowedMatrixRule",
+			"pattern": {
+				"major_range_uid": "uid:codex_entry:game_development:major_range:project_core",
+				"segment_uid": "*",
+				"schema_uid": "uid:codex_entry:game_development:schema:registry_table_meta_json",
+				"artifact_type_uid": "uid:codex_entry:game_development:artifact_type:registry_table_meta"
+			},
+			"verdict": "Valid",
+			"rationale": "Registry table meta JSON is valid for project core majors and any segment slot."
+		},
+		{
+			"uid": "uid:codex_entry:game_development:matrix_rule:generated_major_header_valid",
+			"kind": "AllowedMatrixRule",
+			"pattern": {
+				"major_range_uid": "*",
+				"segment_uid": "*",
+				"schema_uid": "uid:codex_entry:game_development:schema:generated_major_header",
+				"artifact_type_uid": "uid:codex_entry:game_development:artifact_type:generated_major_header"
+			},
+			"verdict": "Valid",
+			"rationale": "Generated major headers are valid generated artifacts for any major range."
+		},
+		{
+			"uid": "uid:codex_entry:game_development:matrix_rule:generated_segment_header_discouraged_external",
+			"kind": "AllowedMatrixRule",
+			"pattern": {
+				"major_range_uid": "*",
+				"segment_uid": "*",
+				"schema_uid": "uid:codex_entry:game_development:schema:generated_segment_header",
+				"artifact_type_uid": "uid:codex_entry:game_development:artifact_type:generated_segment_header"
+			},
+			"verdict": "Discouraged",
+			"rationale": "Segment headers are internal implementation detail; external usage is discouraged. Prefer major header include surface."
+		}
+	]
+}
+
+@@@FILE_END
+
+
+@@@FILE_BEGIN Codex/Pins/active_codex.json
+{
+	"uid": "uid:codex_pin:active",
+	"title": "Active Codex Pin",
+	"summary": "Project-selected codex package and overlays. This file is human-facing; ProjectEnv remains the execution authority.",
+	"domain": "GameDevelopment",
+	"codex_package_uid": "uid:codex:game_development",
+	"codex_version": "1.73",
+	"overlays": [
+		{
+			"overlay_uid": "uid:codex_overlay:project_local",
+			"enabled": true
+		}
+	],
+	"effective_codex_uid": "uid:effective_codex:game_development:1_73__project_local"
+}
+
+@@@FILE_END
+
+
+@@@FILE_BEGIN Codex/Overlays/ProjectLocal/overlay.meta.json
+{
+	"overlay_uid": "uid:codex_overlay:project_local",
+	"title": "Project Local Overlay",
+	"summary": "Project-specific patch layer applied on top of codex. Use for exceptions/extensions only, never to redefine codex authority.",
+	"status": "Active",
+	"applies_to_codex_uid": "uid:codex:game_development",
+	"applies_to_version": "1.73",
+	"patches": [
+		"Codex/Overlays/ProjectLocal/patches.json"
+	],
+	"rules": [
+		"Overlay must declare target_entry_uid and justification for each patch.",
+		"Overlay must not change codex uid interpretation rules."
+	]
+}
+
+@@@FILE_END
+
+
+@@@FILE_BEGIN Codex/Overlays/ProjectLocal/patches.json
+{
+	"uid": "uid:codex_overlay_patches:project_local",
+	"title": "Overlay Patches",
+	"summary": "Declarative patch operations applied to codex entries. Empty by default.",
+	"status": "Active",
+	"patches": []
+}
+
+@@@FILE_END
+
+
+@@@FILE_BEGIN Codex/Effective/effective_codex.meta.json
+{
+	"effective_codex_uid": "uid:effective_codex:game_development:1_73__project_local",
+	"title": "Effective Codex",
+	"summary": "Codex + Overlay combined view used by tasks/scripts/tables. This is the execution reference.",
+	"domain": "GameDevelopment",
+	"base_codex_uid": "uid:codex:game_development",
+	"base_version": "1.73",
+	"overlay_uids": [
+		"uid:codex_overlay:project_local"
+	],
+	"status": "Generated",
+	"execution_rules": [
+		"Task/Script/Table validation must use Effective Codex selected by ProjectEnv.",
+		"Codex-Free assets must be explicitly declared and justified."
+	]
+}
+
+@@@FILE_END

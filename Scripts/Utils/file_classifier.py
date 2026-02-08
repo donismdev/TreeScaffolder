@@ -31,7 +31,9 @@ class FileTypeClassifier:
         the internal extension-to-icon lookup.
         """
         if config_filepath is None:
-            config_filepath = Path(__file__).parent / self.DEFAULT_CONFIG_FILENAME
+            # Construct path to Resources/file_type_icons.json from the current file's location
+            project_root = Path(__file__).parent.parent.parent
+            config_filepath = project_root / "Resources" / self.DEFAULT_CONFIG_FILENAME
         else:
             config_filepath = Path(config_filepath)
             

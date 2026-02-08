@@ -28,7 +28,7 @@ from Scripts.UI.tree_populator import _clear_tree as clear_tree_function # Impor
 # --- Constants ---
 APP_TITLE = "Tree Scaffolder v1.1"
 LOG_DIR = "Log"
-CONFIG_FILE = "config.json"
+CONFIG_FILE = "Resources/config.json"
 DEFAULT_GEOMETRY = "1200x700"
 DEFAULT_TREE_TEMPLATE = """# =========================================================
 # - Use @ROOT to define the logical root marker.
@@ -278,7 +278,7 @@ class ScaffoldApp:
     def on_load_test_data(self):
         print("DEBUG: on_load_test_data called") # Debug print
         try:
-            for file, text_widget in [("test_tree.txt", self.tree_text), ("test_data.txt", self.source_code_text)]:
+            for file, text_widget in [("Resources/test_tree.txt", self.tree_text), ("Resources/test_data.txt", self.source_code_text)]:
                 if Path(file).exists():
                     text_widget.delete("1.0", tk.END)
                     text_widget.insert("1.0", Path(file).read_text(encoding="utf-8"))

@@ -1,0 +1,32 @@
+@ROOT {{Root}}
+
+{{Root}}/
+	Codex/
+		Effective/
+			effective_codex.meta.json
+		Overlays/
+			ProjectLocal/
+				overlay.meta.json
+				patches.json
+		Packages/
+			GameDevelopment/
+				codex.meta.json
+				Entries/
+					ArtifactTypes/
+						artifact_types.json
+					Categories/
+						categories.json
+					Domain/
+						domain_entry.json
+					Majors/
+						majors.json
+					Schemas/
+						schemas.json
+					Segments/
+						segments.json
+					RuleSets/
+						rulesets.json
+				Matrix/
+					allowed_matrix.json
+		Pins/
+			active_codex.json
