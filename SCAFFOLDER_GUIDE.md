@@ -140,3 +140,24 @@ public class NewModule : ModuleRules
 -   `enable_runtime_logging` (boolean)
     -   **`true`**: 애플리케이션 실행 시, 모든 동작과 오류를 기록하는 `runtime.log` 파일을 생성합니다. 이 로그는 GUI의 로그 패널보다 더 상세하며, 문제 해결에 유용합니다.
     -   **`false`**: `runtime.log` 파일을 생성하지 않습니다.
+
+---
+
+## 7. 키보드 단축키 (Keyboard Shortcuts)
+
+애플리케이션은 `Resources/key_bindings_map.json` 파일에 정의된 키보드 단축키를 지원합니다.
+현재 정의된 단축키 목록은 다음과 같습니다:
+
+| 키 시퀀스      | 동작 (Action)                   | 설명                                                                 |
+| :------------- | :------------------------------ | :------------------------------------------------------------------- |
+| `Space`        | `Load Test Data`                | 테스트 데이터를 로드합니다 (텍스트/입력 위젯에 포커스가 없을 때만). |
+| `Escape`       | `Reset Focus`                   | 현재 포커스를 해제하고 루트 창으로 이동합니다.                      |
+| `` ` `` (Grave)| `Cycle Main Notebook Tabs`      | 메인 노트북 탭을 순환합니다 (텍스트/입력 위젯에 포커스가 없을 때만). |
+| `1`            | `Cycle Before Notebook Tabs`    | 'Before' 패널의 노트북 탭을 순환합니다 (텍스트/입력 위젯에 포커스가 없을 때만). |
+| `2`            | `Cycle After Notebook Tabs`     | 'After' 패널의 노트북 탭을 순환합니다 (텍스트/입력 위젯에 포커스가 없을 때만). |
+| `3`            | `Cycle Editor Notebook Tabs`    | 'Editor' 패널의 노트북 탭을 순환합니다 (텍스트/입력 위젯에 포커스가 없을 때만). |
+| `v`            | `Previous Folder`               | 이전에 선택했던 루트 폴더로 돌아갑니다.                               |
+| `b`            | `Browse Folder`                 | 새 루트 폴더를 탐색하여 선택합니다.                                  |
+| `c`            | `Clear Data`                    | 모든 편집기 내용과 계획된 데이터를 초기화합니다.                     |
+| `d`            | `Compute Diff`                  | 현재 입력된 트리와 소스 코드를 기반으로 스캐폴딩 계획을 계산합니다. |
+| `f`            | `Apply Scaffold`                | 계산된 스캐폴딩 계획을 파일 시스템에 적용합니다.                    |
