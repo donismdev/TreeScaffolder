@@ -59,10 +59,13 @@ def log_message(app, message: str, level: str = "info", buffer_list: list = None
     app.root.update_idletasks()
 
 def load_window_geometry(app):
-    """Loads window geometry from config.json if available, with validation."""
+    """Loads window geometry and sash positions from config.json if available, with validation."""
     config_path = Path.cwd() / app.CONFIG_FILE
     loaded_geometry = None
-    open_folder_after_apply = False # Default value
+    open_folder_after_apply = False
+    main_sash_pos_loaded = None
+    diff_sash_pos_loaded = None
+    window_state_loaded = None
 
     if config_path.exists():
         try:
@@ -72,32 +75,109 @@ def load_window_geometry(app):
                     loaded_geometry = config["geometry"]
                 if "OPEN_FOLDER_AFTER_APPLY" in config:
                     open_folder_after_apply = config["OPEN_FOLDER_AFTER_APPLY"]
+                if "window_state" in config:
+                    window_state_loaded = config["window_state"]
+                if "main_sash_pos" in config:
+                    main_sash_pos_loaded = config["main_sash_pos"]
+                if "diff_sash_pos" in config:
+                    diff_sash_pos_loaded = config["diff_sash_pos"]
         except Exception as e:
-            print(f"Error loading window geometry from config: {e}")
+            print(f"Error loading window config: {e}")
+            # Ensure config is initialized to an empty dict if loading fails to prevent KeyErrors
+            config = {}
+    else:
+        config = {} # Initialize config as empty if file doesn't exist
+
+    print(f"DEBUG: Loaded geometry from config: {loaded_geometry}, state: {window_state_loaded}")
 
     app.open_folder_after_apply.set(open_folder_after_apply)
 
+    # Determine the geometry to apply
+    geometry_to_apply = app.DEFAULT_GEOMETRY
+    print(f"DEBUG: Applying geometry: {geometry_to_apply}")
     if loaded_geometry:
         try:
             match = re.match(r"(\d+)x(\d+)\+(-?\d+)\+(-?\d+)", loaded_geometry)
             if match:
                 width, height, x, y = map(int, match.groups())
                 min_width, min_height = 300, 200
-                max_negative_coord = -1000
+                max_negative_coord = -1000 # Allow slight negative coordinates for multi-monitor setups
 
+                # Ensure dimensions are reasonable and position is not excessively off-screen
                 if width >= min_width and height >= min_height and x > max_negative_coord and y > max_negative_coord:
-                    app.root.geometry(loaded_geometry)
+                    geometry_to_apply = loaded_geometry
                 else:
-                    app.root.geometry(app.DEFAULT_GEOMETRY)
+                    # Invalid geometry, revert to default and mark for saving
+                    print(f"Loaded geometry '{loaded_geometry}' is invalid. Using default.")
             else:
-                app.root.geometry(app.DEFAULT_GEOMETRY)
+                # Malformed geometry string, revert to default and mark for saving
+                print(f"Loaded geometry string '{loaded_geometry}' is malformed. Using default.")
         except Exception as e:
-            app.root.geometry(app.DEFAULT_GEOMETRY)
-    else:
-        app.root.geometry(app.DEFAULT_GEOMETRY)
+            # Error during parsing, revert to default and mark for saving
+            print(f"Error parsing loaded geometry '{loaded_geometry}': {e}. Using default.")
+    
+    app.root.geometry(geometry_to_apply)
+    print(f"DEBUG: After applying geometry, current: {app.root.geometry()}")
+
+    # Apply window state (e.g., 'zoomed')
+    if window_state_loaded in ['normal', 'zoomed', 'iconic']: # Tkinter states
+        print(f"DEBUG: Applying window state: {window_state_loaded}")
+        try:
+            app.root.state(window_state_loaded)
+        except tk.TclError as e:
+            print(f"Warning: Could not apply window state '{window_state_loaded}': {e}. Setting to 'normal'.")
+            app.root.state('normal')
+            config["window_state"] = 'normal' # Update config if state fails
+        print(f"DEBUG: After applying state, current state: {app.root.state()}")
+
+    # Ensure widgets are updated so their sizes are available for sash positioning
+    app.root.update_idletasks()
+
+    # Load main_sash_pos
+    if hasattr(app, 'main_paned_window') and app.main_paned_window.winfo_exists():
+        paned_width = app.main_paned_window.winfo_width()
+        if isinstance(main_sash_pos_loaded, int) and 0 < main_sash_pos_loaded < paned_width:
+            app.main_paned_window.sashpos(0, main_sash_pos_loaded)
+        else:
+            default_pos = paned_width // 3 # Default to 1/3 of the width for main panel
+            if default_pos > 0: # Ensure default position is valid
+                app.main_paned_window.sashpos(0, default_pos)
+                config["main_sash_pos"] = default_pos
+            else:
+                config["main_sash_pos"] = 0 # Fallback for very small initial widths
+
+    # Load diff_sash_pos
+    if hasattr(app, 'diff_paned_window') and app.diff_paned_window.winfo_exists():
+        diff_paned_container = app.diff_paned_window.winfo_parent()
+        # The actual width for diff_paned_window is the width of its parent frame in diff_frame
+        # need to get the width of the frame it sits in, not the PanedWindow itself
+        diff_frame_width = app.diff_paned_window.master.winfo_width()
+        
+        if isinstance(diff_sash_pos_loaded, int) and 0 < diff_sash_pos_loaded < diff_frame_width:
+            app.diff_paned_window.sashpos(0, diff_sash_pos_loaded)
+        else:
+            default_pos = diff_frame_width // 2 # Default to half for diff panel
+            if default_pos > 0: # Ensure default position is valid
+                app.diff_paned_window.sashpos(0, default_pos)
+                config["diff_sash_pos"] = default_pos
+            else:
+                config["diff_sash_pos"] = 0 # Fallback for very small initial widths
+    
+    # If any defaults were set or state was adjusted, save the config
+    if loaded_geometry != geometry_to_apply or window_state_loaded != app.root.state() or \
+       "main_sash_pos" in config or "diff_sash_pos" in config: # Check if sashes were defaulted
+        try:
+            # Ensure we're saving the *current* state if defaults were applied
+            config["geometry"] = app.root.geometry()
+            config["window_state"] = app.root.state()
+
+            with open(config_path, "w", encoding="utf-8") as f:
+                json.dump(config, f, indent=4)
+        except Exception as e:
+            print(f"Error saving updated config with default geometry/state/sash positions: {e}")
 
 def save_window_geometry(app):
-    """Saves current window geometry to config.json."""
+    """Saves current window geometry and sash positions to config.json."""
     config_path = Path.cwd() / app.CONFIG_FILE
     try:
         config = {}
@@ -106,12 +186,21 @@ def save_window_geometry(app):
                 config = json.load(f)
         
         config["geometry"] = app.root.geometry()
+        config["window_state"] = app.root.state() # New: save window state
         config["OPEN_FOLDER_AFTER_APPLY"] = app.open_folder_after_apply.get()
+
+        print(f"DEBUG: Saving geometry: {app.root.geometry()}, state: {app.root.state()}")
+
+        if hasattr(app, 'main_paned_window') and app.main_paned_window.winfo_exists():
+            config["main_sash_pos"] = app.main_paned_window.sashpos(0)
+        
+        if hasattr(app, 'diff_paned_window') and app.diff_paned_window.winfo_exists():
+            config["diff_sash_pos"] = app.diff_paned_window.sashpos(0)
         
         with open(config_path, "w", encoding="utf-8") as f:
             json.dump(config, f, indent=4)
     except Exception as e:
-        print(f"Error saving window geometry: {e}")
+        print(f"Error saving window config: {e}")
 
 def load_last_root_path(app):
     """Loads the last selected root path from config.json and updates UI."""

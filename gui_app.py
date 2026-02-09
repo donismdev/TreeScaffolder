@@ -141,7 +141,8 @@ class ScaffoldApp:
         self.after_list.tag_configure('overwrite', foreground='#0078D7', font=self.treeview_item_font)
 
         self.root.bind("<Destroy>", lambda event: self._save_window_geometry())
-        app_utils.load_last_root_path(self)
+        self._load_window_geometry()  # Load geometry after all relevant widgets are created
+        app_utils.load_last_root_path(self) # Keep this as it's for a different purpose
         key_bindings.setup_key_bindings(self)
         
         # --- Shortcut Hint Setup ---
@@ -339,7 +340,9 @@ class ScaffoldApp:
 
     # --- Helper Method Stubs ---
     def _load_window_geometry(self): app_utils.load_window_geometry(self)
-    def _save_window_geometry(self): app_utils.save_window_geometry(self)
+    def _save_window_geometry(self):
+        print("DEBUG: _save_window_geometry called.")
+        app_utils.save_window_geometry(self)
     def _load_last_root_path(self): app_utils.load_last_root_path(self)
     def _save_last_root_path(self, path: str): app_utils.save_last_root_path(self, path)
     def _validate_path(self, path: str) -> tuple[bool, str]: return app_utils.validate_path(path)
@@ -356,7 +359,7 @@ def setup_runtime_logging():
     try:
         config_file_path = Path.cwd() / CONFIG_FILE
         print(f"DEBUG: Attempting to open config file: {config_file_path}")
-        with open(config_file_path, "r") as f:
+        with open(config_file_path, "r", encoding="utf-8") as f:
             config = json.load(f)
         print(f"DEBUG: Config loaded successfully. enable_runtime_logging: {config.get('enable_runtime_logging', False)}")
         

@@ -156,14 +156,14 @@ def create_right_panel(app):
     diff_frame.rowconfigure(0, weight=1)
     diff_frame.columnconfigure(0, weight=1)
 
-    diff_paned = ttk.PanedWindow(diff_frame, orient=tk.HORIZONTAL)
-    diff_paned.grid(row=0, column=0, sticky="nsew")
+    app.diff_paned_window = ttk.PanedWindow(diff_frame, orient=tk.HORIZONTAL)
+    app.diff_paned_window.grid(row=0, column=0, sticky="nsew")
 
     # --- Before Pane ---
-    before_pane_frame = ttk.LabelFrame(diff_paned, text="Before (Current State)")
+    before_pane_frame = ttk.LabelFrame(app.diff_paned_window, text="Before (Current State)")
     before_pane_frame.rowconfigure(0, weight=1)
     before_pane_frame.columnconfigure(0, weight=1)
-    diff_paned.add(before_pane_frame, weight=1)
+    app.diff_paned_window.add(before_pane_frame, weight=1)
 
     app.before_notebook = ttk.Notebook(before_pane_frame)
     app.before_notebook.grid(row=0, column=0, sticky="nsew", padx=2, pady=2)
@@ -182,10 +182,10 @@ def create_right_panel(app):
     app.before_notebook.add(before_list_frame, text="List")
 
     # --- After Pane ---
-    after_pane_frame = ttk.LabelFrame(diff_paned, text="After (Planned State)")
+    after_pane_frame = ttk.LabelFrame(app.diff_paned_window, text="After (Planned State)")
     after_pane_frame.rowconfigure(0, weight=1)
     after_pane_frame.columnconfigure(0, weight=1)
-    diff_paned.add(after_pane_frame, weight=1)
+    app.diff_paned_window.add(after_pane_frame, weight=1)
     
     app.after_notebook = ttk.Notebook(after_pane_frame)
     app.after_notebook.grid(row=0, column=0, sticky="nsew", padx=2, pady=2)
