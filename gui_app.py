@@ -151,6 +151,7 @@ class ScaffoldApp:
         self.root.bind("<KeyPress-Alt_R>", self.hint_manager.show_hints)
         self.root.bind("<KeyRelease-Alt_L>", self.hint_manager.hide_hints)
         self.root.bind("<KeyRelease-Alt_R>", self.hint_manager.hide_hints)
+        self.root.bind("<FocusOut>", self.hint_manager.hide_hints) # Hide hints when window loses focus
 
         print("DEBUG: ScaffoldApp.__init__ completed") # Debug print
 
