@@ -11,6 +11,7 @@ import json
 import logging
 import subprocess
 import sys
+import re
 from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, font
@@ -24,10 +25,11 @@ from Scripts.UI import app_utils
 from Scripts.UI import scaffold_runner
 from Scripts.UI import key_bindings
 from Scripts.UI import shortcut_hints # Added import
+from Scripts.Utils import tree_generator # Import the new utility
 from Scripts.UI.tree_populator import _clear_tree as clear_tree_function # Import as different name
 
 # --- Constants ---
-APP_TITLE = "Tree Scaffolder v1.1"
+APP_TITLE = "Tree Scaffolder v1.2"
 LOG_DIR = "Log"
 CONFIG_FILE = "Resources/config.json"
 DEFAULT_GEOMETRY = "1200x700"
@@ -110,6 +112,7 @@ class ScaffoldApp:
         
         self.widget_map = {} # Map action names to UI widgets for shortcut hints
         self.key_bindings_map = key_bindings._load_key_bindings_config() # Load keybindings for hint manager
+        self.editor_buttons = [] # Holds the buttons above the editor
 
         # --- Main Layout ---
         self.main_paned_window = ttk.PanedWindow(self.root, orient=tk.HORIZONTAL)
@@ -123,6 +126,11 @@ class ScaffoldApp:
 
         self.setup_left_panel()
         self.setup_right_panel()
+
+        # --- Event-based setup ---
+        # This must be done AFTER the UI is created in setup_left_panel
+        self.editor_notebook.bind("<<NotebookTabChanged>>", self._on_editor_tab_changed)
+        self._on_editor_tab_changed(None) # Set initial state
 
         # Configure Treeview tags AFTER widgets are created
         self.style.configure('new.Treeview', foreground='green', font=self.treeview_item_font)
@@ -154,6 +162,26 @@ class ScaffoldApp:
         self.root.bind("<FocusOut>", self.hint_manager.hide_hints) # Hide hints when window loses focus
 
         print("DEBUG: ScaffoldApp.__init__ completed") # Debug print
+
+    def _on_editor_tab_changed(self, event):
+        """Called when the editor notebook tab is changed. Configures button states."""
+        if not hasattr(self, 'editor_buttons') or not self.editor_buttons:
+            return
+
+        # Disable buttons 2, 3, 4 and clear their text
+        for i in range(1, 4):
+            self.editor_buttons[i].config(state=tk.DISABLED, text="")
+
+        try:
+            selected_tab_text = self.editor_notebook.tab(self.editor_notebook.select(), "text")
+        except tk.TclError:
+            selected_tab_text = "Scaffold Tree" # Default to first tab during init
+
+        # Configure the first button based on the selected tab
+        if selected_tab_text == "Source Code":
+            self.editor_buttons[0].config(state=tk.NORMAL, text="make tree", command=self.on_make_tree_from_source)
+        else: # For "Scaffold Tree" and "Content"
+            self.editor_buttons[0].config(state=tk.DISABLED, text="", command=None)
 
     def setup_styles(self):
         # Custom Fonts
@@ -338,6 +366,68 @@ class ScaffoldApp:
         print("DEBUG: on_escape_pressed called, resetting focus.")
         self.root.focus_set()
         return "break" # Prevent further propagation of the Escape key
+
+    def on_make_tree_from_source(self):
+        """
+        Parses the source code editor for V2 blocks and generates a new
+        scaffold tree from the file paths found.
+        """
+        self._log("Attempting to generate tree from source...", "info")
+        source_text = self.source_code_text.get("1.0", "end-1c")
+        if not source_text.strip():
+            messagebox.showinfo("Info", "Source Code editor is empty. Nothing to do.")
+            return
+
+        try:
+            # Use the core parser to get file paths
+            # A best-effort root marker is passed, though it's not critical for this operation
+            root_marker_match = re.search(r'@ROOT\s+([^{\s}]+|{{[\w-]+}})', self.tree_text.get("1.0", "end-1c"))
+            root_marker = root_marker_match.group(1) if root_marker_match else "{{Root}}"
+            patch_data = scaffold_core.parse_v2_format(source_text, root_marker=root_marker)
+            paths = [item['path'] for item in patch_data]
+
+            if not paths:
+                messagebox.showinfo("Info", "No valid V2 blocks found in the Source Code editor.")
+                return
+            
+            new_tree_text = tree_generator.generate_tree_from_paths(paths, root_marker_name=root_marker)
+
+            # Clear and update the scaffold tree editor
+            self.tree_text.delete("1.0", tk.END)
+            self.tree_text.insert("1.0", new_tree_text)
+            self.editor_notebook.select(0) # Switch focus to the tree tab
+            self._log(f"Successfully generated tree from {len(paths)} file paths.", "success")
+
+        except V2ParserError as e:
+            self._log(f"Failed to parse source code: {e}", "error")
+            messagebox.showerror("V2 Parsing Error", f"Could not parse the source code editor content:\n\n{e}")
+        except Exception as e:
+            self._log(f"An unexpected error occurred during tree generation: {e}", "error")
+            messagebox.showerror("Error", f"An unexpected error occurred:\n\n{e}")
+
+    def _on_editor_tab_changed(self, event):
+        """Called when the editor notebook tab is changed. Configures button states."""
+        if not hasattr(self, 'editor_buttons') or not self.editor_buttons:
+            return
+
+        try:
+            selected_tab_text = self.editor_notebook.tab(self.editor_notebook.select(), "text")
+        except tk.TclError:
+            selected_tab_text = "Scaffold Tree"
+
+        # Disable all buttons by default
+        for i, button in enumerate(self.editor_buttons):
+            button.config(state=tk.DISABLED, text=f"", command=None)
+            if i > 0: # Only show text for Button 1 for now
+                button.config(text=f"Button {i+1}")
+        
+        self.editor_buttons[0].config(text="make tree")
+
+
+        if selected_tab_text == "Source Code":
+            self.editor_buttons[0].config(state=tk.NORMAL, command=self.on_make_tree_from_source)
+        else: # For "Scaffold Tree" and "Content", all buttons remain disabled
+            self.editor_buttons[0].config(state=tk.DISABLED)
 
     # --- Helper Method Stubs ---
     def _load_window_geometry(self): app_utils.load_window_geometry(self)

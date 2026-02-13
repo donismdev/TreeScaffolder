@@ -44,11 +44,23 @@ def create_left_panel(app):
     # --- Editor Tabs ---
     editor_tabs_frame = ttk.LabelFrame(app.left_frame, text="2. Define Scaffold Tree")
     editor_tabs_frame.grid(row=1, column=0, sticky="nsew")
-    editor_tabs_frame.rowconfigure(0, weight=1)
-    editor_tabs_frame.columnconfigure(0, weight=1)
+    editor_tabs_frame.columnconfigure(0, weight=1) # Make sure the column expands
 
+    # --- New Button Bar ---
+    button_bar_frame = ttk.Frame(editor_tabs_frame)
+    button_bar_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=(0, 5))
+
+    # Add 4 placeholder buttons and store them on the app instance
+    app.editor_buttons = []
+    for i in range(4):
+        button = ttk.Button(button_bar_frame, text=f"Button {i+1}")
+        button.pack(side="left", padx=2)
+        app.editor_buttons.append(button)
+
+    # --- Notebook ---
     app.editor_notebook = ttk.Notebook(editor_tabs_frame)
-    app.editor_notebook.grid(row=0, column=0, sticky="nsew")
+    app.editor_notebook.grid(row=1, column=0, sticky="nsew") # Notebook is now in row 1
+    editor_tabs_frame.rowconfigure(1, weight=1) # Configure row 1 to expand
     app.widget_map["cycle_notebook_editor_notebook"] = app.editor_notebook
 
     # --- Scaffold Tree Tab ---
