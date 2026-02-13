@@ -410,24 +410,20 @@ class ScaffoldApp:
         if not hasattr(self, 'editor_buttons') or not self.editor_buttons:
             return
 
+        # Buttons 2, 3, 4 are always disabled and blank.
+        for i in range(1, 4):
+            self.editor_buttons[i].config(state=tk.DISABLED, text="")
+
         try:
             selected_tab_text = self.editor_notebook.tab(self.editor_notebook.select(), "text")
         except tk.TclError:
-            selected_tab_text = "Scaffold Tree"
+            selected_tab_text = "Scaffold Tree" # Default to first tab during init
 
-        # Disable all buttons by default
-        for i, button in enumerate(self.editor_buttons):
-            button.config(state=tk.DISABLED, text=f"", command=None)
-            if i > 0: # Only show text for Button 1 for now
-                button.config(text=f"Button {i+1}")
-        
-        self.editor_buttons[0].config(text="make tree")
-
-
+        # Configure the first button based on the selected tab.
         if selected_tab_text == "Source Code":
-            self.editor_buttons[0].config(state=tk.NORMAL, command=self.on_make_tree_from_source)
-        else: # For "Scaffold Tree" and "Content", all buttons remain disabled
-            self.editor_buttons[0].config(state=tk.DISABLED)
+            self.editor_buttons[0].config(state=tk.NORMAL, text="make tree", command=self.on_make_tree_from_source)
+        else: # For "Scaffold Tree" and "Content" tabs.
+            self.editor_buttons[0].config(state=tk.DISABLED, text="", command=None)
 
     # --- Helper Method Stubs ---
     def _load_window_geometry(self): app_utils.load_window_geometry(self)
