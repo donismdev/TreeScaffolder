@@ -101,6 +101,21 @@ public class NewModule : ModuleRules
 이 텍스트 또한 무시됩니다.
 ```
 
+### 3.3. 에디터 툴바 (Editor Toolbar)
+
+"Define Scaffold Tree" 패널의 텍스트 에디터 상단에는 동적으로 상태가 변경되는 툴바가 존재합니다.
+
+-   **동작 규칙**: 툴바의 버튼들은 현재 선택된 탭("Scaffold Tree", "Source Code", "Content")에 따라 활성화 또는 비활성화됩니다.
+-   **Scaffold Tree / Content 탭**: 모든 툴바 버튼이 비활성화됩니다.
+-   **Source Code 탭**:
+    -   `make tree` 버튼이 활성화됩니다.
+    -   **`make tree` 기능**:
+        1.  현재 "Source Code" 에디터에 있는 모든 V2 블록 (`@@@FILE_BEGIN...END` 등)을 파싱합니다.
+        2.  추출된 모든 `path` 정보를 기반으로, "Scaffold Tree"에 맞는 새로운 트리 구조 텍스트를 자동으로 생성합니다.
+        3.  기존 "Scaffold Tree"의 내용을 모두 지우고, 새로 생성된 트리 텍스트로 덮어씁니다.
+        4.  작업 완료 후 "Scaffold Tree" 탭으로 자동 전환하여 결과를 바로 확인할 수 있습니다.
+        5.  이 기능은 V2 블록이 이미 작성된 텍스트로부터 트리 구조를 역으로 생성할 때 유용합니다.
+
 ---
 
 ## 4. 데이터 흐름 및 실행 순서 (GUI 기준)
