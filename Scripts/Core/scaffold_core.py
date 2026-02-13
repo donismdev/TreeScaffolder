@@ -81,13 +81,12 @@ def _get_content(line: str) -> str:
 def parse_tree_text(text: str) -> Tuple[List[NodeItem], Optional[str], Optional[str]]:
     """
     Parses the multiline tree text into a list of NodeItems,
-    skipping content within V2 patch blocks and normalizing indentation.
+    normalizing indentation. It assumes the input text does not contain V2 blocks.
     """
     items: List[NodeItem] = []
     root_marker_name: Optional[str] = None
-    parsing_v2_content: bool = False
-    tree_lines_info: List[Tuple[int, str]] = [] # (line_index, raw_line)
-    
+    tree_lines_info: List[Tuple[int, str]] = []  # (line_index, raw_line)
+
     lines = text.splitlines()
 
     # --- First pass: Identify tree lines and the root marker ---
@@ -95,14 +94,7 @@ def parse_tree_text(text: str) -> Tuple[List[NodeItem], Optional[str], Optional[
         raw = line.rstrip("\n")
         trimmed = _get_content(raw)
 
-        if trimmed.startswith("@@@FILE_BEGIN"):
-            parsing_v2_content = True
-            continue
-        elif trimmed.startswith("@@@FILE_END"):
-            parsing_v2_content = False
-            continue
-        
-        if parsing_v2_content or not trimmed or trimmed.startswith("#"):
+        if not trimmed or trimmed.startswith("#"):
             continue
 
         if trimmed.startswith("@ROOT"):
@@ -110,7 +102,7 @@ def parse_tree_text(text: str) -> Tuple[List[NodeItem], Optional[str], Optional[
             if match:
                 root_marker_name = match.group(1)
             continue
-        
+
         tree_lines_info.append((i, raw))
 
     # --- Determine base indentation from the collected tree lines ---
@@ -120,30 +112,30 @@ def parse_tree_text(text: str) -> Tuple[List[NodeItem], Optional[str], Optional[
         min_indent_level = _count_raw_indent(first_node_line)
     else:
         min_indent_level = 0
-    
+
     # --- Second pass: Build NodeItems with normalized indentation ---
     for line_index, raw_line in tree_lines_info:
         raw_indent = _count_raw_indent(raw_line)
         content = _get_content(raw_line)
-        
+
         effective_indent = raw_indent - min_indent_level
-        if effective_indent < 0: # Should not happen, but as a safeguard
+        if effective_indent < 0:  # Should not happen, but as a safeguard
             effective_indent = 0
 
         is_dir = content.endswith("/")
         name = content[:-1] if is_dir else content
-        
+
         # Check for invalid path characters
         # Reject absolute paths, path traversal, and colons (invalid on Windows, avoided for cross-platform compatibility)
         if name.startswith(('/', '\\')) or '..' in name or ':' in name:
             return [], None, f"Error at line {line_index + 1}: Invalid characters in path name ('..', '/', '\\', ':'). Found: '{name}'"
-        
+
         items.append(NodeItem(indent=effective_indent, name=name, is_dir=is_dir, line_number=line_index + 1))
-    
+
     # --- Post-parsing validation ---
     if not root_marker_name and items:
         return [], None, "Error: Missing '@ROOT {marker}' declaration for the provided tree structure."
-    
+
     if root_marker_name and items and (items[0].name != root_marker_name or not items[0].is_dir):
         return [], root_marker_name, f"Error: The first node must be '{root_marker_name}/' and have the lowest indentation."
 
@@ -192,18 +184,38 @@ def generate_plan(root_path: Path, text_input: str, config: dict) -> Plan:
 	Generates a unified plan from a text input that may contain both a
 	scaffold tree and V2 patch blocks.
 	"""
+	# 1. Pre-process the input to remove any text between an END and a BEGIN marker for any keyword.
+	end_begin_junk_pattern = re.compile(r"(@@@[A-Z_]+_END)[\s\S]*?(@@@[A-Z_]+_BEGIN)")
+	text_input = end_begin_junk_pattern.sub(r"\1\n\2", text_input)
+
 	plan = Plan(root_path=root_path, tree_text=text_input, config=config)
 
-	# 1. Parse scaffold tree structure
-	tree_nodes, initial_root_marker, tree_error = parse_tree_text(text_input)
+	# 2. High-Priority: Validate and parse V2 blocks from the pre-processed text.
+	# This ensures block integrity before we try to separate tree vs. V2 content.
+	try:
+		# Determine a best-guess root marker for the V2 parser.
+		root_match_in_full_text = re.search(r'@ROOT\s+([^{\s}]+|{{[\w-]+}})', text_input)
+		effective_root_marker = None
+		if root_match_in_full_text:
+			effective_root_marker = root_match_in_full_text.group(1)
+		elif "{{Root}}" in text_input:
+			effective_root_marker = "{{Root}}"
+		
+		patch_data = parse_v2_format(text_input, root_marker=effective_root_marker)
+	except V2ParserError as e:
+		plan.errors.append(f"{e}") # Removed "V2 Patch Error: " prefix to show user the direct error
+		return plan
+
+	# 3. Isolate Tree Text: If V2 parsing was successful, remove all blocks to get clean tree text.
+	all_blocks_pattern = re.compile(r"@@@[A-Z_]+_BEGIN[\s\S]*?@@@[A-Z_]+_END\n?")
+	tree_text_only = all_blocks_pattern.sub("", text_input)
+
+	# 4. Parse the isolated scaffold tree structure.
+	tree_nodes, initial_root_marker, tree_error = parse_tree_text(tree_text_only)
 	if tree_error:
 		plan.errors.append(tree_error)
 
-	# Determine the effective root_marker for replacement in V2 paths
-	effective_root_marker = initial_root_marker
-	if not effective_root_marker and "{{Root}}" in text_input:
-		effective_root_marker = "{{Root}}"
-
+	# 5. Process the parsed tree nodes to build the directory/file plan.
 	if tree_nodes:
 		plan.nodes = tree_nodes[1:] # Remove {{Root}} node
 		stack: List[Tuple[int, Path]] = [(0, root_path)]
@@ -221,86 +233,54 @@ def generate_plan(root_path: Path, text_input: str, config: dict) -> Plan:
 			else:
 				plan.planned_files.add(current_path)
 	
-	# 2. Parse V2 patch blocks
-	try:
-		patch_data = parse_v2_format(text_input, root_marker=effective_root_marker)
-		for item in patch_data:
-			path_str = item['path']
-			content = item['content']
-			if '..' in path_str or Path(path_str).is_absolute():
-				plan.errors.append(f"Invalid path in patch: '{path_str}'.")
-				continue
-			target_path = root_path / path_str
-			plan.planned_files.add(target_path)
-			plan.file_contents[target_path.resolve()] = content
-			for parent in target_path.parents:
-				if parent != root_path and parent.is_relative_to(root_path):
-					plan.planned_dirs.add(parent)
-	except V2ParserError as e:
-		plan.errors.append(f"V2 Patch Error: {e}")
+	# 6. Process the already-parsed V2 patch data to populate file contents.
+	for item in patch_data:
+		path_str = item['path']
+		content = item['content']
+		if '..' in path_str or Path(path_str).is_absolute():
+			plan.errors.append(f"Invalid path in patch: '{path_str}'.")
+			continue
+		target_path = root_path / path_str
+		plan.planned_files.add(target_path)
+		plan.file_contents[target_path.resolve()] = content
+		for parent in target_path.parents:
+			if parent != root_path and parent.is_relative_to(root_path):
+				plan.planned_dirs.add(parent)
 
 	# --- Smart Merge Logic for Mismatched Paths ---
-	# This section attempts to reconcile files planned by the tree structure
-	# with content provided by V2 patches at a different but similarly named path.
-	
-	# Store a temporary set of planned files from tree for easier lookup of original tree paths
-	# This is essentially plan.planned_files before any V2-specific additions to planned_files,
-	# but since plan.planned_files is a set and order is not guaranteed, we just track the
-	# paths from the tree parsing phase.
-	tree_only_planned_files = set(plan.planned_files) # Take a snapshot after tree parsing
-
-	# Copy file_contents items to avoid modifying while iterating
-	# Create a dictionary to hold content that needs to be moved
+	tree_only_planned_files = set(plan.planned_files)
 	content_to_move: Dict[Path, str] = {}
 	paths_to_remove_from_file_contents: Set[Path] = set()
 	paths_to_remove_from_planned_files: Set[Path] = set()
 	
-	# Iterate over content entries from V2 parser
 	for data_path_resolved, content in plan.file_contents.items():
 		found_merge_target = False
-		# Check against files identified SOLELY by the tree parser
 		for tree_path in tree_only_planned_files:
-			# Ensure it's a file (not a directory) and that the names match but paths differ
-			if tree_path.name == data_path_resolved.name and \
-			   tree_path.resolve() != data_path_resolved:
-				
-				# If the tree_path doesn't already have content assigned directly from V2 patches
+			if tree_path.name == data_path_resolved.name and tree_path.resolve() != data_path_resolved:
 				if tree_path.resolve() not in plan.file_contents or plan.file_contents[tree_path.resolve()] == "":
 					content_to_move[tree_path.resolve()] = content
 					paths_to_remove_from_file_contents.add(data_path_resolved)
-					
-					# Remove the original data_path from planned_files if it was implicitly added by V2 parser
-					# This prevents creating two files (one empty, one with content)
 					if data_path_resolved in plan.planned_files:
 						paths_to_remove_from_planned_files.add(data_path_resolved)
-					
 					plan.migration_warnings.append(f"Content for '{data_path_resolved.name}' at '{data_path_resolved.relative_to(root_path)}' migrated to '{tree_path.relative_to(root_path)}' due to tree structure precedence.")
 					found_merge_target = True
-					break # Move to the next content file
-
-		# If data_path_resolved could not be merged, ensure it is still part of the plan
-		# (this handles V2 files that have no matching tree-planned counterpart)
+					break
 		if not found_merge_target:
-			plan.planned_files.add(data_path_resolved) # Add it back in case it was temporary
+			plan.planned_files.add(data_path_resolved)
 		
-	# Apply the moves
 	for old_path_resolved in paths_to_remove_from_file_contents:
-		if old_path_resolved in plan.file_contents:
-			del plan.file_contents[old_path_resolved]
-	
+		if old_path_resolved in plan.file_contents: del plan.file_contents[old_path_resolved]
 	for new_path_resolved, content in content_to_move.items():
 		plan.file_contents[new_path_resolved] = content
-		
 	for removed_path in paths_to_remove_from_planned_files:
-		if removed_path in plan.planned_files:
-			plan.planned_files.remove(removed_path)
+		if removed_path in plan.planned_files: plan.planned_files.remove(removed_path)
 
 	if not plan.planned_dirs and not plan.planned_files:
 		if not plan.errors:
 			plan.errors.append("No valid scaffold tree or V2 patch blocks found in the input.")
 		return plan
 
-	# 3. Analyze filesystem state
+	# --- Final Analysis ---
 	all_planned_paths = plan.planned_dirs.union(plan.planned_files)
 	for path in sorted(list(all_planned_paths), key=lambda p: len(p.parts)):
 		state = ""
@@ -308,19 +288,15 @@ def generate_plan(root_path: Path, text_input: str, config: dict) -> Plan:
 			is_planned_dir = path in plan.planned_dirs
 			is_planned_file = path in plan.planned_files
 			is_fs_dir = path.is_dir()
-
 			if is_planned_dir and not is_fs_dir: state = "conflict_file"
 			elif is_planned_file and is_fs_dir: state = "conflict_dir"
 			elif is_planned_file and path.resolve() in plan.file_contents: state = "overwrite"
 			else: state = "exists"
 		else:
 			state = "new"
-		
 		if state: plan.path_states[path] = state
 		if state.startswith("conflict"):
 			plan.errors.append(f"Conflict at '{path}': trying to create { 'dir' if is_planned_dir else 'file' } but a { 'file' if not is_fs_dir else 'dir' } exists.")
 
-	# 4. Analyze warnings
 	plan.existing_files = scan_existing_files(root_path, config)
-
 	return plan

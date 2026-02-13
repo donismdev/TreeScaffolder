@@ -21,6 +21,14 @@ def _call_method_with_event(method, event):
 
 def _call_method_without_event(method, event):
     # 'event' is received from Tkinter bind, but the method doesn't need it.
+    app = method.__self__
+    focused_widget = app.root.focus_get()
+
+    if isinstance(focused_widget, (tk.Text, tk.Entry)):
+        if hasattr(app, '_log'):
+            app._log(f"Shortcut for '{method.__name__}' skipped: Text widget focused.", "info")
+        return "break"
+
     return method()
 
 def _on_load_test_data_conditional(app, event):
