@@ -61,38 +61,47 @@ class Plan:
 	
 	@property
 	def has_conflicts(self) -> bool:
-		return any(v.startswith("conflict") or v == "overwrite" for v in self.path_states.values())
+		return any(v.startswith("conflict") for v in self.path_states.values())
 
 # ---------- Parsing Logic ----------
 
 def _count_raw_indent(line: str) -> int:
-    """Counts raw indentation level from a line."""
+    """Counts raw indentation level from a line, handling tabs and spaces more flexibly."""
     leading_match = re.match(r"^[	 ]*", line)
     prefix = leading_match.group(0) if leading_match else ""
+    
+    # Each TAB is one level. 
+    # For spaces, we look for the most common indentation (2, 4, or 8)
+    # but as a fallback, we use 4.
     tab_count = prefix.count("	")
     space_count = prefix.count(" ")
-    space_level = space_count // 4
-    return tab_count + space_level
-
-def _get_content(line: str) -> str:
-    """Gets the stripped content of a line."""
-    return line.strip()
+    
+    # If there are only spaces and no tabs, we try to be smart, 
+    # but stick to 4 for consistency unless it's clearly 2.
+    if space_count > 0 and tab_count == 0:
+        if space_count % 4 == 0:
+            return space_count // 4
+        if space_count % 2 == 0:
+            return space_count // 2
+        return space_count // 4
+    
+    return tab_count + (space_count // 4)
 
 def parse_tree_text(text: str) -> Tuple[List[NodeItem], Optional[str], Optional[str]]:
     """
-    Parses the multiline tree text into a list of NodeItems,
-    normalizing indentation. It assumes the input text does not contain V2 blocks.
+    Parses the multiline tree text with strict Python-style indentation validation.
+    Forbids mixing tabs and spaces and enforces a consistent indentation unit.
     """
     items: List[NodeItem] = []
     root_marker_name: Optional[str] = None
-    tree_lines_info: List[Tuple[int, str]] = []  # (line_index, raw_line)
+    tree_lines_info: List[Tuple[int, str]] = []
 
     lines = text.splitlines()
 
     # --- First pass: Identify tree lines and the root marker ---
     for i, line in enumerate(lines):
         raw = line.rstrip("\n")
-        trimmed = _get_content(raw)
+        trimmed = line.strip()
 
         if not trimmed or trimmed.startswith("#"):
             continue
@@ -105,39 +114,81 @@ def parse_tree_text(text: str) -> Tuple[List[NodeItem], Optional[str], Optional[
 
         tree_lines_info.append((i, raw))
 
-    # --- Determine base indentation from the collected tree lines ---
-    if tree_lines_info:
-        # Find the indentation of the first actual tree node to handle global offsets
-        first_node_line = tree_lines_info[0][1]
-        min_indent_level = _count_raw_indent(first_node_line)
-    else:
-        min_indent_level = 0
-
-    # --- Second pass: Build NodeItems with normalized indentation ---
+    # --- Strict Indentation Validation ---
+    indent_unit_type = None  # 'tab' or 'space'
+    indent_unit_size = None  # Number of spaces if type is 'space'
+    
     for line_index, raw_line in tree_lines_info:
-        raw_indent = _count_raw_indent(raw_line)
-        content = _get_content(raw_line)
+        leading_match = re.match(r"^[ \t]*", raw_line)
+        whitespace = leading_match.group(0) if leading_match else ""
+        
+        if not whitespace:
+            continue
+            
+        # 1. Check for mixed tabs and spaces
+        has_tabs = "\t" in whitespace
+        has_spaces = " " in whitespace
+        
+        if has_tabs and has_spaces:
+            return [], None, f"TabError at line {line_index + 1}: 들여쓰기에 탭(\\t)과 공백(Space)이 혼용되었습니다. 한 가지 방식만 사용해주세요."
+            
+        current_type = 'tab' if has_tabs else 'space'
+        current_size = len(whitespace) if current_type == 'space' else whitespace.count("\t")
+        
+        # 2. Establish the indentation unit from the very first indented line
+        if indent_unit_type is None:
+            indent_unit_type = current_type
+            indent_unit_size = current_size
+        
+        # 3. Validate against established unit
+        if current_type != indent_unit_type:
+            type_name = "공백(Space)" if indent_unit_type == 'space' else "탭(\\t)"
+            return [], None, f"TabError at line {line_index + 1}: 이전 줄에서는 {type_name}을 사용했지만, 여기서는 다른 방식을 사용했습니다."
+            
+        if indent_unit_type == 'space':
+            if current_size % indent_unit_size != 0:
+                return [], None, f"IndentationError at line {line_index + 1}: 일관성 없는 들여쓰기입니다. 현재 {current_size}칸이 사용되었으나, 이 트리의 들여쓰기 단위는 {indent_unit_size}칸입니다."
+            effective_indent = current_size // indent_unit_size
+        else:
+            effective_indent = current_size # Tab count is the level
 
-        effective_indent = raw_indent - min_indent_level
-        if effective_indent < 0:  # Should not happen, but as a safeguard
+    # --- Second pass: Build NodeItems with calculated effective_indent ---
+    # To handle global offsets (if the whole tree is indented), we find the min level
+    temp_info = []
+    for line_index, raw_line in tree_lines_info:
+        leading_match = re.match(r"^[ \t]*", raw_line)
+        whitespace = leading_match.group(0) if leading_match else ""
+        
+        if not whitespace:
+            level = 0
+        elif indent_unit_type == 'space':
+            level = len(whitespace) // indent_unit_size
+        else:
+            level = whitespace.count("\t")
+        temp_info.append((line_index, raw_line, level))
+        
+    min_level = temp_info[0][2] if temp_info else 0
+
+    for line_index, raw_line, level in temp_info:
+        content = raw_line.strip()
+        effective_indent = level - min_level
+        if effective_indent < 0:
             effective_indent = 0
 
-        is_dir = content.endswith("/")
+        is_dir = content.endswith("/") or content.endswith("\\")
         name = content[:-1] if is_dir else content
+        name = name.replace("\\", "/")
 
-        # Check for invalid path characters
-        # Reject absolute paths, path traversal, and colons (invalid on Windows, avoided for cross-platform compatibility)
-        if name.startswith(('/', '\\')) or '..' in name or ':' in name:
-            return [], None, f"Error at line {line_index + 1}: Invalid characters in path name ('..', '/', '\\', ':'). Found: '{name}'"
+        if name.startswith('/') or '..' in name or ':' in name:
+            return [], None, f"Error at line {line_index + 1}: 파일명에 부적절한 문자가 포함되었습니다. ('{name}')"
 
         items.append(NodeItem(indent=effective_indent, name=name, is_dir=is_dir, line_number=line_index + 1))
 
-    # --- Post-parsing validation ---
     if not root_marker_name and items:
-        return [], None, "Error: Missing '@ROOT {marker}' declaration for the provided tree structure."
+        return [], None, "Error: '@ROOT' 선언이 누락되었습니다."
 
     if root_marker_name and items and (items[0].name != root_marker_name or not items[0].is_dir):
-        return [], root_marker_name, f"Error: The first node must be '{root_marker_name}/' and have the lowest indentation."
+        return [], root_marker_name, f"Error: 첫 번째 노드는 반드시 '@ROOT'에서 지정한 '{root_marker_name}/' 이어야 합니다."
 
     return items, root_marker_name, None
 
@@ -249,46 +300,26 @@ def generate_plan(root_path: Path, text_input: str, config: dict) -> Plan:
 				plan.planned_files.add(current_path)
 	
 	# 6. Process the already-parsed V2 patch data to populate file contents.
+	seen_paths_in_v2: Dict[Path, str] = {}
 	for item in patch_data:
 		path_str = item['path']
 		content = item['content']
 		if '..' in path_str or Path(path_str).is_absolute():
 			plan.errors.append(f"Invalid path in patch: '{path_str}'.")
 			continue
-		target_path = root_path / path_str
+		target_path = (root_path / path_str).resolve()
+
+		# Check for duplicates within the source code itself
+		if target_path in seen_paths_in_v2:
+			prev_path_str = seen_paths_in_v2[target_path]
+			plan.errors.append(f"Duplicate file definition in Source Code: '{path_str}' (already defined as '{prev_path_str}')")
+		
+		seen_paths_in_v2[target_path] = path_str
 		plan.planned_files.add(target_path)
-		plan.file_contents[target_path.resolve()] = content
+		plan.file_contents[target_path] = content
 		for parent in target_path.parents:
 			if parent != root_path and parent.is_relative_to(root_path):
 				plan.planned_dirs.add(parent)
-
-	# --- Smart Merge Logic for Mismatched Paths ---
-	tree_only_planned_files = set(plan.planned_files)
-	content_to_move: Dict[Path, str] = {}
-	paths_to_remove_from_file_contents: Set[Path] = set()
-	paths_to_remove_from_planned_files: Set[Path] = set()
-	
-	for data_path_resolved, content in plan.file_contents.items():
-		found_merge_target = False
-		for tree_path in tree_only_planned_files:
-			if tree_path.name == data_path_resolved.name and tree_path.resolve() != data_path_resolved:
-				if tree_path.resolve() not in plan.file_contents or plan.file_contents[tree_path.resolve()] == "":
-					content_to_move[tree_path.resolve()] = content
-					paths_to_remove_from_file_contents.add(data_path_resolved)
-					if data_path_resolved in plan.planned_files:
-						paths_to_remove_from_planned_files.add(data_path_resolved)
-					plan.migration_warnings.append(f"Content for '{data_path_resolved.name}' at '{data_path_resolved.relative_to(root_path)}' migrated to '{tree_path.relative_to(root_path)}' due to tree structure precedence.")
-					found_merge_target = True
-					break
-		if not found_merge_target:
-			plan.planned_files.add(data_path_resolved)
-		
-	for old_path_resolved in paths_to_remove_from_file_contents:
-		if old_path_resolved in plan.file_contents: del plan.file_contents[old_path_resolved]
-	for new_path_resolved, content in content_to_move.items():
-		plan.file_contents[new_path_resolved] = content
-	for removed_path in paths_to_remove_from_planned_files:
-		if removed_path in plan.planned_files: plan.planned_files.remove(removed_path)
 
 	if not plan.planned_dirs and not plan.planned_files:
 		if not plan.errors:

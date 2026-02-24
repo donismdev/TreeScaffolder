@@ -46,12 +46,24 @@ def log_message(app, message: str, level: str = "info", buffer_list: list = None
     # Configure tag only if not already configured
     if tag not in app.log_text.tag_names(): # Use tag_names() for robustness
         color = "black"
+        font_weight = "normal"
         if level == "error": color = "red"
         elif level == "warn": color = "#E59400"
         elif level == "success": color = "green"
         elif level == "skip": color = "gray"
-        elif level == "debug": color = "purple" # Add debug color for GUI
-        app.log_text.tag_configure(tag, foreground=color)
+        elif level == "debug": color = "purple"
+        elif level == "overwrite": 
+            color = "#0078D7" # Blue
+            font_weight = "bold"
+        
+        # Get current font and modify it
+        current_font = app.log_text.cget("font")
+        # In Tkinter, if font is a string like 'Consolas 9', we can modify it
+        # but a safer way for bolding is using a tuple or a font object.
+        # Since we have app.editor_font, but log_text has its own.
+        log_font = ("Consolas", 10, "bold") if font_weight == "bold" else ("Consolas", 9)
+        
+        app.log_text.tag_configure(tag, foreground=color, font=log_font)
 
     app.log_text.insert(tk.END, message + '\n', tag)
     app.log_text.see(tk.END)

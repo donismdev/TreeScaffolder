@@ -65,7 +65,9 @@ def execute_scaffold(app):
 
         if state == "new" or state == "overwrite":
             is_overwrite = state == "overwrite"
-            ok, created, skipped = _ensure_file(app, path, is_dry_run, content, is_overwrite, successful_paths)
+            # Pass correct level for logging based on state
+            log_level = "overwrite" if is_overwrite else "success"
+            ok, created, skipped = _ensure_file(app, path, is_dry_run, content, is_overwrite, successful_paths, log_level)
             if ok:
                 if created and not is_overwrite:
                     stats["files_created"] += 1
@@ -240,7 +242,7 @@ def _ensure_dir(app, path: Path, dry_run: bool, successful_paths: list) -> tuple
         app._log(f"[SKIP DIR]  {path}", "skip")
         return True, False, True
 
-    app._log(f"[MKDIR]     {path}", "info")
+    app._log(f"[MKDIR]     {path}", "success")
     if not dry_run:
         try:
             path.mkdir(parents=True, exist_ok=True)
@@ -249,7 +251,7 @@ def _ensure_dir(app, path: Path, dry_run: bool, successful_paths: list) -> tuple
             return False, False, False
     return True, True, False
 
-def _ensure_file(app, path: Path, dry_run: bool, content: str | None, is_overwrite: bool, successful_paths: list) -> tuple[bool, bool, bool]:
+def _ensure_file(app, path: Path, dry_run: bool, content: str | None, is_overwrite: bool, successful_paths: list, log_level: str = "success") -> tuple[bool, bool, bool]:
     """(ok, created, skipped)"""
     verb = "[OVERWRITE]" if is_overwrite else "[CREATE]"
     
@@ -257,7 +259,6 @@ def _ensure_file(app, path: Path, dry_run: bool, content: str | None, is_overwri
         app._log(f"[SKIP FILE] {path} (already exists)", "skip")
         return True, False, True
 
-    log_level = "info" if content is not None else "success"
     app._log(f"{verb:<11} {path}", log_level)
 
     if not dry_run:
