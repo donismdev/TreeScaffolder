@@ -61,7 +61,7 @@ class Plan:
 	
 	@property
 	def has_conflicts(self) -> bool:
-		return any(v.startswith("conflict") for v in self.path_states.values())
+		return any(v.startswith("conflict") or v == "overwrite" for v in self.path_states.values())
 
 # ---------- Parsing Logic ----------
 
@@ -179,6 +179,21 @@ def find_similar_candidates(existing_map: Dict[str, List[Path]], target_name: st
     return out
 # -------------------------------------------------------------
 
+def is_content_identical(actual: str, planned: str) -> bool:
+    """Compares actual and planned content with normalization."""
+    def normalize(text):
+        if text is None: return ""
+        # Normalize line endings
+        text = text.replace('\r\n', '\n')
+        # Strip trailing whitespace from each line
+        lines = [line.rstrip() for line in text.splitlines()]
+        # Remove trailing empty lines from the end of the file
+        while lines and not lines[-1]:
+            lines.pop()
+        return "\n".join(lines)
+    
+    return normalize(actual) == normalize(planned)
+
 def generate_plan(root_path: Path, text_input: str, config: dict) -> Plan:
 	"""
 	Generates a unified plan from a text input that may contain both a
@@ -290,8 +305,19 @@ def generate_plan(root_path: Path, text_input: str, config: dict) -> Plan:
 			is_fs_dir = path.is_dir()
 			if is_planned_dir and not is_fs_dir: state = "conflict_file"
 			elif is_planned_file and is_fs_dir: state = "conflict_dir"
-			elif is_planned_file and path.resolve() in plan.file_contents: state = "overwrite"
-			else: state = "exists"
+			elif is_planned_file and path.resolve() in plan.file_contents:
+				# Compare content if it's a file and we have planned content
+				try:
+					existing_content = path.read_text(encoding='utf-8', errors='replace')
+					planned_content = plan.file_contents[path.resolve()]
+					if is_content_identical(existing_content, planned_content):
+						state = "identical"
+					else:
+						state = "overwrite"
+				except Exception:
+					state = "overwrite" # Fallback to overwrite if we can't read it
+			else:
+				state = "exists"
 		else:
 			state = "new"
 		if state: plan.path_states[path] = state

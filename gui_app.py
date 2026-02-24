@@ -255,26 +255,75 @@ class ScaffoldApp:
             "SIMILARITY_RATIO_THRESHOLD": self.similarity_threshold.get(),
         }
         self.current_plan = scaffold_core.generate_plan(root_path, text_input, config)
+        
+        # --- 1. Log 초기화 및 준비 ---
         self.log_text.config(state=tk.NORMAL)
         self.log_text.delete('1.0', tk.END)
         self.log_text.config(state=tk.DISABLED)
+        
+        # --- 2. 심각한 충돌 확인 (내용 불일치 중복 정의) ---
+        different_files = [p for p, s in self.current_plan.path_states.items() if s == 'overwrite']
+        
+        if different_files:
+            # 로그에 에러 리스트 출력
+            self._log("\n[ERROR] Duplicate File Definition Conflict: The following files already exist with different content:", "error")
+            self._log("Source Code 내부에 중복정의된 파일 내용이 존재합니다. 데이터 보호를 위해 작업을 중단합니다.", "error")
+            for p in different_files:
+                self._log(f"- {p.relative_to(root_path)}", "error")
+            
+            # After View 비우기 (진행 안 된 것처럼 보이게 함)
+            self._clear_tree(self.after_tree)
+            self._clear_tree(self.after_list)
+            self.apply_button.config(state=tk.DISABLED)
+            
+            # 에러 팝업 띄우기
+            error_msg = (
+                f"{len(different_files)}개의 파일이 중복 정의되었습니다.\n"
+                "Source Code 내부에 중복정의된 파일 내용이 존재합니다.\n\n"
+                "기존 데이터 보호를 위해 작업을 즉시 중단했습니다.\n"
+                "로그 탭에서 대상 파일 리스트를 확인해주세요."
+            )
+            messagebox.showerror("Duplicate File Definition Error", error_msg)
+            
+            # 로그 뷰로 강제 전환
+            self.notebook.select(1) 
+            return # 여기서 완전히 중단 (After View 업데이트 안 함)
+
+        # --- 3. 일반 오류 및 동일 내용 확인 ---
         if self.current_plan.errors:
             self._log("Plan generation finished with errors:", "error")
             for err in self.current_plan.errors:
                 self._log(f"- {err}", "error")
-            messagebox.showerror("Planning Error", f"Errors found during planning:\n\n{self.current_plan.errors[0]}")
         else:
             self._log("Plan generated successfully.", "success")
+
+        identical_files = [p for p, s in self.current_plan.path_states.items() if s == 'identical']
+        if identical_files:
+            self._log("\n[INFO] Redundant File Definition (Identical): The following files already match the Source Code definition:", "warn")
+            self._log("이미 동일한 내용의 파일이 존재합니다. 추가 작업 없이 유지됩니다.", "warn")
+            for p in identical_files:
+                self._log(f"- {p.relative_to(root_path)}", "warn")
+            
+            warn_msg = (
+                f"{len(identical_files)}개의 파일이 이미 대상 폴더에 동일한 내용으로 존재합니다.\n\n"
+                "해당 파일들은 변경 사항이 없으므로 안전하게 무시됩니다. (Log 탭 확인)"
+            )
+            messagebox.showwarning("Notice: Identical Files Found", warn_msg)
+
+        # --- 4. 정상 진행 시 UI 업데이트 ---
         self._populate_before_tree(root_path)
         self._populate_after_tree(self.current_plan)
+        
         if self.current_plan.has_conflicts:
-            messagebox.showwarning("Conflicts Found", "Conflicts were detected. 'Apply' is disabled.")
+            messagebox.showwarning("Conflicts Found", "구조적 충돌이 발견되었습니다. Apply가 비활성화됩니다.")
             self.apply_button.config(state=tk.DISABLED)
         elif not self.current_plan.errors:
             self.apply_button.config(state=tk.NORMAL)
-            self.notebook.select(0)
+            self.notebook.select(0) # 정상일 때만 After View 보여줌
         else:
             self.apply_button.config(state=tk.DISABLED)
+            self.notebook.select(1) # 에러가 있다면 로그 뷰 유지
+
         print("DEBUG: on_recompute completed") # Debug print
 
     def on_apply(self):
@@ -375,6 +424,11 @@ class ScaffoldApp:
                     self._log(f"Loaded '{file}'.", "info")
                 else:
                     messagebox.showwarning("File Not Found", f"'{file}' not found.")
+            
+            # Auto-recompute if a target root is selected
+            if self.target_root_path.get() and self.target_root_path.get() != "No folder selected.":
+                self.on_recompute()
+                
         except Exception as e:
             messagebox.showerror("Error Loading Data", f"An error occurred: {e}")
         print("DEBUG: on_load_test_data completed") # Debug print

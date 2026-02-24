@@ -90,7 +90,7 @@ def populate_after_tree(app, plan):
     
     # Populate the 'Apply Tree' (after_list)
     _populate_treeview_from_plan(app, app.after_list, plan, root_path, 
-                                     lambda p, plan_obj, mpd: plan_obj.path_states.get(p) in ('new', 'overwrite', 'conflict_file', 'conflict_dir', 'exists') or p in mpd, modified_parent_dirs, auto_open_modified=True)
+                                     lambda p, plan_obj, mpd: plan_obj.path_states.get(p) in ('new', 'overwrite', 'conflict_file', 'conflict_dir', 'exists', 'identical') or p in mpd, modified_parent_dirs, auto_open_modified=True)
 
 def _populate_treeview_from_plan(app, tree_widget: ttk.Treeview, plan_obj, root_path_param: Path, filter_func, modified_parent_dirs: set, auto_open_modified: bool):
     dir_nodes = {}
@@ -144,6 +144,7 @@ def _populate_treeview_from_plan(app, tree_widget: ttk.Treeview, plan_obj, root_
             state = plan_obj.path_states.get(path)
             if state == 'new': tags.append('new')
             elif state == 'overwrite': tags.append('overwrite')
+            elif state == 'identical': tags.append('warning')
             elif state in ('conflict_file', 'conflict_dir'): tags.append('conflict')
             if path in modified_parent_dirs: tags.append('modified_parent')
             

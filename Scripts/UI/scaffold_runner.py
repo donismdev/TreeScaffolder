@@ -76,6 +76,9 @@ def execute_scaffold(app):
                 if skipped: stats["files_skipped"] += 1
             else:
                 stats["files_error"] += 1
+        elif state == "identical":
+            app._log(f"[SKIP FILE] {path} (Identical content)", "skip")
+            stats["files_skipped"] += 1
         elif state == "exists":
             app._log(f"[SKIP FILE] {path}", "skip")
             stats["files_skipped"] += 1
