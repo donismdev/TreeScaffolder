@@ -9,6 +9,7 @@ import json
 import tkinter as tk
 from pathlib import Path
 from tkinter import ttk
+from Scripts.UI import options_ui
 
 # --- Configuration ---
 KEYBINDINGS_CONFIG_FILE = "Resources/key_bindings_map.json"
@@ -19,14 +20,15 @@ KEYBINDINGS_CONFIG_FILE = "Resources/key_bindings_map.json"
 def _call_method_with_event(method, event):
     return method(event)
 
-def _call_method_without_event(method, event):
+def _call_method_without_event(app, method, event):
     # 'event' is received from Tkinter bind, but the method doesn't need it.
-    app = method.__self__
     focused_widget = app.root.focus_get()
 
     if isinstance(focused_widget, (tk.Text, tk.Entry)):
         if hasattr(app, '_log'):
-            app._log(f"Shortcut for '{method.__name__}' skipped: Text widget focused.", "info")
+            # Safely get method name for logging
+            method_name = getattr(method, "__name__", "unknown")
+            app._log(f"Shortcut for '{method_name}' skipped: Text widget focused.", "info")
         return "break"
 
     return method()
@@ -117,11 +119,12 @@ def setup_key_bindings(app):
         "on_load_test_data_conditional": _on_load_test_data_conditional,
         "on_escape_pressed": lambda event: _call_method_with_event(app.on_escape_pressed, event),
         "cycle_notebook": _on_cycle_notebook,
-        "on_previous_folder": lambda event: _call_method_without_event(app.on_previous_folder, event),
-        "on_browse_folder": lambda event: _call_method_without_event(app.on_browse_folder, event),
-        "on_clear_data": lambda event: _call_method_without_event(app.on_clear_data, event),
-        "on_recompute": lambda event: _call_method_without_event(app.on_recompute, event),
-        "on_apply": lambda event: _call_method_without_event(app.on_apply, event),
+        "on_previous_folder": lambda event: _call_method_without_event(app, app.on_previous_folder, event),
+        "on_browse_folder": lambda event: _call_method_without_event(app, app.on_browse_folder, event),
+        "on_clear_data": lambda event: _call_method_without_event(app, app.on_clear_data, event),
+        "on_recompute": lambda event: _call_method_without_event(app, app.on_recompute, event),
+        "on_apply": lambda event: _call_method_without_event(app, app.on_apply, event),
+        "on_options": lambda event: _call_method_without_event(app, lambda: options_ui.show_options(app.root), event),
     }
 
     for key_sequence, binding_config in bindings_map.items():

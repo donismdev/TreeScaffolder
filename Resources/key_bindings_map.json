@@ -1,7 +1,7 @@
 {
     "Space": { "action": "on_load_test_data_conditional" },
     "Escape": { "action": "on_escape_pressed" },
-    "Grave": { "action": "cycle_notebook", "target_notebook": "notebook" },
+    "Grave": { "action": "cycle_notebook", "target_notebook": "analysis_notebook" },
     "1": { "action": "cycle_notebook", "target_notebook": "before_notebook" },
     "2": { "action": "cycle_notebook", "target_notebook": "after_notebook" },
     "3": { "action": "cycle_notebook", "target_notebook": "editor_notebook" },
@@ -9,5 +9,6 @@
     "b": { "action": "on_browse_folder" },
     "c": { "action": "on_clear_data" },
     "d": { "action": "on_recompute" },
-    "f": { "action": "on_apply" }
+    "f": { "action": "on_apply" },
+    "x": { "action": "on_options" }
 }

@@ -6,6 +6,7 @@ UI panel creation logic for the Tree Scaffolder GUI application.
 """
 import tkinter as tk
 from tkinter import ttk
+from Scripts.UI import options_ui
 
 def create_left_panel(app):
     """Creates all widgets for the left control panel."""
@@ -36,10 +37,6 @@ def create_left_panel(app):
     app.prev_dir_button = ttk.Button(path_buttons_frame, text="Prev", command=app.on_previous_folder, width=5, state=tk.DISABLED)
     app.prev_dir_button.grid(row=0, column=3, padx=(0, 5))
     app.widget_map["on_previous_folder"] = app.prev_dir_button
-
-    app.clear_button = ttk.Button(path_buttons_frame, text="Clear", command=app.on_clear_data, width=5)
-    app.clear_button.grid(row=0, column=4)
-    app.widget_map["on_clear_data"] = app.clear_button
 
     # --- Editor Tabs ---
     editor_tabs_frame = ttk.LabelFrame(app.left_frame, text="2. Define Scaffold Tree")
@@ -157,18 +154,28 @@ def create_treeview(parent: ttk.Frame, show: str = "tree") -> ttk.Treeview:
     return tree
 
 def create_right_panel(app):
-    """Creates the notebook for showing diffs and logs."""
-    app.notebook = ttk.Notebook(app.right_frame)
-    app.notebook.pack(fill=tk.BOTH, expand=True)
-    app.widget_map["cycle_notebook_notebook"] = app.notebook
+    """Creates the analysis and summary panels in the right frame."""
+    app.right_frame.rowconfigure(0, weight=1)
+    app.right_frame.columnconfigure(0, weight=1)
 
-    # --- Diff View ---
-    diff_frame = ttk.Frame(app.notebook, padding=5)
-    app.notebook.add(diff_frame, text="Before / After Diff")
-    diff_frame.rowconfigure(0, weight=1)
-    diff_frame.columnconfigure(0, weight=1)
+    # 4. Analysis (Diff & Log) LabelFrame
+    app.diff_group = ttk.LabelFrame(app.right_frame, text="4. Analysis")
+    app.diff_group.grid(row=0, column=0, sticky="nsew", padx=5, pady=(5, 2))
+    app.diff_group.rowconfigure(0, weight=1)
+    app.diff_group.columnconfigure(0, weight=1)
 
-    app.diff_paned_window = ttk.PanedWindow(diff_frame, orient=tk.HORIZONTAL)
+    # Analysis Notebook inside Section 4
+    app.analysis_notebook = ttk.Notebook(app.diff_group)
+    app.analysis_notebook.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
+    app.widget_map["cycle_notebook_analysis_notebook"] = app.analysis_notebook
+    
+    # --- Tab 1: Diff View ---
+    diff_tab_frame = ttk.Frame(app.analysis_notebook)
+    app.analysis_notebook.add(diff_tab_frame, text="Diff View")
+    diff_tab_frame.rowconfigure(0, weight=1)
+    diff_tab_frame.columnconfigure(0, weight=1)
+
+    app.diff_paned_window = ttk.PanedWindow(diff_tab_frame, orient=tk.HORIZONTAL)
     app.diff_paned_window.grid(row=0, column=0, sticky="nsew")
 
     # --- Before Pane ---
@@ -215,20 +222,46 @@ def create_right_panel(app):
     app.after_list = create_treeview(after_list_frame, show="tree")
     app.after_notebook.add(after_list_frame, text="Apply Tree")
 
+    # --- Tab 2: Log View ---
+    log_tab_frame = ttk.Frame(app.analysis_notebook)
+    app.analysis_notebook.add(log_tab_frame, text="Log")
+    log_tab_frame.rowconfigure(0, weight=1)
+    log_tab_frame.columnconfigure(0, weight=1)
+
+    app.log_text = tk.Text(log_tab_frame, wrap=tk.WORD, state=tk.DISABLED, font=("Consolas", 9))
+    app.log_text.grid(row=0, column=0, sticky="nsew")
+    log_scrollbar = ttk.Scrollbar(log_tab_frame, orient=tk.VERTICAL, command=app.log_text.yview)
+    log_scrollbar.grid(row=0, column=1, sticky="ns")
+    app.log_text.config(yscrollcommand=log_scrollbar.set)
+
+    # 5. Summary LabelFrame
+    app.summary_group = ttk.LabelFrame(app.right_frame, text="5. Summary")
+    app.summary_group.grid(row=1, column=0, sticky="ew", padx=5, pady=(2, 5))
+    app.summary_group.columnconfigure(0, weight=1)
+    
+    app.summary_label = ttk.Label(app.summary_group, text="No plan computed.", padding=5)
+    app.summary_label.grid(row=0, column=0, sticky="w")
+
+    # Buttons Container on the right
+    summary_btns_frame = ttk.Frame(app.summary_group)
+    summary_btns_frame.grid(row=0, column=1, padx=5)
+
+    app.option_button = ttk.Button(summary_btns_frame, text="Option", width=8, command=lambda: options_ui.show_options(app.root))
+    app.option_button.pack(side="left", padx=2)
+    app.widget_map["on_options"] = app.option_button
+    
+    app.clear_button = ttk.Button(summary_btns_frame, text="Clear", command=app.on_clear_data, width=8)
+    app.clear_button.pack(side="left", padx=2)
+    app.widget_map["on_clear_data"] = app.clear_button
+
     # Bind selection event
     app.before_tree.bind("<<TreeviewSelect>>", app.on_tree_select)
     app.after_tree.bind("<<TreeviewSelect>>", app.on_tree_select)
     app.before_list.bind("<<TreeviewSelect>>", app.on_tree_select)
     app.after_list.bind("<<TreeviewSelect>>", app.on_tree_select)
 
-    # --- Log View ---
-    log_frame = ttk.Frame(app.notebook, padding=5)
-    app.notebook.add(log_frame, text="Log")
-    log_frame.rowconfigure(0, weight=1)
-    log_frame.columnconfigure(0, weight=1)
-
-    app.log_text = tk.Text(log_frame, wrap=tk.WORD, state=tk.DISABLED, font=("Consolas", 9))
-    app.log_text.grid(row=0, column=0, sticky="nsew")
-    log_scrollbar = ttk.Scrollbar(log_frame, orient=tk.VERTICAL, command=app.log_text.yview)
-    log_scrollbar.grid(row=0, column=1, sticky="ns")
-    app.log_text.config(yscrollcommand=log_scrollbar.set)
+    # Bind selection event
+    app.before_tree.bind("<<TreeviewSelect>>", app.on_tree_select)
+    app.after_tree.bind("<<TreeviewSelect>>", app.on_tree_select)
+    app.before_list.bind("<<TreeviewSelect>>", app.on_tree_select)
+    app.after_list.bind("<<TreeviewSelect>>", app.on_tree_select)

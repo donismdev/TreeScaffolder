@@ -356,4 +356,15 @@ def generate_plan(root_path: Path, text_input: str, config: dict) -> Plan:
 			plan.errors.append(f"Conflict at '{path}': trying to create { 'dir' if is_planned_dir else 'file' } but a { 'file' if not is_fs_dir else 'dir' } exists.")
 
 	plan.existing_files = scan_existing_files(root_path, config)
+
+	# --- Similarity Scan ---
+	if config.get("ENABLE_SIMILARITY_SCAN", True):
+		for planned_file in plan.planned_files:
+			target_name = planned_file.name
+			similar = find_similar_candidates(plan.existing_files, target_name, config)
+			# Filter out exact matches (those are handled by overwrite/identical logic)
+			similar = [s for s in similar if s[0] != target_name]
+			if similar:
+				plan.similarity_warnings[planned_file] = similar
+
 	return plan

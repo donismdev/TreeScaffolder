@@ -280,13 +280,23 @@ class ScaffoldApp:
             
             error_msg = "Plan generation failed. Please check the Log tab for details."
             messagebox.showerror("Scaffold Plan Error", error_msg)
-            self.notebook.select(1)
+            self.analysis_notebook.select(1)
             return False
         else:
             if not silent:
                 self._log("Plan generated successfully.", "success")
 
-        # --- 3. 동일 내용 및 안내 사항 확인 (Silent가 아닐 때만) ---
+        # --- 3. 유사성 경고 확인 (Similarity Warnings) ---
+        if self.current_plan.similarity_warnings:
+            self._log("\n[⚠️ WARNING] Potential Name Conflicts / Typos Detected:", "warn")
+            self._log("계획된 파일과 이름이 매우 유사한 기존 파일이 존재합니다. 오타인지 확인하세요.", "warn")
+            for planned_path, candidates in self.current_plan.similarity_warnings.items():
+                rel_planned = planned_path.relative_to(root_path)
+                self._log(f"- Target: {rel_planned}", "warn")
+                for exist_name, ratio, exist_paths in candidates:
+                    self._log(f"  ? Similar to: '{exist_name}' (Match: {ratio:.1%})", "warn")
+
+        # --- 4. 동일 내용 및 안내 사항 확인 (Silent가 아닐 때만) ---
         if not silent:
             identical_files = [p for p, s in self.current_plan.path_states.items() if s == 'identical']
             if identical_files:
@@ -305,7 +315,15 @@ class ScaffoldApp:
             return False
         else:
             self.apply_button.config(state=tk.NORMAL)
-            self.notebook.select(0) # 정상일 때만 After View 보여줌
+            
+            # --- 5. Summary Label 업데이트 ---
+            new_files = sum(1 for p, s in self.current_plan.path_states.items() if s == 'new' and p in self.current_plan.planned_files)
+            new_dirs = sum(1 for p, s in self.current_plan.path_states.items() if s == 'new' and p in self.current_plan.planned_dirs)
+            overwrites = sum(1 for s in self.current_plan.path_states.values() if s == 'overwrite')
+            summary_msg = f"Plan computed: {new_dirs} new folders, {new_files} new files, {overwrites} overwrites."
+            self.summary_label.config(text=summary_msg)
+
+            self.analysis_notebook.select(0) # 정상일 때만 After View 보여줌
             return True
 
     def on_apply(self):
@@ -341,7 +359,7 @@ class ScaffoldApp:
             confirmed = messagebox.askyesno(title, msg, icon='warning')
 
         if confirmed:
-            self.notebook.select(1)
+            self.analysis_notebook.select(1)
             self.recompute_button.config(state=tk.DISABLED)
             self.apply_button.config(state=tk.DISABLED)
             self.root.after(100, self._execute_scaffold)
@@ -461,9 +479,15 @@ class ScaffoldApp:
         print("DEBUG: on_previous_folder completed") # Debug print
 
     def on_escape_pressed(self, event=None):
-        """Resets focus to the root window, effectively taking focus away from specific widgets."""
+        """Resets focus to the root window and closes any open Options window."""
         print("DEBUG: on_escape_pressed called, resetting focus.")
         self.root.focus_set()
+        
+        # Check if Options window exists and close it
+        from Scripts.UI.options_ui import OptionsWindow
+        if OptionsWindow._instance and OptionsWindow._instance.window.winfo_exists():
+            OptionsWindow._instance.window.destroy()
+            
         return "break" # Prevent further propagation of the Escape key
 
     def on_make_tree_from_source(self):
