@@ -282,11 +282,39 @@ class ScaffoldApp:
         if not self.current_plan or self.current_plan.has_conflicts:
             messagebox.showerror("Cannot Apply", "No valid plan or plan has conflicts.")
             return
-        if messagebox.askyesno("Confirm Apply", "This will create and overwrite files. Are you sure?"):
+
+        is_dry_run = self.dry_run.get()
+        
+        # 변경 사항 카운트
+        new_files = sum(1 for p, s in self.current_plan.path_states.items() if s == 'new' and p in self.current_plan.planned_files)
+        new_dirs = sum(1 for p, s in self.current_plan.path_states.items() if s == 'new' and p in self.current_plan.planned_dirs)
+        overwrites = sum(1 for s in self.current_plan.path_states.values() if s == 'overwrite')
+
+        if is_dry_run:
+            title = "Confirm Dry Run"
+            msg = (f"현재 [Dry Run] 모드입니다. 실제 파일은 생성되지 않습니다.\n\n"
+                   f"- 생성 예정 폴더: {new_dirs}개\n"
+                   f"- 생성 예정 파일: {new_files}개\n"
+                   f"- 덮어쓰기 예정: {overwrites}개\n\n"
+                   f"시뮬레이션 로그를 생성하시겠습니까?")
+            confirmed = messagebox.askyesno(title, msg)
+        else:
+            title = "⚠️ 경고: 실제 적용(Apply)"
+            msg = (f"실제 파일 시스템에 변경 사항을 적용합니다!\n"
+                   f"이 작업은 되돌릴 수 없으며 기존 파일이 삭제되거나 덮어써질 수 있습니다.\n\n"
+                   f"- 새 폴더 생성: {new_dirs}개\n"
+                   f"- 새 파일 생성: {new_files}개\n"
+                   f"- 파일 덮어쓰기: {overwrites}개\n\n"
+                   f"정말로 진행하시겠습니까?")
+            # 실제 적용 시에는 좀 더 주의를 끌기 위해 askyesno 대신 경고 아이콘이 있는 창 사용 고려
+            confirmed = messagebox.askyesno(title, msg, icon='warning')
+
+        if confirmed:
             self.notebook.select(1)
             self.recompute_button.config(state=tk.DISABLED)
             self.apply_button.config(state=tk.DISABLED)
             self.root.after(100, self._execute_scaffold)
+        
         print("DEBUG: on_apply completed") # Debug print
 
     def on_tree_select(self, event: tk.Event):
