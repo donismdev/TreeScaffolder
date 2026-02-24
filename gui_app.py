@@ -27,6 +27,7 @@ from Scripts.UI import key_bindings
 from Scripts.UI import shortcut_hints # Added import
 from Scripts.Utils import tree_generator # Import the new utility
 from Scripts.UI.tree_populator import _clear_tree as clear_tree_function # Import as different name
+from Scripts.Utils.i18n import t
 
 # --- Constants ---
 APP_TITLE = "Tree Scaffolder v1.2"
@@ -77,7 +78,7 @@ class ScaffoldApp:
     def __init__(self, root: tk.Tk):
         print("DEBUG: ScaffoldApp.__init__ started") # Debug print
         self.root = root
-        self.root.title(APP_TITLE)
+        self.root.title(t("ui.title"))
         self.root.geometry(DEFAULT_GEOMETRY)
         self.root.minsize(800, 600)
         
@@ -93,7 +94,7 @@ class ScaffoldApp:
         self.setup_styles()
 
         # --- Member Variables ---
-        self.target_root_path = tk.StringVar()
+        self.target_root_path = tk.StringVar(value=t("ui.no_folder_selected"))
         self.dry_run = tk.BooleanVar(value=True)
         self.open_folder_after_apply = tk.BooleanVar(value=False)
         self.enable_similarity_scan = tk.BooleanVar(value=True)
@@ -163,6 +164,78 @@ class ScaffoldApp:
 
         print("DEBUG: ScaffoldApp.__init__ completed") # Debug print
 
+    def refresh_ui(self):
+        """Re-initializes the UI components to apply language changes."""
+        # Store current text/state
+        current_tree = self.tree_text.get("1.0", tk.END)
+        current_source = self.source_code_text.get("1.0", tk.END)
+        current_root = self.target_root_path.get()
+        
+        # Destroy main layout
+        for child in self.root.winfo_children():
+            # Don't destroy the Options window itself if it's open
+            if isinstance(child, tk.Toplevel): continue
+            child.destroy()
+
+        # Re-initialize UI
+        self.root.title(t("ui.title"))
+        
+        # Reset member variables that are bound to widgets
+        self.widget_map = {} 
+        self.editor_buttons = []
+
+        self.main_paned_window = ttk.PanedWindow(self.root, orient=tk.HORIZONTAL)
+        self.main_paned_window.pack(fill=tk.BOTH, expand=True)
+
+        self.left_frame = ttk.Frame(self.main_paned_window, padding=5)
+        self.main_paned_window.add(self.left_frame, weight=1)
+
+        self.right_frame = ttk.Frame(self.main_paned_window)
+        self.main_paned_window.add(self.right_frame, weight=2)
+
+        self.setup_left_panel()
+        self.setup_right_panel()
+
+        # Restore state
+        self.tree_text.delete("1.0", tk.END)
+        self.tree_text.insert("1.0", current_tree)
+        self.source_code_text.delete("1.0", tk.END)
+        self.source_code_text.insert("1.0", current_source)
+        self.target_root_path.set(current_root)
+
+        # Re-bind events
+        self.editor_notebook.bind("<<NotebookTabChanged>>", self._on_editor_tab_changed)
+        self._on_editor_tab_changed(None)
+
+        # Re-configure tags
+        self.style.configure('new.Treeview', foreground='green', font=self.treeview_item_font)
+        self.style.configure('conflict.Treeview', foreground='red', font=self.treeview_item_font)
+        self.style.configure('warning.Treeview', foreground='#E59400', font=self.treeview_item_font)
+        self.before_tree.tag_configure('new', foreground='green', font=self.treeview_item_font)
+        self.after_tree.tag_configure('new', foreground='green', font=self.treeview_item_font)
+        self.after_tree.tag_configure('conflict', foreground='red', font=self.treeview_item_font)
+        self.after_tree.tag_configure('warning', foreground='#E59400', font=self.treeview_item_font)
+        self.after_tree.tag_configure('modified_parent', foreground='#DAA520', font=self.treeview_item_font)
+        self.after_tree.tag_configure('overwrite', foreground='#0078D7', font=self.treeview_item_font)
+        self.after_list.tag_configure('new', foreground='green', font=self.treeview_item_font)
+        self.after_list.tag_configure('conflict', foreground='red', font=self.treeview_item_font)
+        self.after_list.tag_configure('warning', foreground='#E59400', font=self.treeview_item_font)
+        self.after_list.tag_configure('modified_parent', foreground='#DAA520', font=self.treeview_item_font)
+        self.after_list.tag_configure('overwrite', foreground='#0078D7', font=self.treeview_item_font)
+
+        key_bindings.setup_key_bindings(self)
+        self.hint_manager = shortcut_hints.ShortcutHintManager(self)
+        
+        if self.current_plan:
+             self._populate_before_tree(Path(current_root) if current_root != t("ui.no_folder_selected") else None)
+             self._populate_after_tree(self.current_plan)
+             # Update summary
+             new_files = sum(1 for p, s in self.current_plan.path_states.items() if s == 'new' and p in self.current_plan.planned_files)
+             new_dirs = sum(1 for p, s in self.current_plan.path_states.items() if s == 'new' and p in self.current_plan.planned_dirs)
+             overwrites = sum(1 for s in self.current_plan.path_states.values() if s == 'overwrite')
+             summary_msg = t("ui.plan_summary", dirs=new_dirs, files=new_files, overwrites=overwrites)
+             self.summary_label.config(text=summary_msg)
+
     def _on_editor_tab_changed(self, event):
         """Called when the editor notebook tab is changed. Configures button states."""
         if not hasattr(self, 'editor_buttons') or not self.editor_buttons:
@@ -221,8 +294,8 @@ class ScaffoldApp:
             return
         is_valid, message = self._validate_path(path)
         if not is_valid:
-            messagebox.showerror("Invalid Folder", message)
-            self.target_root_path.set("No folder selected.")
+            messagebox.showerror(t("message.invalid_folder_title"), message)
+            self.target_root_path.set(t("ui.no_folder_selected"))
             self.recompute_button.config(state=tk.DISABLED)
             self._clear_tree(self.before_tree)
             self._clear_tree(self.after_tree)
@@ -241,13 +314,13 @@ class ScaffoldApp:
     def on_recompute(self, silent=False):
         print(f"DEBUG: on_recompute called (silent={silent})") # Debug print
         root_path_str = self.target_root_path.get()
-        if not root_path_str or not Path(root_path_str).is_dir():
-            messagebox.showerror("Error", "Please select a valid root folder first.")
+        if not root_path_str or root_path_str == t("ui.no_folder_selected") or not Path(root_path_str).is_dir():
+            messagebox.showerror(t("message.error_title"), t("message.select_root_first"))
             return False
         root_path = Path(root_path_str)
         text_input = self.tree_text.get("1.0", "end-1c") + "\n" + self.source_code_text.get("1.0", "end-1c")
         if not text_input.strip():
-            messagebox.showinfo("Info", "Both editors are empty. Nothing to compute.")
+            messagebox.showinfo("Info", t("message.empty_editors"))
             return False
         config = {
             "DRY_RUN": self.dry_run.get(),
@@ -269,7 +342,7 @@ class ScaffoldApp:
                 self.log_text.delete('1.0', tk.END)
                 self.log_text.config(state=tk.DISABLED)
 
-            self._log("\n[ERROR] Plan generation finished with errors:", "error")
+            self._log(f"\n{t('log.error_plan')}", "error")
             for err in self.current_plan.errors:
                 self._log(f"- {err}", "error")
             
@@ -284,12 +357,12 @@ class ScaffoldApp:
             return False
         else:
             if not silent:
-                self._log("Plan generated successfully.", "success")
+                self._log(t("log.recompute_success"), "success")
 
         # --- 3. 유사성 경고 확인 (Similarity Warnings) ---
         if self.current_plan.similarity_warnings:
-            self._log("\n[⚠️ WARNING] Potential Name Conflicts / Typos Detected:", "warn")
-            self._log("계획된 파일과 이름이 매우 유사한 기존 파일이 존재합니다. 오타인지 확인하세요.", "warn")
+            self._log(f"\n{t('log.similar_warning')}", "warn")
+            self._log(t("log.similar_desc"), "warn")
             for planned_path, candidates in self.current_plan.similarity_warnings.items():
                 rel_planned = planned_path.relative_to(root_path)
                 self._log(f"- Target: {rel_planned}", "warn")
@@ -300,8 +373,8 @@ class ScaffoldApp:
         if not silent:
             identical_files = [p for p, s in self.current_plan.path_states.items() if s == 'identical']
             if identical_files:
-                self._log("\n[INFO] Redundant File Definition (Identical): The following files already match the Source Code definition:", "warn")
-                self._log("이미 동일한 내용의 파일이 존재합니다. 추가 작업 없이 유지됩니다.", "warn")
+                self._log(f"\n{t('log.identical_info')}", "warn")
+                self._log(t("log.identical_desc"), "warn")
                 for p in identical_files:
                     self._log(f"- {p.relative_to(root_path)}", "warn")
 
@@ -310,7 +383,7 @@ class ScaffoldApp:
         self._populate_after_tree(self.current_plan)
         
         if self.current_plan.has_conflicts:
-            messagebox.showwarning("Conflicts Found", "구조적 충돌이 발견되었습니다. (예: 파일 위치에 폴더 존재)\nApply가 비활성화됩니다.")
+            messagebox.showwarning(t("message.conflicts_found_title"), t("message.conflicts_msg"))
             self.apply_button.config(state=tk.DISABLED)
             return False
         else:
@@ -320,7 +393,7 @@ class ScaffoldApp:
             new_files = sum(1 for p, s in self.current_plan.path_states.items() if s == 'new' and p in self.current_plan.planned_files)
             new_dirs = sum(1 for p, s in self.current_plan.path_states.items() if s == 'new' and p in self.current_plan.planned_dirs)
             overwrites = sum(1 for s in self.current_plan.path_states.values() if s == 'overwrite')
-            summary_msg = f"Plan computed: {new_dirs} new folders, {new_files} new files, {overwrites} overwrites."
+            summary_msg = t("ui.plan_summary", dirs=new_dirs, files=new_files, overwrites=overwrites)
             self.summary_label.config(text=summary_msg)
 
             self.analysis_notebook.select(0) # 정상일 때만 After View 보여줌
@@ -340,21 +413,12 @@ class ScaffoldApp:
         overwrites = sum(1 for s in self.current_plan.path_states.values() if s == 'overwrite')
 
         if is_dry_run:
-            title = "Confirm Dry Run"
-            msg = (f"현재 [Dry Run] 모드입니다. 실제 파일은 생성되지 않습니다.\n\n"
-                   f"- 생성 예정 폴더: {new_dirs}개\n"
-                   f"- 생성 예정 파일: {new_files}개\n"
-                   f"- 덮어쓰기 예정: {overwrites}개\n\n"
-                   f"시뮬레이션 로그를 생성하시겠습니까?")
+            title = t("message.confirm_dry_run_title")
+            msg = t("message.confirm_dry_run_msg", dirs=new_dirs, files=new_files, overwrites=overwrites)
             confirmed = messagebox.askyesno(title, msg)
         else:
-            title = "⚠️ 경고: 실제 적용(Apply)"
-            msg = (f"실제 파일 시스템에 변경 사항을 적용합니다!\n"
-                   f"이 작업은 되돌릴 수 없으며 기존 파일이 삭제되거나 덮어써질 수 있습니다.\n\n"
-                   f"- 새 폴더 생성: {new_dirs}개\n"
-                   f"- 새 파일 생성: {new_files}개\n"
-                   f"- 파일 덮어쓰기: {overwrites}개\n\n"
-                   f"정말로 진행하시겠습니까?")
+            title = t("message.confirm_apply_title")
+            msg = t("message.confirm_apply_msg", dirs=new_dirs, files=new_files, overwrites=overwrites)
             # 실제 적용 시에는 좀 더 주의를 끌기 위해 askyesno 대신 경고 아이콘이 있는 창 사용 고려
             confirmed = messagebox.askyesno(title, msg, icon='warning')
 
@@ -427,24 +491,30 @@ class ScaffoldApp:
                     text_widget.delete("1.0", tk.END)
                     text_widget.insert("1.0", Path(file).read_text(encoding="utf-8"))
                 else:
-                    messagebox.showwarning("File Not Found", f"'{file}' not found.")
+                    messagebox.showwarning(t("message.error_title"), t("message.no_test_data", file=file))
             
             # Auto-recompute if a target root is selected
             success = True
-            if self.target_root_path.get() and self.target_root_path.get() != "No folder selected.":
+            if self.target_root_path.get() and self.target_root_path.get() != t("ui.no_folder_selected"):
                 # Use silent=True to avoid messy logs unless there are errors
                 success = self.on_recompute(silent=True)
             
             if success:
-                self._log("Load Test Data completed.", "success")
+                self._log(t("log.load_test_data_success"), "success")
                 
         except Exception as e:
-            messagebox.showerror("Error Loading Data", f"An error occurred: {e}")
+            messagebox.showerror(t("message.error_title"), f"An error occurred: {e}")
         print("DEBUG: on_load_test_data completed") # Debug print
+
+    def on_options(self):
+        """Opens the options window."""
+        print("DEBUG: on_options called")
+        from Scripts.UI import options_ui
+        options_ui.show_options(self.root, self)
 
     def on_clear_data(self):
         print("DEBUG: on_clear_data called") # Debug print
-        app_utils.log_message(self, "Clearing all editor content and planned data...", "info")
+        app_utils.log_message(self, t("log.clearing_data"), "info")
         self.dry_run.set(True)
         self.enable_similarity_scan.set(True)
         self.similarity_threshold.set(0.86)
@@ -457,7 +527,8 @@ class ScaffoldApp:
             self._clear_tree(tree)
         self.recompute_button.config(state=tk.DISABLED)
         self.apply_button.config(state=tk.DISABLED)
-        app_utils.log_message(self, "Runtime data cleared.", "info")
+        self.summary_label.config(text=t("ui.no_plan"))
+        app_utils.log_message(self, t("log.data_cleared"), "info")
         print("DEBUG: on_clear_data completed") # Debug print
 
     def on_previous_folder(self):
@@ -486,7 +557,7 @@ class ScaffoldApp:
         # Check if Options window exists and close it
         from Scripts.UI.options_ui import OptionsWindow
         if OptionsWindow._instance and OptionsWindow._instance.window.winfo_exists():
-            OptionsWindow._instance.window.destroy()
+            OptionsWindow._instance._on_close()
             
         return "break" # Prevent further propagation of the Escape key
 
@@ -495,10 +566,10 @@ class ScaffoldApp:
         Parses the source code editor for V2 blocks and generates a new
         scaffold tree from the file paths found.
         """
-        self._log("Attempting to generate tree from source...", "info")
+        self._log(t("log.make_tree_attempt"), "info")
         source_text = self.source_code_text.get("1.0", "end-1c")
         if not source_text.strip():
-            messagebox.showinfo("Info", "Source Code editor is empty. Nothing to do.")
+            messagebox.showinfo("Info", t("message.empty_editors"))
             return
 
         try:
@@ -510,7 +581,7 @@ class ScaffoldApp:
             paths = [item['path'] for item in patch_data]
 
             if not paths:
-                messagebox.showinfo("Info", "No valid V2 blocks found in the Source Code editor.")
+                messagebox.showinfo("Info", t("message.no_v2_blocks"))
                 return
             
             new_tree_text = tree_generator.generate_tree_from_paths(paths, root_marker_name=root_marker)
@@ -519,14 +590,14 @@ class ScaffoldApp:
             self.tree_text.delete("1.0", tk.END)
             self.tree_text.insert("1.0", new_tree_text)
             self.editor_notebook.select(0) # Switch focus to the tree tab
-            self._log(f"Successfully generated tree from {len(paths)} file paths.", "success")
+            self._log(t("log.make_tree_success", count=len(paths)), "success")
 
         except V2ParserError as e:
-            self._log(f"Failed to parse source code: {e}", "error")
-            messagebox.showerror("V2 Parsing Error", f"Could not parse the source code editor content:\n\n{e}")
+            self._log(f"{t('message.v2_parse_error_title')}: {e}", "error")
+            messagebox.showerror(t("message.v2_parse_error_title"), f"{e}")
         except Exception as e:
-            self._log(f"An unexpected error occurred during tree generation: {e}", "error")
-            messagebox.showerror("Error", f"An unexpected error occurred:\n\n{e}")
+            self._log(f"An unexpected error occurred: {e}", "error")
+            messagebox.showerror(t("message.error_title"), f"An unexpected error occurred:\n\n{e}")
 
     def _on_editor_tab_changed(self, event):
         """Called when the editor notebook tab is changed. Configures button states."""

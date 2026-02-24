@@ -124,7 +124,7 @@ def setup_key_bindings(app):
         "on_clear_data": lambda event: _call_method_without_event(app, app.on_clear_data, event),
         "on_recompute": lambda event: _call_method_without_event(app, app.on_recompute, event),
         "on_apply": lambda event: _call_method_without_event(app, app.on_apply, event),
-        "on_options": lambda event: _call_method_without_event(app, lambda: options_ui.show_options(app.root), event),
+        "on_options": lambda event: _call_method_without_event(app, app.on_options, event),
     }
 
     for key_sequence, binding_config in bindings_map.items():

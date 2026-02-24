@@ -7,6 +7,7 @@ UI panel creation logic for the Tree Scaffolder GUI application.
 import tkinter as tk
 from tkinter import ttk
 from Scripts.UI import options_ui
+from Scripts.Utils.i18n import t
 
 def create_left_panel(app):
     """Creates all widgets for the left control panel."""
@@ -19,7 +20,7 @@ def create_left_panel(app):
     controls_frame.columnconfigure(0, weight=1)
 
     # Folder Selection
-    folder_frame = ttk.LabelFrame(controls_frame, text="1. Select Target Root Folder")
+    folder_frame = ttk.LabelFrame(controls_frame, text=t("ui.section_1"))
     folder_frame.grid(row=0, column=0, sticky="ew", pady=(0, 10))
     
     path_buttons_frame = ttk.Frame(folder_frame)
@@ -27,19 +28,19 @@ def create_left_panel(app):
     path_buttons_frame.columnconfigure(1, weight=1)
 
     app.folder_label = ttk.Label(path_buttons_frame, textvariable=app.target_root_path, relief="sunken", padding=3, width=50)
-    app.target_root_path.set("No folder selected.")
+    app.target_root_path.set(t("ui.no_folder_selected"))
     app.folder_label.grid(row=0, column=0, sticky="w", padx=(0, 5))
     
-    app.browse_button = ttk.Button(path_buttons_frame, text="Browse...", command=app.on_browse_folder, width=8)
+    app.browse_button = ttk.Button(path_buttons_frame, text=t("ui.browse"), command=app.on_browse_folder, width=12)
     app.browse_button.grid(row=0, column=2, padx=(0, 5))
     app.widget_map["on_browse_folder"] = app.browse_button
 
-    app.prev_dir_button = ttk.Button(path_buttons_frame, text="Prev", command=app.on_previous_folder, width=5, state=tk.DISABLED)
+    app.prev_dir_button = ttk.Button(path_buttons_frame, text=t("ui.prev"), command=app.on_previous_folder, width=8, state=tk.DISABLED)
     app.prev_dir_button.grid(row=0, column=3, padx=(0, 5))
     app.widget_map["on_previous_folder"] = app.prev_dir_button
 
     # --- Editor Tabs ---
-    editor_tabs_frame = ttk.LabelFrame(app.left_frame, text="2. Define Scaffold Tree")
+    editor_tabs_frame = ttk.LabelFrame(app.left_frame, text=t("ui.section_2"))
     editor_tabs_frame.grid(row=1, column=0, sticky="nsew")
     editor_tabs_frame.columnconfigure(0, weight=1) # Make sure the column expands
 
@@ -50,7 +51,7 @@ def create_left_panel(app):
     # Add 4 placeholder buttons and store them on the app instance
     app.editor_buttons = []
     for i in range(4):
-        button = ttk.Button(button_bar_frame, text=f"Button {i+1}")
+        button = ttk.Button(button_bar_frame, text="")
         button.pack(side="left", padx=2)
         app.editor_buttons.append(button)
 
@@ -62,7 +63,7 @@ def create_left_panel(app):
 
     # --- Scaffold Tree Tab ---
     scaffold_tree_frame = ttk.Frame(app.editor_notebook)
-    app.editor_notebook.add(scaffold_tree_frame, text="Scaffold Tree")
+    app.editor_notebook.add(scaffold_tree_frame, text=t("ui.tab_scaffold_tree"))
     scaffold_tree_frame.rowconfigure(0, weight=1)
     scaffold_tree_frame.columnconfigure(0, weight=1)
     
@@ -80,7 +81,7 @@ def create_left_panel(app):
 
     # --- Source Code Tab ---
     source_code_frame = ttk.Frame(app.editor_notebook)
-    app.editor_notebook.add(source_code_frame, text="Source Code")
+    app.editor_notebook.add(source_code_frame, text=t("ui.tab_source_code"))
     source_code_frame.rowconfigure(0, weight=1)
     source_code_frame.columnconfigure(0, weight=1)
 
@@ -96,7 +97,7 @@ def create_left_panel(app):
 
     # --- Content Tab ---
     content_frame = ttk.Frame(app.editor_notebook)
-    app.editor_notebook.add(content_frame, text="Content")
+    app.editor_notebook.add(content_frame, text=t("ui.tab_content"))
     content_frame.rowconfigure(0, weight=1)
     content_frame.columnconfigure(0, weight=1)
 
@@ -111,33 +112,33 @@ def create_left_panel(app):
     content_xscroller.grid(row=1, column=0, sticky="ew")
 
     # --- Settings & Actions Frame ---
-    settings_frame = ttk.LabelFrame(app.left_frame, text="3. Settings & Actions")
+    settings_frame = ttk.LabelFrame(app.left_frame, text=t("ui.section_3"))
     settings_frame.grid(row=2, column=0, sticky="ew", pady=5)
     settings_frame.columnconfigure(1, weight=1)
 
     # Settings
-    ttk.Checkbutton(settings_frame, text="Dry Run (don't write files)", variable=app.dry_run).grid(row=0, column=0, columnspan=2, sticky="w", padx=5)
-    ttk.Checkbutton(settings_frame, text="Scan for similar names", variable=app.enable_similarity_scan).grid(row=1, column=0, columnspan=2, sticky="w", padx=5)
+    ttk.Checkbutton(settings_frame, text=t("ui.dry_run"), variable=app.dry_run).grid(row=0, column=0, columnspan=2, sticky="w", padx=5)
+    ttk.Checkbutton(settings_frame, text=t("ui.similarity_scan"), variable=app.enable_similarity_scan).grid(row=1, column=0, columnspan=2, sticky="w", padx=5)
 
-    ttk.Label(settings_frame, text="Similarity Ratio:").grid(row=2, column=0, sticky="w", padx=5, pady=2)
+    ttk.Label(settings_frame, text=t("ui.similarity_ratio")).grid(row=2, column=0, sticky="w", padx=5, pady=2)
     ttk.Scale(settings_frame, from_=0.5, to=1.0, variable=app.similarity_threshold, orient=tk.HORIZONTAL).grid(row=2, column=1, sticky="ew", padx=5)
 
-    ttk.Checkbutton(settings_frame, text="Open folder after Apply Scaffold", variable=app.open_folder_after_apply).grid(row=3, column=0, columnspan=2, sticky="w", padx=5)
+    ttk.Checkbutton(settings_frame, text=t("ui.open_after"), variable=app.open_folder_after_apply).grid(row=3, column=0, columnspan=2, sticky="w", padx=5)
     
     # Action Buttons
     actions_subframe = ttk.Frame(settings_frame)
     actions_subframe.grid(row=4, column=0, columnspan=2, sticky="ew", pady=5)
     actions_subframe.columnconfigure((0, 1), weight=1)
 
-    app.recompute_button = ttk.Button(actions_subframe, text="Compute Diff", command=app.on_recompute, state=tk.DISABLED)
+    app.recompute_button = ttk.Button(actions_subframe, text=t("ui.compute_diff"), command=app.on_recompute, state=tk.DISABLED)
     app.recompute_button.grid(row=0, column=0, padx=2, sticky="ew")
     app.widget_map["on_recompute"] = app.recompute_button
 
-    app.apply_button = ttk.Button(actions_subframe, text="Apply Scaffold", command=app.on_apply, state=tk.DISABLED)
+    app.apply_button = ttk.Button(actions_subframe, text=t("ui.apply_scaffold"), command=app.on_apply, state=tk.DISABLED)
     app.apply_button.grid(row=0, column=1, padx=2, sticky="ew")
     app.widget_map["on_apply"] = app.apply_button
 
-    app.load_test_data_button = ttk.Button(actions_subframe, text="Load Test Data", command=app.on_load_test_data)
+    app.load_test_data_button = ttk.Button(actions_subframe, text=t("ui.load_test_data"), command=app.on_load_test_data)
     app.load_test_data_button.grid(row=1, column=0, columnspan=2, padx=2, pady=(5,0), sticky="ew")
     app.widget_map["on_load_test_data_conditional"] = app.load_test_data_button
 
@@ -159,7 +160,7 @@ def create_right_panel(app):
     app.right_frame.columnconfigure(0, weight=1)
 
     # 4. Analysis (Diff & Log) LabelFrame
-    app.diff_group = ttk.LabelFrame(app.right_frame, text="4. Analysis")
+    app.diff_group = ttk.LabelFrame(app.right_frame, text=t("ui.section_4"))
     app.diff_group.grid(row=0, column=0, sticky="nsew", padx=5, pady=(5, 2))
     app.diff_group.rowconfigure(0, weight=1)
     app.diff_group.columnconfigure(0, weight=1)
@@ -171,7 +172,7 @@ def create_right_panel(app):
     
     # --- Tab 1: Diff View ---
     diff_tab_frame = ttk.Frame(app.analysis_notebook)
-    app.analysis_notebook.add(diff_tab_frame, text="Diff View")
+    app.analysis_notebook.add(diff_tab_frame, text=t("ui.tab_diff_view"))
     diff_tab_frame.rowconfigure(0, weight=1)
     diff_tab_frame.columnconfigure(0, weight=1)
 
@@ -179,7 +180,7 @@ def create_right_panel(app):
     app.diff_paned_window.grid(row=0, column=0, sticky="nsew")
 
     # --- Before Pane ---
-    before_pane_frame = ttk.LabelFrame(app.diff_paned_window, text="Before (Current State)")
+    before_pane_frame = ttk.LabelFrame(app.diff_paned_window, text=t("ui.before_pane"))
     before_pane_frame.rowconfigure(0, weight=1)
     before_pane_frame.columnconfigure(0, weight=1)
     app.diff_paned_window.add(before_pane_frame, weight=1)
@@ -192,16 +193,16 @@ def create_right_panel(app):
     before_tree_frame.rowconfigure(0, weight=1)
     before_tree_frame.columnconfigure(0, weight=1)
     app.before_tree = create_treeview(before_tree_frame, show="tree")
-    app.before_notebook.add(before_tree_frame, text="Tree")
+    app.before_notebook.add(before_tree_frame, text=t("ui.tree_view"))
     
     before_list_frame = ttk.Frame(app.before_notebook)
     before_list_frame.rowconfigure(0, weight=1)
     before_list_frame.columnconfigure(0, weight=1)
     app.before_list = create_treeview(before_list_frame, show="tree")
-    app.before_notebook.add(before_list_frame, text="List")
+    app.before_notebook.add(before_list_frame, text=t("ui.list_view"))
 
     # --- After Pane ---
-    after_pane_frame = ttk.LabelFrame(app.diff_paned_window, text="After (Planned State)")
+    after_pane_frame = ttk.LabelFrame(app.diff_paned_window, text=t("ui.after_pane"))
     after_pane_frame.rowconfigure(0, weight=1)
     after_pane_frame.columnconfigure(0, weight=1)
     app.diff_paned_window.add(after_pane_frame, weight=1)
@@ -214,17 +215,17 @@ def create_right_panel(app):
     after_tree_frame.rowconfigure(0, weight=1)
     after_tree_frame.columnconfigure(0, weight=1)
     app.after_tree = create_treeview(after_tree_frame, show="tree")
-    app.after_notebook.add(after_tree_frame, text="Tree")
+    app.after_notebook.add(after_tree_frame, text=t("ui.tree_view"))
 
     after_list_frame = ttk.Frame(app.after_notebook)
     after_list_frame.rowconfigure(0, weight=1)
     after_list_frame.columnconfigure(0, weight=1)
     app.after_list = create_treeview(after_list_frame, show="tree")
-    app.after_notebook.add(after_list_frame, text="Apply Tree")
+    app.after_notebook.add(after_list_frame, text=t("ui.apply_tree"))
 
     # --- Tab 2: Log View ---
     log_tab_frame = ttk.Frame(app.analysis_notebook)
-    app.analysis_notebook.add(log_tab_frame, text="Log")
+    app.analysis_notebook.add(log_tab_frame, text=t("ui.tab_log"))
     log_tab_frame.rowconfigure(0, weight=1)
     log_tab_frame.columnconfigure(0, weight=1)
 
@@ -235,22 +236,22 @@ def create_right_panel(app):
     app.log_text.config(yscrollcommand=log_scrollbar.set)
 
     # 5. Summary LabelFrame
-    app.summary_group = ttk.LabelFrame(app.right_frame, text="5. Summary")
+    app.summary_group = ttk.LabelFrame(app.right_frame, text=t("ui.section_5"))
     app.summary_group.grid(row=1, column=0, sticky="ew", padx=5, pady=(2, 5))
     app.summary_group.columnconfigure(0, weight=1)
     
-    app.summary_label = ttk.Label(app.summary_group, text="No plan computed.", padding=5)
+    app.summary_label = ttk.Label(app.summary_group, text=t("ui.no_plan"), padding=5)
     app.summary_label.grid(row=0, column=0, sticky="w")
 
     # Buttons Container on the right
     summary_btns_frame = ttk.Frame(app.summary_group)
     summary_btns_frame.grid(row=0, column=1, padx=5)
 
-    app.option_button = ttk.Button(summary_btns_frame, text="Option", width=8, command=lambda: options_ui.show_options(app.root))
+    app.option_button = ttk.Button(summary_btns_frame, text=t("ui.option"), width=12, command=lambda: options_ui.show_options(app.root, app))
     app.option_button.pack(side="left", padx=2)
     app.widget_map["on_options"] = app.option_button
     
-    app.clear_button = ttk.Button(summary_btns_frame, text="Clear", command=app.on_clear_data, width=8)
+    app.clear_button = ttk.Button(summary_btns_frame, text=t("ui.clear"), command=app.on_clear_data, width=8)
     app.clear_button.pack(side="left", padx=2)
     app.widget_map["on_clear_data"] = app.clear_button
 
