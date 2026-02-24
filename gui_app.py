@@ -190,7 +190,17 @@ class ScaffoldApp:
         self.treeview_item_font = font.Font(family="Segoe UI", size=11)
 
         # Style Configuration
-        self.style.map("Treeview", background=[('selected', '#0078D7')])
+        # Distinguish between focused and unfocused selection
+        self.style.map("Treeview", 
+            background=[
+                ('selected', 'focus', '#0078D7'),   # Active (Dark Blue)
+                ('selected', '!focus', '#A0A0A0')   # Inactive/Other Pane (Medium Gray)
+            ],
+            foreground=[
+                ('selected', 'focus', 'white'),
+                ('selected', '!focus', 'black')
+            ]
+        )
         self.style.configure('TButton', font=self.app_button_font)
 
     def setup_left_panel(self):
@@ -282,6 +292,7 @@ class ScaffoldApp:
     def on_tree_select(self, event: tk.Event):
         print("DEBUG: on_tree_select called") # Debug print
         widget = event.widget
+        widget.focus_set() # Set focus to the clicked widget for visual highlighting
         selection = widget.selection()
         if not selection: return
         item_id = selection[0]
@@ -296,16 +307,31 @@ class ScaffoldApp:
                 self.content_text.insert("1.0", f"Directory selected:\n{path}")
                 self.editor_notebook.select(2)
                 return
-            if widget == self.after_tree and self.current_plan:
-                planned_content = self.current_plan.file_contents.get(path.resolve())
+            
+            # Check if we are in one of the 'After' views
+            is_after_view = widget in (self.after_tree, self.after_list)
+            
+            if is_after_view and self.current_plan:
+                # Try to get planned content using various path representations for robustness
+                resolved_path = path.resolve()
+                planned_content = self.current_plan.file_contents.get(resolved_path)
+                
+                # Fallback: some paths might be stored in planned_files but not yet resolved in the same way
+                if planned_content is None:
+                    # Try direct match if not already matching
+                    planned_content = self.current_plan.file_contents.get(path)
+                
                 if planned_content is not None:
                     content_to_show, source_info = planned_content, f"--- PLANNED CONTENT ---\nFile: {path}\n"
                 elif path.exists():
-                    content_to_show, source_info = path.read_text(encoding='utf-8', errors='replace'), f"--- EXISTING CONTENT ---\nFile: {path}\n"
+                    content_to_show, source_info = path.read_text(encoding='utf-8', errors='replace'), f"--- EXISTING CONTENT (Unchanged) ---\nFile: {path}\n"
+                else:
+                    content_to_show, source_info = "", f"--- NEW FILE (Empty) ---\nFile: {path}\n"
             elif path.exists():
                 content_to_show, source_info = path.read_text(encoding='utf-8', errors='replace'), f"--- CURRENT CONTENT ---\nFile: {path}\n"
         except Exception as e:
             content_to_show = f"Error reading file content:\n{e}"
+        
         self.content_text.delete("1.0", tk.END)
         self.content_text.insert("1.0", source_info + "="*40 + "\n" + content_to_show)
         self.editor_notebook.select(2)
