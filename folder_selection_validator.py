@@ -72,8 +72,14 @@ def validate_folder(path_to_check: str | Path) -> dict:
 
     # --- 1. Initial Resolution ---
     try:
+        input_path = Path(path_to_check)
+        
+        # Security: Warn if the input path is a symlink
+        if input_path.is_symlink():
+            result["warnings"].append("Warning: The selected path is a symbolic link. It will be resolved to its target.")
+        
         # Use resolve() to handle symlinks and normalize the path (e.g., "..")
-        resolved_path = Path(path_to_check).resolve()
+        resolved_path = input_path.resolve()
         result["resolved_path"] = str(resolved_path)
     except (OSError, FileNotFoundError) as e:
         result["errors"].append(f"Path cannot be resolved or does not exist: {e}")
