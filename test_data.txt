@@ -1,0 +1,403 @@
+@@@FILE_BEGIN {{Root}}/MercenaryMode/MercenaryMode.Build.cs
+using UnrealBuildTool;
+
+public class MercenaryMode : ModuleRules
+{
+	public MercenaryMode(ReadOnlyTargetRules Target) : base(Target)
+	{
+		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
+
+		PublicDependencyModuleNames.AddRange(new string[]
+		{
+			"Core",
+			"CoreUObject",
+			"Engine",
+		});
+
+		PrivateDependencyModuleNames.AddRange(new string[]
+		{
+			"CDR",
+			"RegistryRuntime",
+			"GameplayCore",
+		});
+	}
+}
+@@@FILE_END
+@@@FILE_BEGIN {{Root}}/MercenaryMode/Public/MercenaryModeCore.h
+#pragma once
+
+#include "CoreMinimal.h"
+#include "UObject/Object.h"
+#include "MercenaryModeCore.generated.h"
+
+UCLASS()
+class UMercenaryModeCore final : public UObject
+{
+	GENERATED_BODY()
+
+public:
+	UFUNCTION()
+	void Initialize();
+
+	UFUNCTION()
+	void Tick(const float DeltaSeconds);
+
+	UFUNCTION()
+	void Shutdown();
+};
+@@@FILE_END
+@@@FILE_BEGIN {{Root}}/MercenaryMode/Private/MercenaryModeCore.cpp
+#include "MercenaryModeCore.h"
+
+void UMercenaryModeCore::Initialize()
+{
+	// TODO: 보드만 있는 용병 룰 초기화
+}
+
+void UMercenaryModeCore::Tick(const float DeltaSeconds)
+{
+	(void)DeltaSeconds;
+}
+
+void UMercenaryModeCore::Shutdown()
+{
+}
+@@@FILE_END
+@@@FILE_BEGIN {{Root}}/MercenaryMode/Public/Presentation/MercenaryPresentation.h
+#pragma once
+
+#include "CoreMinimal.h"
+#include "Presentation/IPuzzlePresentation.h"
+
+class FMercenaryPresentation final : public IPuzzlePresentation
+{
+public:
+	virtual EPuzzlePresentationType GetType() const override;
+	virtual void Initialize(UWorld* WorldPtr) override;
+	virtual void Tick(const float DeltaSeconds) override;
+	virtual void Shutdown() override;
+
+private:
+	TWeakObjectPtr<UWorld> CachedWorld;
+};
+@@@FILE_END
+@@@FILE_BEGIN {{Root}}/MercenaryMode/Private/Presentation/MercenaryPresentation.cpp
+#include "Presentation/MercenaryPresentation.h"
+
+EPuzzlePresentationType FMercenaryPresentation::GetType() const
+{
+	return EPuzzlePresentationType::Mercenary;
+}
+
+void FMercenaryPresentation::Initialize(UWorld* WorldPtr)
+{
+	CachedWorld = WorldPtr;
+
+	// TODO: 용병 레이아웃(보드만 강조), 카메라, 스폰 최소화
+}
+
+void FMercenaryPresentation::Tick(const float DeltaSeconds)
+{
+	(void)DeltaSeconds;
+}
+
+void FMercenaryPresentation::Shutdown()
+{
+	CachedWorld = nullptr;
+}
+@@@FILE_END
+@@@FILE_BEGIN {{Root}}/MercenaryMode/Private/MercenaryModeModule.cpp
+#include "Modules/ModuleManager.h"
+
+class FMercenaryModeModule final : public IModuleInterface
+{
+};
+
+IMPLEMENT_MODULE(FMercenaryModeModule, MercenaryMode);
+@@@FILE_END
+@@@FILE_BEGIN {{Root}}/ScoreMode/ScoreMode.Build.cs
+using UnrealBuildTool;
+
+public class ScoreMode : ModuleRules
+{
+	public ScoreMode(ReadOnlyTargetRules Target) : base(Target)
+	{
+		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
+
+		PublicDependencyModuleNames.AddRange(new string[]
+		{
+			"Core",
+			"CoreUObject",
+			"Engine",
+		});
+
+		PrivateDependencyModuleNames.AddRange(new string[]
+		{
+			"CDR",
+			"RegistryRuntime",
+			"GameplayCore",
+		});
+	}
+}
+@@@FILE_END
+@@@FILE_BEGIN {{Root}}/ScoreMode/Public/ScoreModeCore.h
+#pragma once
+
+#include "CoreMinimal.h"
+#include "UObject/Object.h"
+#include "ScoreModeCore.generated.h"
+
+UCLASS()
+class UScoreModeCore final : public UObject
+{
+	GENERATED_BODY()
+
+public:
+	UFUNCTION()
+	void Initialize();
+
+	UFUNCTION()
+	void Tick(const float DeltaSeconds);
+
+	UFUNCTION()
+	void Shutdown();
+};
+@@@FILE_END
+@@@FILE_BEGIN {{Root}}/ScoreMode/Private/ScoreModeCore.cpp
+#include "ScoreModeCore.h"
+
+void UScoreModeCore::Initialize()
+{
+	// TODO: 스코어 모드 운영(오늘의 퍼즐/달력 퍼즐 선택 등)
+	// 룰 자체는 GameplayCore/Rules 쪽으로 위임
+}
+
+void UScoreModeCore::Tick(const float DeltaSeconds)
+{
+	(void)DeltaSeconds;
+}
+
+void UScoreModeCore::Shutdown()
+{
+}
+@@@FILE_END
+@@@FILE_BEGIN {{Root}}/ScoreMode/Public/Presentation/ScorePresentation.h
+#pragma once
+
+#include "CoreMinimal.h"
+#include "Presentation/IPuzzlePresentation.h"
+
+class FScorePresentation final : public IPuzzlePresentation
+{
+public:
+	virtual EPuzzlePresentationType GetType() const override;
+	virtual void Initialize(UWorld* WorldPtr) override;
+	virtual void Tick(const float DeltaSeconds) override;
+	virtual void Shutdown() override;
+
+private:
+	TWeakObjectPtr<UWorld> CachedWorld;
+};
+@@@FILE_END
+@@@FILE_BEGIN {{Root}}/ScoreMode/Private/Presentation/ScorePresentation.cpp
+#include "Presentation/ScorePresentation.h"
+
+EPuzzlePresentationType FScorePresentation::GetType() const
+{
+	return EPuzzlePresentationType::Score;
+}
+
+void FScorePresentation::Initialize(UWorld* WorldPtr)
+{
+	CachedWorld = WorldPtr;
+
+	// TODO: 스코어 레이아웃(스코어 UI/카메라/연출)
+}
+
+void FScorePresentation::Tick(const float DeltaSeconds)
+{
+	(void)DeltaSeconds;
+}
+
+void FScorePresentation::Shutdown()
+{
+	CachedWorld = nullptr;
+}
+@@@FILE_END
+@@@FILE_BEGIN {{Root}}/ScoreMode/Private/ScoreModeModule.cpp
+#include "Modules/ModuleManager.h"
+
+class FScoreModeModule final : public IModuleInterface
+{
+};
+
+IMPLEMENT_MODULE(FScoreModeModule, ScoreMode);
+@@@FILE_END
+@@@FILE_BEGIN {{Root}}/PartyMode/PartyMode.Build.cs
+using UnrealBuildTool;
+
+public class PartyMode : ModuleRules
+{
+	public PartyMode(ReadOnlyTargetRules Target) : base(Target)
+	{
+		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
+
+		PublicDependencyModuleNames.AddRange(new string[]
+		{
+			"Core",
+			"CoreUObject",
+			"Engine",
+		});
+
+		PrivateDependencyModuleNames.AddRange(new string[]
+		{
+			"CDR",
+			"RegistryRuntime",
+			"GameplayCore",
+		});
+	}
+}
+@@@FILE_END
+@@@FILE_BEGIN {{Root}}/PartyMode/Public/PartyModeCore.h
+#pragma once
+
+#include "CoreMinimal.h"
+#include "UObject/Object.h"
+#include "PartyModeCore.generated.h"
+
+UCLASS()
+class UPartyModeCore final : public UObject
+{
+	GENERATED_BODY()
+
+public:
+	UFUNCTION()
+	void Initialize();
+
+	UFUNCTION()
+	void Tick(const float DeltaSeconds);
+
+	UFUNCTION()
+	void Shutdown();
+};
+@@@FILE_END
+@@@FILE_BEGIN {{Root}}/PartyMode/Private/PartyModeCore.cpp
+#include "PartyModeCore.h"
+
+void UPartyModeCore::Initialize()
+{
+	// TODO: 파티 기반 룰(파티 구성/스킬/패시브 적용 등)
+}
+
+void UPartyModeCore::Tick(const float DeltaSeconds)
+{
+	(void)DeltaSeconds;
+}
+
+void UPartyModeCore::Shutdown()
+{
+}
+@@@FILE_END
+@@@FILE_BEGIN {{Root}}/PartyMode/Public/Presentation/PartyPresentation.h
+#pragma once
+
+#include "CoreMinimal.h"
+#include "Presentation/IPuzzlePresentation.h"
+
+class FPartyPresentation final : public IPuzzlePresentation
+{
+public:
+	virtual EPuzzlePresentationType GetType() const override;
+	virtual void Initialize(UWorld* WorldPtr) override;
+	virtual void Tick(const float DeltaSeconds) override;
+	virtual void Shutdown() override;
+
+private:
+	TWeakObjectPtr<UWorld> CachedWorld;
+};
+@@@FILE_END
+@@@FILE_BEGIN {{Root}}/PartyMode/Private/Presentation/PartyPresentation.cpp
+#include "Presentation/PartyPresentation.h"
+
+EPuzzlePresentationType FPartyPresentation::GetType() const
+{
+	return EPuzzlePresentationType::Party;
+}
+
+void FPartyPresentation::Initialize(UWorld* WorldPtr)
+{
+	CachedWorld = WorldPtr;
+
+	// TODO: 파티 레이아웃(무대/캐릭터/보드 배치/카메라/연출)
+}
+
+void FPartyPresentation::Tick(const float DeltaSeconds)
+{
+	(void)DeltaSeconds;
+}
+
+void FPartyPresentation::Shutdown()
+{
+	CachedWorld = nullptr;
+}
+@@@FILE_END
+@@@FILE_BEGIN {{Root}}/PartyMode/Private/PartyModeModule.cpp
+#include "Modules/ModuleManager.h"
+
+class FPartyModeModule final : public IModuleInterface
+{
+};
+
+IMPLEMENT_MODULE(FPartyModeModule, PartyMode);
+@@@FILE_END
+@@@FILE_BEGIN {{Root}}/GameplayCore/Public/Presentation/IPuzzlePresentation.h
+#pragma once
+
+#include "CoreMinimal.h"
+
+enum class EPuzzlePresentationType : uint8
+{
+	Mercenary = 0,
+	Party,
+	Score,
+};
+
+class IPuzzlePresentation
+{
+public:
+	virtual ~IPuzzlePresentation() = default;
+
+	virtual EPuzzlePresentationType GetType() const = 0;
+	virtual void Initialize(UWorld* WorldPtr) = 0;
+	virtual void Tick(const float DeltaSeconds) = 0;
+	virtual void Shutdown() = 0;
+};
+@@@FILE_END
+@@@FILE_BEGIN {{Root}}/GameplayCore/Public/Rules/Calendar/CalendarPuzzleRules.h
+#pragma once
+
+#include "CoreMinimal.h"
+
+class FCalendarPuzzleRules final
+{
+public:
+	void Reset();
+	bool Validate() const;
+
+private:
+	int32 DummyValue = 0;
+};
+@@@FILE_END
+@@@FILE_BEGIN {{Root}}/GameplayCore/Private/Rules/Calendar/CalendarPuzzleRules.cpp
+#include "Rules/Calendar/CalendarPuzzleRules.h"
+
+void FCalendarPuzzleRules::Reset()
+{
+	DummyValue = 0;
+}
+
+bool FCalendarPuzzleRules::Validate() const
+{
+	return true;
+}
+@@@FILE_END
