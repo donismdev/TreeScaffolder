@@ -1,3 +1,5 @@
+> ⚠️ **Warning**: This tool modifies the file system directly. You **MUST** use it with a version control system like **Git or SVN** to ensure data safety. (반드시 **Git, SVN** 등과 함께 사용해야 합니다.)
+
 [English](README.en.md) | [한국어](README.ko.md)
 
 # 🌲 Tree Scaffolder User Guide

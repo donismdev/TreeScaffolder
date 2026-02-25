@@ -1,3 +1,5 @@
+> ⚠️ **Warning**: 이 도구는 파일 시스템을 직접 수정합니다. 데이터 안전을 위해 반드시 **Git, SVN 등의 형상 관리 도구와 함께 사용해야만 합니다.** (You **MUST** use this tool with **Git, SVN**, etc.)
+
 [English](GUIDE.en.md) | [한국어](GUIDE.ko.md)
 
 # 🌲 Tree Scaffolder 기술 설명서
