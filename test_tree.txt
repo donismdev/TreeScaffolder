@@ -1,0 +1,53 @@
+# =========================================================
+# - Use @ROOT to define the logical root marker.
+# - The first node must be that marker, ending with a '/'.
+# - Indent with TABS or 4-SPACES.
+# =========================================================
+
+@ROOT {{Root}}
+
+{{Root}}/
+	MercenaryMode/
+		MercenaryMode.Build.cs
+		Public/
+			MercenaryModeCore.h
+			Presentation/
+				MercenaryPresentation.h
+		Private/
+			MercenaryModeCore.cpp
+			MercenaryModeModule.cpp
+			Presentation/
+				MercenaryPresentation.cpp
+	ScoreMode/
+		ScoreMode.Build.cs
+		Public/
+			ScoreModeCore.h
+			Presentation/
+				ScorePresentation.h
+			Private/
+				ScoreModeCore.cpp
+				ScoreModeModule.cpp
+				Presentation/
+					ScorePresentation.cpp
+	PartyMode/
+		PartyMode.Build.cs
+		Public/
+			PartyModeCore.h
+			Presentation/
+				PartyPresentation.h
+			Private/
+				PartyModeCore.cpp
+				PartyModeModule.cpp
+				Presentation/
+					PartyModePresentation.cpp
+	GameplayCore/
+		Public/
+			Presentation/
+				IPuzzlePresentation.h
+			Rules/
+				Calendar/
+					CalendarPuzzleRules.h
+			Private/
+				Rules/
+					Calendar/
+						CalendarPuzzleRules.cpp
