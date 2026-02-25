@@ -34,6 +34,7 @@
         "options_title": "Application Options",
         "options_desc": "Settings will be added here.",
         "language": "Language",
+        "runtime_logging": "Enable Runtime Logging (.log)",
         "close": "Close",
         "esc_to_close": "(Esc to close)"
     },

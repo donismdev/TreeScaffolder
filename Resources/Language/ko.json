@@ -34,6 +34,7 @@
         "options_title": "애플리케이션 옵션",
         "options_desc": "여기에 설정 항목이 추가될 예정입니다.",
         "language": "언어 (Language)",
+        "runtime_logging": "런타임 로그 기록 활성화 (.log)",
         "close": "닫기",
         "esc_to_close": "(Esc를 눌러 닫기)"
     },

@@ -22,8 +22,8 @@ class OptionsWindow:
         self.app = app_instance
         self.window = tk.Toplevel(parent)
         self.window.title(t("ui.options_title"))
-        self.window.geometry("400x350")
-        self.window.minsize(300, 250)
+        self.window.geometry("350x250")
+        self.window.minsize(300, 200)
         self.window.grab_set()  # Make it modal
         self.window.focus_set() # Set focus to the new window
 
@@ -38,6 +38,30 @@ class OptionsWindow:
         action_handler.handle_options_closed(self.app)
         self.window.destroy()
 
+    def _load_config(self):
+        import json
+        from pathlib import Path
+        config_path = Path("Resources/config.json")
+        if config_path.exists():
+            try:
+                with open(config_path, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except Exception:
+                pass
+        return {}
+
+    def _save_config(self, key, value):
+        import json
+        from pathlib import Path
+        config_path = Path("Resources/config.json")
+        config = self._load_config()
+        config[key] = value
+        try:
+            with open(config_path, "w", encoding="utf-8") as f:
+                json.dump(config, f, indent=4)
+        except Exception:
+            pass
+
     def setup_ui(self):
         # Clear current UI if re-running
         for widget in self.window.winfo_children():
@@ -46,7 +70,7 @@ class OptionsWindow:
         main_frame = ttk.Frame(self.window, padding=20)
         main_frame.pack(fill=tk.BOTH, expand=True)
 
-        ttk.Label(main_frame, text=t("ui.options_title"), font=("Segoe UI", 12, "bold")).pack(pady=(0, 20))
+        ttk.Label(main_frame, text=t("ui.options_title"), font=("Segoe UI", 11, "bold")).pack(pady=(0, 15))
         
         # Language Selection
         lang_frame = ttk.Frame(main_frame)
@@ -59,14 +83,23 @@ class OptionsWindow:
         lang_combo.pack(side=tk.LEFT)
         lang_combo.bind("<<ComboboxSelected>>", self._on_lang_change)
 
-        ttk.Label(main_frame, text=t("ui.options_desc")).pack(pady=20)
+        # Runtime Logging Toggle
+        config = self._load_config()
+        self.logging_var = tk.BooleanVar(value=config.get("enable_runtime_logging", False))
+        logging_check = ttk.Checkbutton(
+            main_frame, 
+            text=t("ui.runtime_logging"), 
+            variable=self.logging_var,
+            command=lambda: self._save_config("enable_runtime_logging", self.logging_var.get())
+        )
+        logging_check.pack(fill=tk.X, pady=10)
 
         # Close button at the bottom
         btn_frame = ttk.Frame(main_frame)
-        btn_frame.pack(side=tk.BOTTOM, fill=tk.X, pady=(20, 0))
+        btn_frame.pack(side=tk.BOTTOM, fill=tk.X, pady=(10, 0))
         
         ttk.Button(btn_frame, text=t("ui.close"), command=self._on_close).pack(side=tk.RIGHT)
-        ttk.Label(btn_frame, text=t("ui.esc_to_close"), foreground="gray").pack(side=tk.RIGHT, padx=10)
+        ttk.Label(btn_frame, text=t("ui.esc_to_close"), foreground="gray", font=("Segoe UI", 8)).pack(side=tk.RIGHT, padx=10)
 
     def _on_lang_change(self, event):
         new_lang = self.lang_var.get()
