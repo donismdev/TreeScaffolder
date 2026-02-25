@@ -92,6 +92,14 @@
         "apply_success_msg": "Scaffolding applied successfully.",
         "no_test_data": "Test data file '{file}' not found.",
         "no_v2_blocks": "No valid V2 blocks found in the Source Code editor.",
-        "v2_parse_error_title": "V2 Parsing Error"
+        "v2_parse_error_title": "V2 Parsing Error",
+        "err_tab_mix": "TabError at line {line}: Mixed tabs and spaces in indentation.",
+        "err_indent_type": "TabError at line {line}: Indentation type changed from parent line.",
+        "err_indent_unit": "IndentationError at line {line}: Inconsistent indentation. Expected multiple of {unit} spaces.",
+        "err_invalid_char": "Error at line {line}: Invalid characters in filename ('{name}').",
+        "err_no_root": "Error: '@ROOT' declaration missing.",
+        "err_root_first": "Error: First node must be '@ROOT' name '{name}/'.",
+        "err_deep_indent": "Structure error at line {line}: Node '{name}' is indented too deeply.",
+        "err_duplicate_v2": "Duplicate file definition FOUND INSIDE 'Source Code' editor: '{path}'"
     }
 }

@@ -56,13 +56,15 @@ class ShortcutHintManager:
                 y = widget_y - root_y
                 
                 # Create a hint label as a child of the root window
-                hint_label = ttk.Label(
+                hint_label = tk.Label(
                     self.app.root, 
                     text=key_sequence.upper(), 
                     relief="solid", 
+                    borderwidth=1,
                     background="yellow", 
                     foreground="black",
-                    padding=(2, 0)
+                    padx=2,
+                    pady=0
                 )
 
                 # Place the hint label using absolute coordinates within the root window

@@ -272,27 +272,9 @@ def _ensure_file(app, path: Path, dry_run: bool, content: str | None, is_overwri
     if not dry_run:
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(content or "", encoding='utf-8')
-            
-            try:
-                written_binary_content = path.read_bytes()
-                original_binary_content = (content or "").encode('utf-8')
-
-                extra_newline_added = False
-                if written_binary_content.endswith(b'\r\n') and not original_binary_content.endswith(b'\r\n'):
-                    extra_newline_added = True
-                    truncate_bytes = 2
-                elif written_binary_content.endswith(b'\n') and not original_binary_content.endswith(b'\n'):
-                    extra_newline_added = True
-                    truncate_bytes = 1
-                
-                if extra_newline_added:
-                    with open(path, 'wb') as f:
-                        f.write(written_binary_content[:-truncate_bytes])
-                    app._log(f"[FIX] Hardcoded: Removed implicit extra newline from {path}", "warn")
-
-            except Exception as fix_e:
-                app._log(f"[ERROR] Hardcoded newline fix failed for {path}: {fix_e}", "error")
+            # Review feedback: Use write_bytes to avoid platform-specific newline transformations
+            # and remove dangerous post-truncation logic.
+            path.write_bytes((content or "").encode('utf-8'))
         except Exception as e:
             app._log(f"[ERROR] write file failed: {path} | {e}", "error")
             return False, False, False

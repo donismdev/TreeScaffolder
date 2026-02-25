@@ -26,18 +26,23 @@ def create_left_panel(app):
     
     path_buttons_frame = ttk.Frame(folder_frame)
     path_buttons_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
-    path_buttons_frame.columnconfigure(1, weight=1)
+    
+    # 가중치 설정: 0번 열(라벨)만 늘어나게 하고, 1, 2번 열(버튼)은 고정
+    path_buttons_frame.columnconfigure(0, weight=1)
+    path_buttons_frame.columnconfigure(1, weight=0)
+    path_buttons_frame.columnconfigure(2, weight=0)
 
-    app.folder_label = ttk.Label(path_buttons_frame, textvariable=app.target_root_path, relief="sunken", padding=3, width=50)
+    app.folder_label = ttk.Label(path_buttons_frame, textvariable=app.target_root_path, relief="sunken", padding=3)
     app.target_root_path.set(t("ui.no_folder_selected"))
-    app.folder_label.grid(row=0, column=0, sticky="w", padx=(0, 5))
+    # sticky="ew"를 주어 라벨이 0번 열을 꽉 채우게 함
+    app.folder_label.grid(row=0, column=0, sticky="ew", padx=(0, 5))
     
     app.browse_button = ttk.Button(path_buttons_frame, text=t("ui.browse"), command=app.on_browse_folder, width=12)
-    app.browse_button.grid(row=0, column=2, padx=(0, 5))
+    app.browse_button.grid(row=0, column=1, padx=(0, 5))
     app.widget_map["on_browse_folder"] = app.browse_button
 
     app.prev_dir_button = ttk.Button(path_buttons_frame, text=t("ui.prev"), command=app.on_previous_folder, width=8, state=tk.DISABLED)
-    app.prev_dir_button.grid(row=0, column=3, padx=(0, 5))
+    app.prev_dir_button.grid(row=0, column=2)
     app.widget_map["on_previous_folder"] = app.prev_dir_button
 
     # --- Editor Tabs ---
@@ -185,14 +190,14 @@ def create_right_panel(app):
     diff_tab_frame.rowconfigure(0, weight=1)
     diff_tab_frame.columnconfigure(0, weight=1)
 
-    app.diff_paned_window = ttk.PanedWindow(diff_tab_frame, orient=tk.HORIZONTAL)
+    app.diff_paned_window = tk.PanedWindow(diff_tab_frame, orient=tk.HORIZONTAL, sashrelief=tk.RAISED, sashwidth=4)
     app.diff_paned_window.grid(row=0, column=0, sticky="nsew")
 
     # --- Before Pane ---
     before_pane_frame = ttk.LabelFrame(app.diff_paned_window, text=t("ui.before_pane"))
     before_pane_frame.rowconfigure(0, weight=1)
     before_pane_frame.columnconfigure(0, weight=1)
-    app.diff_paned_window.add(before_pane_frame, weight=1)
+    app.diff_paned_window.add(before_pane_frame, stretch="always", minsize=200)
 
     app.before_notebook = ttk.Notebook(before_pane_frame)
     app.before_notebook.grid(row=0, column=0, sticky="nsew", padx=2, pady=2)
@@ -214,7 +219,7 @@ def create_right_panel(app):
     after_pane_frame = ttk.LabelFrame(app.diff_paned_window, text=t("ui.after_pane"))
     after_pane_frame.rowconfigure(0, weight=1)
     after_pane_frame.columnconfigure(0, weight=1)
-    app.diff_paned_window.add(after_pane_frame, weight=1)
+    app.diff_paned_window.add(after_pane_frame, stretch="always", minsize=200)
     
     app.after_notebook = ttk.Notebook(after_pane_frame)
     app.after_notebook.grid(row=0, column=0, sticky="nsew", padx=2, pady=2)
@@ -263,12 +268,6 @@ def create_right_panel(app):
     app.clear_button = ttk.Button(summary_btns_frame, text=t("ui.clear"), command=app.on_clear_data, width=8)
     app.clear_button.pack(side="left", padx=2)
     app.widget_map["on_clear_data"] = app.clear_button
-
-    # Bind selection event
-    app.before_tree.bind("<<TreeviewSelect>>", app.on_tree_select)
-    app.after_tree.bind("<<TreeviewSelect>>", app.on_tree_select)
-    app.before_list.bind("<<TreeviewSelect>>", app.on_tree_select)
-    app.after_list.bind("<<TreeviewSelect>>", app.on_tree_select)
 
     # Bind selection event
     app.before_tree.bind("<<TreeviewSelect>>", app.on_tree_select)

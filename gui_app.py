@@ -117,14 +117,15 @@ class ScaffoldApp:
         self.editor_buttons = [] # Holds the buttons above the editor
 
         # --- Main Layout ---
-        self.main_paned_window = ttk.PanedWindow(self.root, orient=tk.HORIZONTAL)
+        # ttk.PanedWindow 대신 minsize를 지원하는 tk.PanedWindow 사용
+        self.main_paned_window = tk.PanedWindow(self.root, orient=tk.HORIZONTAL, sashrelief=tk.RAISED, sashwidth=4)
         self.main_paned_window.pack(fill=tk.BOTH, expand=True)
 
         self.left_frame = ttk.Frame(self.main_paned_window, padding=5)
-        self.main_paned_window.add(self.left_frame, weight=1)
+        self.main_paned_window.add(self.left_frame, stretch="always", minsize=400)
 
         self.right_frame = ttk.Frame(self.main_paned_window)
-        self.main_paned_window.add(self.right_frame, weight=2)
+        self.main_paned_window.add(self.right_frame, stretch="always", minsize=400)
 
         self.setup_left_panel()
         self.setup_right_panel()
@@ -231,15 +232,19 @@ class ScaffoldApp:
         key_bindings.setup_key_bindings(self)
         self.hint_manager = shortcut_hints.ShortcutHintManager(self)
         
+        # --- Restore Tree Views ---
+        # 1. Populate Before Tree based on current target folder
+        current_root_str = self.target_root_path.get()
+        if current_root_str and current_root_str != t("ui.no_folder_selected"):
+            current_root_path = Path(current_root_str)
+            if current_root_path.is_dir():
+                self._populate_before_tree(current_root_path)
+
+        # 2. Populate After Tree if a plan exists
         if self.current_plan:
-             self._populate_before_tree(Path(current_root) if current_root != t("ui.no_folder_selected") else None)
              self._populate_after_tree(self.current_plan)
-             # Update summary
-             new_files = sum(1 for p, s in self.current_plan.path_states.items() if s == 'new' and p in self.current_plan.planned_files)
-             new_dirs = sum(1 for p, s in self.current_plan.path_states.items() if s == 'new' and p in self.current_plan.planned_dirs)
-             overwrites = sum(1 for s in self.current_plan.path_states.values() if s == 'overwrite')
-             summary_msg = t("ui.plan_summary", dirs=new_dirs, files=new_files, overwrites=overwrites)
-             self.summary_label.config(text=summary_msg)
+             # Update summary via handler to ensure pretty formatting
+             action_handler.handle_diff_computed(self, self.current_plan)
 
     def _on_editor_tab_changed(self, event):
         """Called when the editor notebook tab is changed. Configures button states."""

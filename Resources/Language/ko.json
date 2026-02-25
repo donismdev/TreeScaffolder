@@ -92,6 +92,14 @@
         "apply_success_msg": "스캐폴딩이 성공적으로 적용되었습니다.",
         "no_test_data": "테스트 데이터 파일 '{file}'을(를) 찾을 수 없습니다.",
         "no_v2_blocks": "소스 코드 에디터에서 유효한 V2 블록을 찾을 수 없습니다.",
-        "v2_parse_error_title": "V2 파싱 오류"
+        "v2_parse_error_title": "V2 파싱 오류",
+        "err_tab_mix": "TabError {line}행: 들여쓰기에 탭(\\t)과 공백(Space)이 혼용되었습니다.",
+        "err_indent_type": "TabError {line}행: 이전 줄과 다른 들여쓰기 방식을 사용했습니다.",
+        "err_indent_unit": "IndentationError {line}행: 일관성 없는 들여쓰기입니다. {unit}칸의 배수여야 합니다.",
+        "err_invalid_char": "Error {line}행: 파일명에 부적절한 문자가 포함되었습니다. ('{name}')",
+        "err_no_root": "오류: '@ROOT' 선언이 누락되었습니다.",
+        "err_root_first": "오류: 첫 번째 노드는 반드시 '@ROOT'에서 지정한 '{name}/' 이어야 합니다.",
+        "err_deep_indent": "구조 오류 {line}행: '{name}' 노드의 들여쓰기가 너무 깊습니다.",
+        "err_duplicate_v2": "중복 오류: '소스 코드' 에디터 내에 중복 정의된 파일이 있습니다: '{path}'"
     }
 }

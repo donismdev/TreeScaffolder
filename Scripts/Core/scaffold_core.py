@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import List, Dict, Tuple, Set, Optional
 
 from .v2_parser import parse_v2_format, V2ParserError
+from Scripts.Utils.i18n import t
 
 # ---------- Data Structures ----------
 
@@ -130,7 +131,7 @@ def parse_tree_text(text: str) -> Tuple[List[NodeItem], Optional[str], Optional[
         has_spaces = " " in whitespace
         
         if has_tabs and has_spaces:
-            return [], None, f"TabError at line {line_index + 1}: 들여쓰기에 탭(\\t)과 공백(Space)이 혼용되었습니다. 한 가지 방식만 사용해주세요."
+            return [], None, t("message.err_tab_mix", line=line_index + 1)
             
         current_type = 'tab' if has_tabs else 'space'
         current_size = len(whitespace) if current_type == 'space' else whitespace.count("\t")
@@ -142,12 +143,11 @@ def parse_tree_text(text: str) -> Tuple[List[NodeItem], Optional[str], Optional[
         
         # 3. Validate against established unit
         if current_type != indent_unit_type:
-            type_name = "공백(Space)" if indent_unit_type == 'space' else "탭(\\t)"
-            return [], None, f"TabError at line {line_index + 1}: 이전 줄에서는 {type_name}을 사용했지만, 여기서는 다른 방식을 사용했습니다."
+            return [], None, t("message.err_indent_type", line=line_index + 1)
             
         if indent_unit_type == 'space':
             if current_size % indent_unit_size != 0:
-                return [], None, f"IndentationError at line {line_index + 1}: 일관성 없는 들여쓰기입니다. 현재 {current_size}칸이 사용되었으나, 이 트리의 들여쓰기 단위는 {indent_unit_size}칸입니다."
+                return [], None, t("message.err_indent_unit", line=line_index + 1, unit=indent_unit_size)
             effective_indent = current_size // indent_unit_size
         else:
             effective_indent = current_size # Tab count is the level
@@ -180,15 +180,15 @@ def parse_tree_text(text: str) -> Tuple[List[NodeItem], Optional[str], Optional[
         name = name.replace("\\", "/")
 
         if name.startswith('/') or '..' in name or ':' in name:
-            return [], None, f"Error at line {line_index + 1}: 파일명에 부적절한 문자가 포함되었습니다. ('{name}')"
+            return [], None, t("message.err_invalid_char", line=line_index + 1, name=name)
 
         items.append(NodeItem(indent=effective_indent, name=name, is_dir=is_dir, line_number=line_index + 1))
 
     if not root_marker_name and items:
-        return [], None, "Error: '@ROOT' 선언이 누락되었습니다."
+        return [], None, t("message.err_no_root")
 
     if root_marker_name and items and (items[0].name != root_marker_name or not items[0].is_dir):
-        return [], root_marker_name, f"Error: 첫 번째 노드는 반드시 '@ROOT'에서 지정한 '{root_marker_name}/' 이어야 합니다."
+        return [], root_marker_name, t("message.err_root_first", name=root_marker_name)
 
     return items, root_marker_name, None
 
@@ -289,7 +289,7 @@ def generate_plan(root_path: Path, text_input: str, config: dict) -> Plan:
 			while stack and stack[-1][0] >= item.indent:
 				stack.pop()
 			if not stack or item.indent > stack[-1][0] + 1:
-				plan.errors.append(f"Structure error at line {item.line_number}: Invalid indentation. Node '{item.name}' is indented too deeply. It must be at most one level deeper than its parent.")
+				plan.errors.append(t("message.err_deep_indent", line=item.line_number, name=item.name))
 				continue
 			base_path = stack[-1][1]
 			current_path = base_path / item.name
@@ -312,7 +312,7 @@ def generate_plan(root_path: Path, text_input: str, config: dict) -> Plan:
 		# Check for duplicates within the source code itself
 		if target_path in seen_paths_in_v2:
 			prev_path_str = seen_paths_in_v2[target_path]
-			plan.errors.append(f"Duplicate file definition FOUND INSIDE 'Source Code' editor: '{path_str}' (already defined earlier in the same text)")
+			plan.errors.append(t("message.err_duplicate_v2", path=path_str))
 		
 		seen_paths_in_v2[target_path] = path_str
 		plan.planned_files.add(target_path)
