@@ -246,26 +246,6 @@ class ScaffoldApp:
              # Update summary via handler to ensure pretty formatting
              action_handler.handle_diff_computed(self, self.current_plan)
 
-    def _on_editor_tab_changed(self, event):
-        """Called when the editor notebook tab is changed. Configures button states."""
-        if not hasattr(self, 'editor_buttons') or not self.editor_buttons:
-            return
-
-        # Disable buttons 2, 3, 4 and clear their text
-        for i in range(1, 4):
-            self.editor_buttons[i].config(state=tk.DISABLED, text="")
-
-        try:
-            selected_tab_text = self.editor_notebook.tab(self.editor_notebook.select(), "text")
-        except tk.TclError:
-            selected_tab_text = t("ui.tab_scaffold_tree") # Default to first tab during init
-
-        # Configure the first button based on the selected tab
-        if selected_tab_text == t("ui.tab_source_code"):
-            self.editor_buttons[0].config(state=tk.NORMAL, text=t("ui.make_tree"), command=self.on_make_tree_from_source)
-        else: # For "Scaffold Tree" and "Content"
-            self.editor_buttons[0].config(state=tk.DISABLED, text="", command=None)
-
     def setup_styles(self):
         # Custom Fonts
         self.editor_font = font.Font(family="Consolas", size=10)

@@ -12,7 +12,7 @@ import difflib
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Dict, Tuple, Set, Optional
+from typing import List, Dict, Set, Optional
 
 from .v2_parser import parse_v2_format, V2ParserError
 from Scripts.Utils.i18n import t
@@ -54,7 +54,7 @@ class Plan:
 	
 	# Warnings
 	duplicate_warnings: Dict[Path, List[Path]] = field(default_factory=dict)
-	similarity_warnings: Dict[Path, List[Tuple[str, float, List[Path]]]] = field(default_factory=dict)
+	similarity_warnings: Dict[Path, List[tuple[str, float, List[Path]]]] = field(default_factory=dict)
 	migration_warnings: List[str] = field(default_factory=list) # New field for migration messages
 	
 	# Errors
@@ -88,14 +88,14 @@ def _count_raw_indent(line: str) -> int:
     
     return tab_count + (space_count // 4)
 
-def parse_tree_text(text: str) -> Tuple[List[NodeItem], Optional[str], Optional[str]]:
+def parse_tree_text(text: str) -> tuple[List[NodeItem], Optional[str], Optional[str]]:
     """
     Parses the multiline tree text with strict Python-style indentation validation.
     Forbids mixing tabs and spaces and enforces a consistent indentation unit.
     """
     items: List[NodeItem] = []
     root_marker_name: Optional[str] = None
-    tree_lines_info: List[Tuple[int, str]] = []
+    tree_lines_info: List[tuple[int, str]] = []
 
     lines = text.splitlines()
 
@@ -214,7 +214,7 @@ def scan_existing_files(root: Path, config: dict) -> Dict[str, List[Path]]:
         print(f"Warning: Could not scan directory fully: {e}")
     return result
 
-def find_similar_candidates(existing_map: Dict[str, List[Path]], target_name: str, config: dict) -> List[Tuple[str, float, List[Path]]]:
+def find_similar_candidates(existing_map: Dict[str, List[Path]], target_name: str, config: dict) -> List[tuple[str, float, List[Path]]]:
     if not config.get("ENABLE_SIMILARITY_SCAN", True): return []
     threshold = config.get("SIMILARITY_RATIO_THRESHOLD", 0.86)
     target_norm = _normalize_filename(target_name, config)
