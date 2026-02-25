@@ -10,6 +10,7 @@ import sys
 import subprocess
 from pathlib import Path
 from Scripts.UI import app_utils # Import app_utils for logging
+from Scripts.UI import action_handler
 
 def execute_scaffold(app):
     """Performs the actual file and directory creation."""
@@ -181,7 +182,14 @@ def execute_scaffold(app):
     app.apply_button.config(state="normal" if plan and not plan.has_conflicts else "disabled")
     app._populate_before_tree(plan.root_path)
     app._populate_after_tree(plan)
-    app.notebook.select(0)
+    
+    # Update Summary and switch tab
+    if stats["dirs_error"] > 0 or stats["files_error"] > 0:
+        action_handler.handle_error(app, "apply")
+    else:
+        action_handler.handle_apply_success(app, is_dry_run=is_dry_run)
+        
+    app.analysis_notebook.select(0)
 
 def _write_execution_log(app, stats: dict, is_dry_run: bool, captured_logs: list, original_log_method):
     """Writes a comprehensive execution log to a timestamped file."""

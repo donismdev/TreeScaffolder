@@ -312,7 +312,7 @@ def generate_plan(root_path: Path, text_input: str, config: dict) -> Plan:
 		# Check for duplicates within the source code itself
 		if target_path in seen_paths_in_v2:
 			prev_path_str = seen_paths_in_v2[target_path]
-			plan.errors.append(f"Duplicate file definition in Source Code: '{path_str}' (already defined as '{prev_path_str}')")
+			plan.errors.append(f"Duplicate file definition FOUND INSIDE 'Source Code' editor: '{path_str}' (already defined earlier in the same text)")
 		
 		seen_paths_in_v2[target_path] = path_str
 		plan.planned_files.add(target_path)

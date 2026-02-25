@@ -8,6 +8,7 @@ import tkinter as tk
 from tkinter import ttk
 from Scripts.UI import options_ui
 from Scripts.Utils.i18n import t
+from Scripts.UI import action_handler
 
 def create_left_panel(app):
     """Creates all widgets for the left control panel."""
@@ -78,6 +79,9 @@ def create_left_panel(app):
     tree_xscroller.grid(row=1, column=0, sticky="ew")
     
     app.tree_text.insert("1.0", app.DEFAULT_TREE_TEMPLATE)
+    
+    # Bind change events
+    app.tree_text.bind("<<Modified>>", lambda e: action_handler.handle_content_updated(app, "tree") if app.tree_text.edit_modified() and app.tree_text.edit_modified(False) else None)
 
     # --- Source Code Tab ---
     source_code_frame = ttk.Frame(app.editor_notebook)
@@ -94,6 +98,8 @@ def create_left_panel(app):
     app.source_code_text.grid(row=0, column=0, sticky="nsew")
     source_yscroller.grid(row=0, column=1, sticky="ns")
     source_xscroller.grid(row=1, column=0, sticky="ew")
+
+    app.source_code_text.bind("<<Modified>>", lambda e: action_handler.handle_content_updated(app, "source") if app.source_code_text.edit_modified() and app.source_code_text.edit_modified(False) else None)
 
     # --- Content Tab ---
     content_frame = ttk.Frame(app.editor_notebook)
@@ -117,13 +123,16 @@ def create_left_panel(app):
     settings_frame.columnconfigure(1, weight=1)
 
     # Settings
-    ttk.Checkbutton(settings_frame, text=t("ui.dry_run"), variable=app.dry_run).grid(row=0, column=0, columnspan=2, sticky="w", padx=5)
-    ttk.Checkbutton(settings_frame, text=t("ui.similarity_scan"), variable=app.enable_similarity_scan).grid(row=1, column=0, columnspan=2, sticky="w", padx=5)
+    ttk.Checkbutton(settings_frame, text=t("ui.dry_run"), variable=app.dry_run, 
+                    command=lambda: action_handler.handle_toggle_dry_run(app, app.dry_run.get())).grid(row=0, column=0, columnspan=2, sticky="w", padx=5)
+    ttk.Checkbutton(settings_frame, text=t("ui.similarity_scan"), variable=app.enable_similarity_scan,
+                    command=lambda: action_handler.handle_toggle_similarity(app, app.enable_similarity_scan.get())).grid(row=1, column=0, columnspan=2, sticky="w", padx=5)
 
     ttk.Label(settings_frame, text=t("ui.similarity_ratio")).grid(row=2, column=0, sticky="w", padx=5, pady=2)
     ttk.Scale(settings_frame, from_=0.5, to=1.0, variable=app.similarity_threshold, orient=tk.HORIZONTAL).grid(row=2, column=1, sticky="ew", padx=5)
 
-    ttk.Checkbutton(settings_frame, text=t("ui.open_after"), variable=app.open_folder_after_apply).grid(row=3, column=0, columnspan=2, sticky="w", padx=5)
+    ttk.Checkbutton(settings_frame, text=t("ui.open_after"), variable=app.open_folder_after_apply,
+                    command=lambda: action_handler.handle_toggle_open_after(app, app.open_folder_after_apply.get())).grid(row=3, column=0, columnspan=2, sticky="w", padx=5)
     
     # Action Buttons
     actions_subframe = ttk.Frame(settings_frame)
@@ -247,7 +256,7 @@ def create_right_panel(app):
     summary_btns_frame = ttk.Frame(app.summary_group)
     summary_btns_frame.grid(row=0, column=1, padx=5)
 
-    app.option_button = ttk.Button(summary_btns_frame, text=t("ui.option"), width=12, command=lambda: options_ui.show_options(app.root, app))
+    app.option_button = ttk.Button(summary_btns_frame, text=t("ui.option"), width=12, command=app.on_options)
     app.option_button.pack(side="left", padx=2)
     app.widget_map["on_options"] = app.option_button
     

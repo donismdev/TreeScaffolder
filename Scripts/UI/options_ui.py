@@ -7,6 +7,7 @@ A separate window for application options.
 import tkinter as tk
 from tkinter import ttk
 from Scripts.Utils.i18n import t, set_language, get_current_language
+from Scripts.UI import action_handler
 
 class OptionsWindow:
     _instance = None
@@ -34,6 +35,7 @@ class OptionsWindow:
 
     def _on_close(self):
         OptionsWindow._instance = None
+        action_handler.handle_options_closed(self.app)
         self.window.destroy()
 
     def setup_ui(self):
@@ -73,6 +75,7 @@ class OptionsWindow:
             # Refresh UI of main app
             if hasattr(self.app, 'refresh_ui'):
                 self.app.refresh_ui()
+                action_handler.handle_language_changed(self.app)
             
             # Update current window strings
             self.window.title(t("ui.options_title"))

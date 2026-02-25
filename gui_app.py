@@ -28,6 +28,7 @@ from Scripts.UI import shortcut_hints # Added import
 from Scripts.Utils import tree_generator # Import the new utility
 from Scripts.UI.tree_populator import _clear_tree as clear_tree_function # Import as different name
 from Scripts.Utils.i18n import t
+from Scripts.UI import action_handler
 
 # --- Constants ---
 APP_TITLE = "Tree Scaffolder v1.2"
@@ -196,6 +197,10 @@ class ScaffoldApp:
         self.setup_left_panel()
         self.setup_right_panel()
 
+        # Restore Prev button state if a last path exists
+        if self.last_root_path:
+            self.prev_dir_button.config(state=tk.NORMAL)
+
         # Restore state
         self.tree_text.delete("1.0", tk.END)
         self.tree_text.insert("1.0", current_tree)
@@ -248,11 +253,11 @@ class ScaffoldApp:
         try:
             selected_tab_text = self.editor_notebook.tab(self.editor_notebook.select(), "text")
         except tk.TclError:
-            selected_tab_text = "Scaffold Tree" # Default to first tab during init
+            selected_tab_text = t("ui.tab_scaffold_tree") # Default to first tab during init
 
         # Configure the first button based on the selected tab
-        if selected_tab_text == "Source Code":
-            self.editor_buttons[0].config(state=tk.NORMAL, text="make tree", command=self.on_make_tree_from_source)
+        if selected_tab_text == t("ui.tab_source_code"):
+            self.editor_buttons[0].config(state=tk.NORMAL, text=t("ui.make_tree"), command=self.on_make_tree_from_source)
         else: # For "Scaffold Tree" and "Content"
             self.editor_buttons[0].config(state=tk.DISABLED, text="", command=None)
 
@@ -309,6 +314,7 @@ class ScaffoldApp:
             self._clear_tree(self.after_tree)
             self._clear_tree(self.after_list)
             self.apply_button.config(state=tk.DISABLED)
+            action_handler.handle_folder_selected(self, message, method="browse")
         print("DEBUG: on_browse_folder completed") # Debug print
 
     def on_recompute(self, silent=False):
@@ -342,7 +348,8 @@ class ScaffoldApp:
                 self.log_text.delete('1.0', tk.END)
                 self.log_text.config(state=tk.DISABLED)
 
-            self._log(f"\n{t('log.error_plan')}", "error")
+            action_source = "Test Data" if silent else "Editor"
+            self._log(f"\n[ERROR] Plan generation failed during {action_source} processing:", "error")
             for err in self.current_plan.errors:
                 self._log(f"- {err}", "error")
             
@@ -351,9 +358,15 @@ class ScaffoldApp:
             self._clear_tree(self.after_list)
             self.apply_button.config(state=tk.DISABLED)
             
-            error_msg = "Plan generation failed. Please check the Log tab for details."
+            error_msg = f"Plan generation failed ({action_source}). Please check the Log tab for details."
             messagebox.showerror("Scaffold Plan Error", error_msg)
             self.analysis_notebook.select(1)
+            
+            # 에러 발생 알림 (silent 여부에 따라 다른 키 전달)
+            if silent:
+                action_handler.handle_test_data_loaded(self, success=False)
+            else:
+                action_handler.handle_error(self, "diff")
             return False
         else:
             if not silent:
@@ -390,11 +403,7 @@ class ScaffoldApp:
             self.apply_button.config(state=tk.NORMAL)
             
             # --- 5. Summary Label 업데이트 ---
-            new_files = sum(1 for p, s in self.current_plan.path_states.items() if s == 'new' and p in self.current_plan.planned_files)
-            new_dirs = sum(1 for p, s in self.current_plan.path_states.items() if s == 'new' and p in self.current_plan.planned_dirs)
-            overwrites = sum(1 for s in self.current_plan.path_states.values() if s == 'overwrite')
-            summary_msg = t("ui.plan_summary", dirs=new_dirs, files=new_files, overwrites=overwrites)
-            self.summary_label.config(text=summary_msg)
+            action_handler.handle_diff_computed(self, self.current_plan)
 
             self.analysis_notebook.select(0) # 정상일 때만 After View 보여줌
             return True
@@ -493,23 +502,57 @@ class ScaffoldApp:
                 else:
                     messagebox.showwarning(t("message.error_title"), t("message.no_test_data", file=file))
             
-            # Auto-recompute if a target root is selected
-            success = True
-            if self.target_root_path.get() and self.target_root_path.get() != t("ui.no_folder_selected"):
-                # Use silent=True to avoid messy logs unless there are errors
-                success = self.on_recompute(silent=True)
+            # --- Validation Logic (Immediately check if data is valid) ---
+            root_path_str = self.target_root_path.get()
+            if root_path_str and root_path_str != t("ui.no_folder_selected") and Path(root_path_str).is_dir():
+                root_path = Path(root_path_str)
+                text_input = self.tree_text.get("1.0", "end-1c") + "\n" + self.source_code_text.get("1.0", "end-1c")
+                config = {
+                    "DRY_RUN": self.dry_run.get(),
+                    "ENABLE_SIMILARITY_SCAN": self.enable_similarity_scan.get(),
+                    "SIMILARITY_RATIO_THRESHOLD": self.similarity_threshold.get(),
+                }
+                # Generate plan just for validation
+                val_plan = scaffold_core.generate_plan(root_path, text_input, config)
+                
+                if val_plan.errors:
+                    self._log(f"\n[ERROR] {t('log.test_data_error')} (Validation Failed):", "error")
+                    for err in val_plan.errors:
+                        self._log(f"- {err}", "error")
+                    action_handler.handle_test_data_loaded(self, success=False)
+                    self.analysis_notebook.select(1) # Switch to Log tab to show errors
+                    return # Stop here if data is invalid
+
+            # --- Success Path (Data is valid or no folder selected yet) ---
+            # Clear stale After view data since editor content changed
+            self._clear_tree(self.after_tree)
+            self._clear_tree(self.after_list)
+            self.apply_button.config(state=tk.DISABLED)
+
+            # Tab Switching Logic
+            tree_content = self.tree_text.get("1.0", "end-1c").strip()
+            source_content = self.source_code_text.get("1.0", "end-1c").strip()
+            is_tree_empty = not tree_content or all(line.strip().startswith("#") or not line.strip() for line in tree_content.splitlines())
             
-            if success:
-                self._log(t("log.load_test_data_success"), "success")
+            if is_tree_empty and source_content:
+                self.editor_notebook.select(1) # Switch to Source Code tab
+            else:
+                self.editor_notebook.select(0) # Default to Scaffold Tree tab
+
+            self._log(t("log.load_test_data_success"), "success")
+            action_handler.handle_test_data_loaded(self, success=True)
                 
         except Exception as e:
+            self._log(f"Error loading test data: {e}", "error")
             messagebox.showerror(t("message.error_title"), f"An error occurred: {e}")
+            action_handler.handle_test_data_loaded(self, success=False)
         print("DEBUG: on_load_test_data completed") # Debug print
 
     def on_options(self):
         """Opens the options window."""
         print("DEBUG: on_options called")
         from Scripts.UI import options_ui
+        action_handler.handle_options_opened(self)
         options_ui.show_options(self.root, self)
 
     def on_clear_data(self):
@@ -527,7 +570,7 @@ class ScaffoldApp:
             self._clear_tree(tree)
         self.recompute_button.config(state=tk.DISABLED)
         self.apply_button.config(state=tk.DISABLED)
-        self.summary_label.config(text=t("ui.no_plan"))
+        action_handler.handle_data_cleared(self)
         app_utils.log_message(self, t("log.data_cleared"), "info")
         print("DEBUG: on_clear_data completed") # Debug print
 
@@ -541,6 +584,7 @@ class ScaffoldApp:
                 self._populate_before_tree(Path(message))
                 self._clear_tree(self.after_tree)
                 self.apply_button.config(state=tk.DISABLED)
+                action_handler.handle_folder_selected(self, message, method="prev")
             else:
                 messagebox.showerror("Invalid Folder", f"Previous folder is no longer valid: {message}")
                 self.last_root_path = None
@@ -591,32 +635,35 @@ class ScaffoldApp:
             self.tree_text.insert("1.0", new_tree_text)
             self.editor_notebook.select(0) # Switch focus to the tree tab
             self._log(t("log.make_tree_success", count=len(paths)), "success")
+            action_handler.handle_make_tree_result(self, success=True)
 
         except V2ParserError as e:
             self._log(f"{t('message.v2_parse_error_title')}: {e}", "error")
             messagebox.showerror(t("message.v2_parse_error_title"), f"{e}")
+            action_handler.handle_make_tree_result(self, success=False)
         except Exception as e:
             self._log(f"An unexpected error occurred: {e}", "error")
             messagebox.showerror(t("message.error_title"), f"An unexpected error occurred:\n\n{e}")
+            action_handler.handle_make_tree_result(self, success=False)
 
     def _on_editor_tab_changed(self, event):
         """Called when the editor notebook tab is changed. Configures button states."""
         if not hasattr(self, 'editor_buttons') or not self.editor_buttons:
             return
 
-        # Buttons 2, 3, 4 are always disabled and blank.
+        # Disable buttons 2, 3, 4 and clear their text
         for i in range(1, 4):
             self.editor_buttons[i].config(state=tk.DISABLED, text="")
 
         try:
             selected_tab_text = self.editor_notebook.tab(self.editor_notebook.select(), "text")
         except tk.TclError:
-            selected_tab_text = "Scaffold Tree" # Default to first tab during init
+            selected_tab_text = t("ui.tab_scaffold_tree") # Default to first tab during init
 
-        # Configure the first button based on the selected tab.
-        if selected_tab_text == "Source Code":
-            self.editor_buttons[0].config(state=tk.NORMAL, text="make tree", command=self.on_make_tree_from_source)
-        else: # For "Scaffold Tree" and "Content" tabs.
+        # Configure the first button based on the selected tab
+        if selected_tab_text == t("ui.tab_source_code"):
+            self.editor_buttons[0].config(state=tk.NORMAL, text=t("ui.make_tree"), command=self.on_make_tree_from_source)
+        else: # For "Scaffold Tree" and "Content"
             self.editor_buttons[0].config(state=tk.DISABLED, text="", command=None)
 
     # --- Helper Method Stubs ---
