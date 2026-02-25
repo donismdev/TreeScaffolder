@@ -272,9 +272,11 @@ def _ensure_file(app, path: Path, dry_run: bool, content: str | None, is_overwri
     if not dry_run:
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
-            # Review feedback: Use write_bytes to avoid platform-specific newline transformations
-            # and remove dangerous post-truncation logic.
-            path.write_bytes((content or "").encode('utf-8'))
+            
+            # Normalize all line endings to CRLF for the output file
+            final_content = (content or "").replace('\r\n', '\n').replace('\n', '\r\n')
+            
+            path.write_bytes(final_content.encode('utf-8'))
         except Exception as e:
             app._log(f"[ERROR] write file failed: {path} | {e}", "error")
             return False, False, False

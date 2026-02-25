@@ -62,6 +62,9 @@ def parse_v2_format(text: str, root_marker: str | None = None, root_marker_name:
     if not text.strip():
         return []
 
+    # Normalize line endings to \n
+    text = text.replace('\r\n', '\n')
+
     # 1. High-priority validation of the entire block structure.
     _validate_block_structure(text)
 
@@ -71,7 +74,7 @@ def parse_v2_format(text: str, root_marker: str | None = None, root_marker_name:
     block_pattern = re.compile(
         r"@@@(?P<keyword>[A-Z_]+)_BEGIN(?P<header>.*?)\n"
         r"(?P<content>.*?)"
-        r"@@@(?P=keyword)_END",
+        r"\n?@@@(?P=keyword)_END",
         re.DOTALL
     )
 
