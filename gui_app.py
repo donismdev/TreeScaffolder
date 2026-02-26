@@ -33,7 +33,14 @@ from Scripts.UI import action_handler
 # --- Constants ---
 APP_TITLE = "Tree Scaffolder v1.2"
 LOG_DIR = "Log"
-CONFIG_FILE = "Resources/config.json"
+# Configuration and Resource paths
+TEST_DIR = Path("Test")
+RESOURCE_DIR = Path("Resources")
+
+if (TEST_DIR / "config.json").exists():
+    CONFIG_FILE = str(TEST_DIR / "config.json")
+else:
+    CONFIG_FILE = str(RESOURCE_DIR / "config.json")
 DEFAULT_GEOMETRY = "1200x700"
 DEFAULT_TREE_TEMPLATE = """# =========================================================
 # - Use @ROOT to define the logical root marker.
@@ -599,12 +606,21 @@ class ScaffoldApp:
             self.log_text.delete('1.0', tk.END)
             self.log_text.config(state=tk.DISABLED)
 
-            for file, text_widget in [("Resources/sample_structure.txt", self.tree_text), ("Resources/sample_blueprint.txt", self.source_code_text)]:
-                if Path(file).exists():
+            # Determine sample files priority
+            structure_file = TEST_DIR / "sample_structure.txt"
+            if not structure_file.exists():
+                structure_file = RESOURCE_DIR / "sample_structure.txt"
+                
+            blueprint_file = TEST_DIR / "sample_blueprint.txt"
+            if not blueprint_file.exists():
+                blueprint_file = RESOURCE_DIR / "sample_blueprint.txt"
+
+            for file_path, text_widget in [(structure_file, self.tree_text), (blueprint_file, self.source_code_text)]:
+                if file_path.exists():
                     text_widget.delete("1.0", tk.END)
-                    text_widget.insert("1.0", Path(file).read_text(encoding="utf-8"))
+                    text_widget.insert("1.0", file_path.read_text(encoding="utf-8"))
                 else:
-                    messagebox.showwarning(t("message.error_title"), t("message.no_test_data", file=file))
+                    messagebox.showwarning(t("message.error_title"), t("message.no_test_data", file=str(file_path)))
             
             # --- Validation Logic (Immediately check if data is valid) ---
             root_path_str = self.target_root_path.get()
