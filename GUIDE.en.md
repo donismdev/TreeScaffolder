@@ -179,17 +179,37 @@ The list of currently defined shortcuts is as follows:
 
 | Key Sequence   | Action                          | Description                                                                 |
 | :------------- | :------------------------------ | :-------------------------------------------------------------------------- |
-| `Space`        | `Load Test Data`                | Loads test data (only when text/input widgets do not have focus).          |
-| `Escape`       | `Reset Focus`                   | Releases the current focus and moves to the root window.                    |
-| `` ` `` (Grave)| `Cycle Main Notebook Tabs`      | Cycles through the main notebook tabs (only when text/input widgets do not have focus). |
-| `1`            | `Cycle Before Notebook Tabs`    | Cycles through the notebook tabs in the 'Before' panel (only when text/input widgets do not have focus). |
-| `2`            | `Cycle After Notebook Tabs`     | Cycles through the notebook tabs in the 'After' panel (only when text/input widgets do not have focus). |
-| `3`            | `Cycle Editor Notebook Tabs`    | Cycles through the notebook tabs in the 'Editor' panel (only when text/input widgets do not have focus). |
-| `v`            | `Previous Folder`               | Returns to the previously selected root folder.                             |
-| `b`            | `Browse Folder`                 | Browses and selects a new root folder.                                      |
-| `c`            | `Clear Data`                    | Resets all editor content and planned data.                                 |
-| `d`            | `Compute Diff`                  | Calculates the scaffolding plan based on the currently entered tree and source code. |
-| `f`            | `Apply Scaffold`                | Applies the calculated scaffolding plan to the file system.                |
+| `t`            | `Load Test Data`                | Loads test data (only when no text/entry widget is focused). |
+| `Space`        | `Toggle Selection`              | (In After View) Toggles the checkbox for the selected item. |
+| `Escape`       | `Reset Focus`                   | Resets focus to the root window.                             |
+| `` ` `` (Grave)| `Cycle Main Notebook Tabs`      | Cycles through main notebook tabs (when not focused on text). |
+| `1`            | `Cycle Before Notebook Tabs`    | Cycles through 'Before' panel tabs.                          |
+| `2`            | `Cycle After Notebook Tabs`     | Cycles through 'After' panel tabs.                           |
+| `3`            | `Cycle Editor Notebook Tabs`    | Cycles through 'Editor' panel tabs.                          |
+| `v`            | `Previous Folder`               | Returns to the previously selected root folder.               |
+| `b`            | `Browse Folder`                 | Opens folder browser for a new root folder.                  |
+| `c`            | `Clear Data`                    | Clears all editor content and planned data.                  |
+| `d`            | `Compute Diff`                  | Calculates the scaffolding plan based on current inputs.      |
+| `f`            | `Apply Scaffold`                | Applies the scaffolding plan to the file system.             |
+
+---
+
+## 8. Interactive Features & Analysis Details
+
+### 8.1. Individual Item Selection in After View (Checkboxes)
+- **Purpose**: Allows users to selectively apply specific files or folders from the plan, enabling incremental scaffolding.
+- **Display**: Checkboxes (`☑`/`☐`) appear in front of items marked as New, Overwrite, or Conflict.
+- **Interaction**:
+    - **Re-click to Toggle**: Clicking an already selected item a second time toggles its checkbox. (The first click is for viewing content and syncing).
+    - **Spacebar**: Toggle the checkbox of the currently focused item in the After View using the Spacebar.
+- **Recursive Logic**:
+    - **Parent Selection**: Checking a child item automatically checks all its ancestors required to create the path.
+    - **Parent Deselection**: Unchecking a parent folder automatically skips all its descendants during the execution phase.
+- **Summary Updates**: Changing a checkbox state immediately updates the counts (folders/files) in the bottom `Summary` panel.
+
+### 8.2. Before/After View Synchronization
+- **Feature**: Clicking an item in the After View automatically finds, expands, and selects the same path in the Before View. This allows users to quickly see where the planned changes sit within the current project structure.
+- **Restriction**: Double-clicking to expand/collapse the tree is disabled to ensure stable single-click/re-click interactions. Use the arrow icons on the left to expand or collapse nodes.
 
 ### 7.1. Shortcut Binding Rules and Limitations
 
