@@ -1,0 +1,82 @@
+@@@FILE_BEGIN {{Root}}/Source/MyGame/MyGame.Build.cs
+using UnrealBuildTool;
+
+public class MyGame : ModuleRules
+{
+	public MyGame(ReadOnlyTargetRules Target) : base(Target)
+	{
+		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
+		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore" });
+	}
+}
+@@@FILE_END
+
+@@@FILE_BEGIN {{Root}}/Source/MyGame/Public/Core/MyGameGameModeBase.h
+#pragma once
+
+#include "CoreMinimal.h"
+#include "GameFramework/GameModeBase.h"
+#include "MyGameGameModeBase.generated.h"
+
+UCLASS()
+class MYGAME_API AMyGameGameModeBase : public AGameModeBase
+{
+	GENERATED_BODY()
+};
+@@@FILE_END
+
+@@@FILE_BEGIN {{Root}}/Source/MyGame/Public/Characters/BaseCharacter.h
+#pragma once
+
+#include "CoreMinimal.h"
+#include "GameFramework/Character.h"
+#include "BaseCharacter.generated.h"
+
+UCLASS()
+class MYGAME_API ABaseCharacter : public ACharacter
+{
+	GENERATED_BODY()
+
+public:
+	ABaseCharacter();
+};
+@@@FILE_END
+
+@@@FILE_BEGIN {{Root}}/Source/MyGame/Private/Characters/BaseCharacter.cpp
+#include "Characters/BaseCharacter.h"
+
+ABaseCharacter::ABaseCharacter()
+{
+	PrimaryActorTick.bCanEverTick = true;
+}
+@@@FILE_END
+
+@@@FILE_BEGIN {{Root}}/Source/MyGame/Public/Items/BaseItem.h
+#pragma once
+
+#include "CoreMinimal.h"
+#include "GameFramework/Actor.h"
+#include "BaseItem.generated.h"
+
+UCLASS()
+class MYGAME_API ABaseItem : public AActor
+{
+	GENERATED_BODY()
+};
+@@@FILE_END
+
+@@@FILE_BEGIN {{Root}}/Plugins/UtilityPlugin/UtilityPlugin.uplugin
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "1.0",
+	"FriendlyName": "UtilityPlugin",
+	"Modules": [
+		{
+			"Name": "UtilityPlugin",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		}
+	]
+}
+@@@FILE_END

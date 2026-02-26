@@ -599,7 +599,7 @@ class ScaffoldApp:
             self.log_text.delete('1.0', tk.END)
             self.log_text.config(state=tk.DISABLED)
 
-            for file, text_widget in [("Resources/test_tree.txt", self.tree_text), ("Resources/test_data.txt", self.source_code_text)]:
+            for file, text_widget in [("Resources/sample_structure.txt", self.tree_text), ("Resources/sample_blueprint.txt", self.source_code_text)]:
                 if Path(file).exists():
                     text_widget.delete("1.0", tk.END)
                     text_widget.insert("1.0", Path(file).read_text(encoding="utf-8"))
