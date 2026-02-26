@@ -30,10 +30,15 @@ def handle_data_cleared(app):
     update_summary(app, "data_cleared")
 
 def handle_diff_computed(app, plan):
-    """Called after a plan is successfully generated."""
-    new_files = sum(1 for p, s in plan.path_states.items() if s == 'new' and p in plan.planned_files)
-    new_dirs = sum(1 for p, s in plan.path_states.items() if s == 'new' and p in plan.planned_dirs)
-    overwrites = sum(1 for s in plan.path_states.values() if s == 'overwrite')
+    """Called after a plan is successfully generated or selection changed."""
+    # Only count items that are selected (default to True if not in selected_paths)
+    def is_selected(p):
+        return app.selected_paths.get(p, True)
+
+    new_files = sum(1 for p, s in plan.path_states.items() if s == 'new' and p in plan.planned_files and is_selected(p))
+    new_dirs = sum(1 for p, s in plan.path_states.items() if s == 'new' and p in plan.planned_dirs and is_selected(p))
+    overwrites = sum(1 for p, s in plan.path_states.items() if p in plan.planned_files and s == 'overwrite' and is_selected(p))
+    
     update_summary(app, "diff_computed", dirs=new_dirs, files=new_files, overwrites=overwrites)
 
 def handle_apply_success(app, is_dry_run=False):

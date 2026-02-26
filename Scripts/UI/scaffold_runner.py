@@ -12,6 +12,20 @@ from pathlib import Path
 from Scripts.UI import app_utils # Import app_utils for logging
 from Scripts.UI import action_handler
 
+def _is_excluded_by_parent(app, path):
+    """Checks if any parent directory of the path is unchecked in selected_paths."""
+    plan = app.current_plan
+    if not plan: return False
+    
+    parent = path.parent
+    root_path = plan.root_path
+    
+    while parent != root_path and parent.is_relative_to(root_path):
+        if parent in app.selected_paths and not app.selected_paths[parent]:
+            return True
+        parent = parent.parent
+    return False
+
 def execute_scaffold(app):
     """Performs the actual file and directory creation."""
     plan = app.current_plan
@@ -47,6 +61,13 @@ def execute_scaffold(app):
 
     for path in sorted(list(plan.planned_dirs), key=lambda p: len(p.parts)):
         state = plan.path_states.get(path)
+
+        # Check if user deselected this path OR if any parent is deselected
+        if (path in app.selected_paths and not app.selected_paths[path]) or _is_excluded_by_parent(app, path):
+            app._log(f"[USER SKIP] {path}", "skip")
+            stats["dirs_skipped"] += 1
+            continue
+
         if state == "new":
             ok, created, skipped = _ensure_dir(app, path, is_dry_run, successful_paths)
             if ok:
@@ -63,6 +84,12 @@ def execute_scaffold(app):
     for path in sorted(list(plan.planned_files), key=lambda p: len(p.parts)):
         state = plan.path_states.get(path)
         content = plan.file_contents.get(path.resolve())
+
+        # Check if user deselected this path OR if any parent is deselected
+        if (path in app.selected_paths and not app.selected_paths[path]) or _is_excluded_by_parent(app, path):
+            app._log(f"[USER SKIP] {path}", "skip")
+            stats["files_skipped"] += 1
+            continue
 
         if state == "new" or state == "overwrite":
             is_overwrite = state == "overwrite"

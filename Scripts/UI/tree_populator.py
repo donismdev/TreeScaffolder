@@ -157,10 +157,20 @@ def _populate_treeview_from_plan(app, tree_widget: ttk.Treeview, plan_obj, root_
             
             icon = app.classifier.classify_path(path, is_planned_dir=path.is_dir() or path in plan_obj.planned_dirs)
             
+            # --- Checkbox Logic ---
+            prefix = ""
+            if state in ('new', 'overwrite', 'conflict_file', 'conflict_dir'):
+                # Initialize selection state if not exists
+                if path not in app.selected_paths:
+                    app.selected_paths[path] = True
+                
+                check_char = "☑" if app.selected_paths[path] else "☐"
+                prefix = f"{check_char} "
+
             item_is_directory = path.is_dir() or path in plan_obj.planned_dirs
             should_open_this_item = auto_open_modified and item_is_directory
             
-            node_id = tree_widget.insert(parent_node_id, "end", text=f"{icon} {path.name}", tags=tags, values=[str(path)], open=should_open_this_item)
+            node_id = tree_widget.insert(parent_node_id, "end", text=f"{prefix}{icon} {path.name}", tags=tags, values=[str(path)], open=should_open_this_item)
             
             if item_is_directory:
                 dir_nodes[path] = node_id

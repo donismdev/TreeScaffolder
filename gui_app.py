@@ -113,6 +113,8 @@ class ScaffoldApp:
         self.after_notebook = None
         self.before_tree_map = {}
         self.before_list_map = {}
+        self.selected_paths = {} # Track checked state in After View: {Path: bool}
+        self.last_selected_after_item = None # For click-again-to-toggle logic
         
         self.widget_map = {} # Map action names to UI widgets for shortcut hints
         self.key_bindings_map = key_bindings._load_key_bindings_config() # Load keybindings for hint manager
@@ -426,6 +428,99 @@ class ScaffoldApp:
         
         print("DEBUG: on_apply completed") # Debug print
 
+    def _on_after_tree_click(self, event):
+        """Handles mouse clicks on After View trees to support toggle-on-reclick."""
+        tree = event.widget
+        item_id = tree.identify_row(event.y)
+        if not item_id:
+            return
+
+        # If the clicked item is already selected, toggle it
+        if item_id in tree.selection():
+            self._toggle_path_selection(tree, item_id)
+        
+        # We don't need to manually select here; the default Button-1 behavior 
+        # will trigger <<TreeviewSelect>> if the selection changes.
+
+    def _on_after_tree_space(self, event):
+        """Handles Spacebar press on After View trees to toggle checkbox."""
+        tree = event.widget
+        selection = tree.selection()
+        if not selection:
+            return
+        
+        # Toggle the first selected item
+        self._toggle_path_selection(tree, selection[0])
+        return "break" # Prevent default spacebar scrolling behavior
+
+    def _toggle_path_selection(self, tree, item_id):
+        """Toggles the selection of a path and its children."""
+        values = tree.item(item_id, "values")
+        if not values: return
+        path = Path(values[0])
+        
+        # If this path is not selectable (no checkbox), ignore
+        if path not in self.selected_paths:
+            return
+
+        new_state = not self.selected_paths[path]
+        self._set_path_selection_recursive(tree, item_id, new_state)
+        
+        # If we just enabled an item, we should also enable all its parents
+        # to ensure the path to this item is valid.
+        if new_state:
+            self._select_parents_recursive(tree, item_id)
+
+        # Refresh summary
+        if self.current_plan:
+             action_handler.handle_diff_computed(self, self.current_plan)
+
+    def _select_parents_recursive(self, tree, item_id):
+        """Recursively selects parent nodes if they are selectable."""
+        parent_id = tree.parent(item_id)
+        if not parent_id:
+            return
+            
+        values = tree.item(parent_id, "values")
+        if not values: return
+        path = Path(values[0])
+        
+        # If the parent is a selectable item (has a checkbox) and is currently unchecked
+        if path in self.selected_paths and not self.selected_paths[path]:
+            self.selected_paths[path] = True
+            
+            # Update Visual
+            current_text = tree.item(parent_id, "text")
+            if current_text.startswith("☐"):
+                new_text = "☑" + current_text[1:]
+                tree.item(parent_id, text=new_text)
+        
+        # Continue up the tree
+        self._select_parents_recursive(tree, parent_id)
+
+    def _set_path_selection_recursive(self, tree, item_id, state):
+        """Helper to recursively set selection state and update UI text."""
+        values = tree.item(item_id, "values")
+        if not values: return
+        path = Path(values[0])
+        
+        # Update state if this item is a selectable item
+        if path in self.selected_paths:
+            self.selected_paths[path] = state
+            
+            # Update Visual
+            current_text = tree.item(item_id, "text")
+            check_char = "☑" if state else "☐"
+            
+            # Replace old checkbox char with new one
+            if current_text.startswith("☑") or current_text.startswith("☐"):
+                new_text = check_char + current_text[1:]
+                tree.item(item_id, text=new_text)
+
+        # Recursively update children
+        for child_id in tree.get_children(item_id):
+            self._set_path_selection_recursive(tree, child_id, state)
+
     def on_tree_select(self, event: tk.Event):
         print("DEBUG: on_tree_select called") # Debug print
         widget = event.widget
@@ -433,6 +528,7 @@ class ScaffoldApp:
         selection = widget.selection()
         if not selection: return
         item_id = selection[0]
+
         values = widget.item(item_id, "values")
         if not values: return
         path = Path(values[0])
