@@ -115,6 +115,7 @@ At the top of the text editor in the "Define Scaffold Tree" panel, there is a to
 -   **Scaffold Tree / Content Tabs**: All toolbar buttons are disabled.
 -   **Source Code Tab**:
     -   `make tree` button is enabled.
+    -   **Implicit Merge**: During actual scaffolding execution (`generate_plan`), the text from the "Scaffold Tree" editor and the V2 block information from the "Source Code" editor are **logically merged**. Therefore, files defined only in "Source Code" will be created correctly even if you do not use the `make tree` feature.
     -   **`make tree` Feature**:
         1.  Parses all V2 blocks (`@@@FILE_BEGIN...END`, etc.) currently in the "Source Code" editor.
         2.  Based on all extracted `path` information, automatically generates a new tree structure text suitable for "Scaffold Tree".

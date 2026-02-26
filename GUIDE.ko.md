@@ -106,6 +106,7 @@ public class NewModule : ModuleRules
 -   **Scaffold Tree / Content 탭**: 모든 툴바 버튼이 비활성화됩니다.
 -   **Source Code 탭**:
     -   `make tree` 버튼이 활성화됩니다.
+    -   **자동 병합 (Implicit Merge)**: 실제 스캐폴딩 실행(`generate_plan`) 시, "Scaffold Tree" 에디터의 텍스트와 "Source Code" 에디터의 V2 블록 정보는 **논리적으로 병합**됩니다. 따라서 "Source Code"에만 정의된 파일이라도 `make tree`를 거치지 않고 바로 스캐폴딩을 수행하면 정상적으로 생성됩니다.
     -   **`make tree` 기능**:
         1.  현재 "Source Code" 에디터에 있는 모든 V2 블록 (`@@@FILE_BEGIN...END` 등)을 파싱합니다.
         2.  추출된 모든 `path` 정보를 기반으로, "Scaffold Tree"에 맞는 새로운 트리 구조 텍스트를 자동으로 생성합니다.

@@ -90,6 +90,12 @@ Follow these steps to get started:
 
 > 💡 **Important**: All content (including line breaks and spaces) between `@@@FILE_BEGIN` and `@@@FILE_END` is saved to the file exactly as written.
 
+> 💡 **Auto-Merge Logic**: 
+> The structure defined in the 'Scaffold Tree' tab and the `@@@FILE_BEGIN` blocks in the 'Source Code' tab are **automatically merged during execution.** 
+> - Files only in the Tree: Created as empty files (0-byte).
+> - Files only in Source Code: Created according to the path and content defined in the source code (necessary parent folders are also created).
+> - Files in both: Created with the content defined in the source code.
+
 > 💡 **Quick Tree Generation Tip: `make tree` button**
 > When you select the 'Source Code' tab, the `make tree` button above the editor becomes active. If the `@@@FILE_BEGIN...END` blocks are already written, you can click this button to automatically generate the structure of 'Scaffold Tree' based on those file paths. This is a convenient feature that shortens the process of manually writing the tree structure.
 
