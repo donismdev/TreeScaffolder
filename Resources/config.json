@@ -1,10 +1,4 @@
 {
     "enable_runtime_logging": true,
-    "language": "en",
-    "geometry": "1483x660+9+21",
-    "window_state": "normal",
-    "OPEN_FOLDER_AFTER_APPLY": false,
-    "main_sash_pos": 0,
-    "diff_sash_pos": 0,
-    "last_root_path": "C:\\Users\\azuli\\Documents\\Unreal Projects\\CDR\\Programming\\Source"
+    "language": "ko"
 }
