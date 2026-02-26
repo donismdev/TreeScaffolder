@@ -111,6 +111,8 @@ class ScaffoldApp:
         self.after_list = None
         self.before_notebook = None
         self.after_notebook = None
+        self.before_tree_map = {}
+        self.before_list_map = {}
         
         self.widget_map = {} # Map action names to UI widgets for shortcut hints
         self.key_bindings_map = key_bindings._load_key_bindings_config() # Load keybindings for hint manager
@@ -151,7 +153,7 @@ class ScaffoldApp:
         self.after_list.tag_configure('modified_parent', foreground='#DAA520', font=self.treeview_item_font)
         self.after_list.tag_configure('overwrite', foreground='#0078D7', font=self.treeview_item_font)
 
-        self.root.bind("<Destroy>", lambda event: self._save_window_geometry())
+        self.root.bind("<Destroy>", lambda event: self._save_window_geometry() if event.widget == self.root else None)
         self._load_window_geometry()  # Load geometry after all relevant widgets are created
         app_utils.load_last_root_path(self) # Keep this as it's for a different purpose
         key_bindings.setup_key_bindings(self)
@@ -445,6 +447,27 @@ class ScaffoldApp:
             
             # Check if we are in one of the 'After' views
             is_after_view = widget in (self.after_tree, self.after_list)
+
+            # --- Synchronize with Before View ---
+            if is_after_view:
+                path_str = str(path)
+                # Sync Before Tree
+                if path_str in self.before_tree_map:
+                    target_node = self.before_tree_map[path_str]
+                    # Expand all parents
+                    parent = self.before_tree.parent(target_node)
+                    while parent:
+                        self.before_tree.item(parent, open=True)
+                        parent = self.before_tree.parent(parent)
+                    # Select and see
+                    self.before_tree.selection_set(target_node)
+                    self.before_tree.see(target_node)
+                
+                # Sync Before List
+                if path_str in self.before_list_map:
+                    target_node = self.before_list_map[path_str]
+                    self.before_list.selection_set(target_node)
+                    self.before_list.see(target_node)
             
             if is_after_view and self.current_plan:
                 # Try to get planned content using various path representations for robustness
@@ -654,7 +677,6 @@ class ScaffoldApp:
     # --- Helper Method Stubs ---
     def _load_window_geometry(self): app_utils.load_window_geometry(self)
     def _save_window_geometry(self):
-        print("DEBUG: _save_window_geometry called.")
         app_utils.save_window_geometry(self)
     def _load_last_root_path(self): app_utils.load_last_root_path(self)
     def _save_last_root_path(self, path: str): app_utils.save_last_root_path(self, path)

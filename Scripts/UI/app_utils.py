@@ -149,28 +149,26 @@ def load_window_geometry(app):
     if hasattr(app, 'main_paned_window') and app.main_paned_window.winfo_exists():
         paned_width = app.main_paned_window.winfo_width()
         if isinstance(main_sash_pos_loaded, int) and 0 < main_sash_pos_loaded < paned_width:
-            app.main_paned_window.sashpos(0, main_sash_pos_loaded)
+            app.main_paned_window.sash_place(0, main_sash_pos_loaded, 0)
         else:
             default_pos = paned_width // 3 # Default to 1/3 of the width for main panel
             if default_pos > 0: # Ensure default position is valid
-                app.main_paned_window.sashpos(0, default_pos)
+                app.main_paned_window.sash_place(0, default_pos, 0)
                 config["main_sash_pos"] = default_pos
             else:
                 config["main_sash_pos"] = 0 # Fallback for very small initial widths
 
     # Load diff_sash_pos
     if hasattr(app, 'diff_paned_window') and app.diff_paned_window.winfo_exists():
-        diff_paned_container = app.diff_paned_window.winfo_parent()
         # The actual width for diff_paned_window is the width of its parent frame in diff_frame
-        # need to get the width of the frame it sits in, not the PanedWindow itself
         diff_frame_width = app.diff_paned_window.master.winfo_width()
         
         if isinstance(diff_sash_pos_loaded, int) and 0 < diff_sash_pos_loaded < diff_frame_width:
-            app.diff_paned_window.sashpos(0, diff_sash_pos_loaded)
+            app.diff_paned_window.sash_place(0, diff_sash_pos_loaded, 0)
         else:
             default_pos = diff_frame_width // 2 # Default to half for diff panel
             if default_pos > 0: # Ensure default position is valid
-                app.diff_paned_window.sashpos(0, default_pos)
+                app.diff_paned_window.sash_place(0, default_pos, 0)
                 config["diff_sash_pos"] = default_pos
             else:
                 config["diff_sash_pos"] = 0 # Fallback for very small initial widths
@@ -201,13 +199,11 @@ def save_window_geometry(app):
         config["window_state"] = app.root.state() # New: save window state
         config["OPEN_FOLDER_AFTER_APPLY"] = app.open_folder_after_apply.get()
 
-        print(f"DEBUG: Saving geometry: {app.root.geometry()}, state: {app.root.state()}")
-
         if hasattr(app, 'main_paned_window') and app.main_paned_window.winfo_exists():
-            config["main_sash_pos"] = app.main_paned_window.sashpos(0)
+            config["main_sash_pos"] = app.main_paned_window.sash_coord(0)[0]
         
         if hasattr(app, 'diff_paned_window') and app.diff_paned_window.winfo_exists():
-            config["diff_sash_pos"] = app.diff_paned_window.sashpos(0)
+            config["diff_sash_pos"] = app.diff_paned_window.sash_coord(0)[0]
         
         with open(config_path, "w", encoding="utf-8") as f:
             json.dump(config, f, indent=4)

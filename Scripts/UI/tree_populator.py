@@ -17,9 +17,13 @@ def populate_before_tree(app, root_path: Path):
     _clear_tree(app.before_tree)
     _clear_tree(app.before_list)
     
+    app.before_tree_map = {}
+    app.before_list_map = {}
+
     # Insert the root directory
     icon = app.classifier.classify_path(root_path)
     root_node = app.before_tree.insert("", "end", text=f"{icon} {root_path.name}", open=True, values=[str(root_path)])
+    app.before_tree_map[str(root_path)] = root_node
     
     # Dictionary to keep track of parent nodes in the treeview
     dir_nodes = {str(root_path): root_node}
@@ -48,11 +52,14 @@ def populate_before_tree(app, root_path: Path):
         if path.is_dir():
             node = app.before_tree.insert(parent_node_id, "end", text=f"{icon} {path.name}", open=False, values=[str(path)])
             dir_nodes[str(path)] = node
+            app.before_tree_map[str(path)] = node
         else:
-            app.before_tree.insert(parent_node_id, "end", text=f"{icon} {path.name}", values=[str(path)])
+            node = app.before_tree.insert(parent_node_id, "end", text=f"{icon} {path.name}", values=[str(path)])
+            app.before_tree_map[str(path)] = node
             # Populate List View (only files)
             relative_path = path.relative_to(root_path)
-            app.before_list.insert("", "end", text=f"{icon} {relative_path}", values=[str(path)])
+            list_node = app.before_list.insert("", "end", text=f"{icon} {relative_path}", values=[str(path)])
+            app.before_list_map[str(path)] = list_node
 
 def populate_after_tree(app, plan):
     """Renders the generated plan in the 'After' treeview and listview."""
