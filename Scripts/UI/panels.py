@@ -312,9 +312,10 @@ def create_right_panel(app):
     app.after_tree.bind("<<TreeviewSelect>>", app.on_after_select)
     app.after_list.bind("<<TreeviewSelect>>", app.on_after_select)
 
-    # Bind click for toggle logic
-    app.after_tree.bind("<Button-1>", lambda e: app._on_after_tree_click(e) if hasattr(app, "_on_after_tree_click") else None)
-    app.after_list.bind("<Button-1>", lambda e: app._on_after_tree_click(e) if hasattr(app, "_on_after_tree_click") else None)
+    # Bind click for toggle logic (Single and Double click)
+    for event_type in ["<Button-1>", "<Double-1>"]:
+        app.after_tree.bind(event_type, lambda e: app._on_after_tree_click(e) if hasattr(app, "_on_after_tree_click") else None, add="+")
+        app.after_list.bind(event_type, lambda e: app._on_after_tree_click(e) if hasattr(app, "_on_after_tree_click") else None, add="+")
 
     # Bind Space for toggle logic
     app.after_tree.bind("<space>", lambda e: app._on_after_tree_space(e) if hasattr(app, "_on_after_tree_space") else None)
@@ -323,8 +324,11 @@ def create_right_panel(app):
     # Reset toggle state when focus leaves
     app.after_tree.bind("<FocusOut>", lambda e: action_handler.on_after_tree_focus_out(app, e))
     app.after_list.bind("<FocusOut>", lambda e: action_handler.on_after_tree_focus_out(app, e))
-    app.after_list.bind("<space>", lambda e: app._on_after_tree_space(e) if hasattr(app, "_on_after_tree_space") else None)
 
-    # Disable double-click expand/collapse for all tree views
-    for tree in [app.before_tree, app.after_tree, app.before_list, app.after_list]:
+    # Disable default double-click expand/collapse for all tree views
+    for tree in [app.before_tree, app.before_list]:
         tree.bind("<Double-1>", lambda e: "break")
+    
+    for tree in [app.after_tree, app.after_list]:
+        # Bind Double-1 to break AFTER our custom handler runs to stop expansion
+        tree.bind("<Double-1>", lambda e: "break", add="+")
