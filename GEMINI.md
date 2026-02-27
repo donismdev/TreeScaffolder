@@ -16,6 +16,11 @@ The application must treat the current state of the filesystem (Before) and the 
 - **Mandate - No Fallback**: NEVER fall back to reading from the disk if a file is not found in the plan. If the plan doesn't define content for a file, the view must state "(No changes planned)" or similar. Falling back to disk content in the After View creates a "False Positive" where the user thinks a file is correctly planned when it is actually just an existing file.
 - **Purpose**: To show the world exactly as it *will* be after applying the scaffold.
 
+### 1.3 Cache Isolation
+- **Mandate**: The `Before View` and `After View` must use entirely separate caching mechanisms (`before_cache` and `after_cache`).
+- **Reasoning**: Sharing a cache between the two views leads to "truth contamination" where physical disk state could be misinterpreted as planned state. Independent caches are a critical defense against AI logic errors.
+- **Source Labeling**: Every content display MUST explicitly label its source (e.g., `PHYSICAL CONTENT (Before View)` or `EXISTING CONTENT (After View)`). Never use generic labels that obscure which view's data is being displayed.
+
 ## 2. Handler Isolation (No Callback Merging)
 
 - **Mandate**: The event handlers for the Before View (`on_before_select`) and the After View (`on_after_select`) must remain **physically separate functions**.
@@ -46,8 +51,14 @@ All source code definitions and recovery logs must strictly follow the **V2 Mult
 
 ## 5. Operational Directives (AI & Developers)
 
-To maintain project stability and integrity, all contributors must adhere to these rules:
+### 5.1. AI Refactoring & Optimization Prohibition (CRITICAL)
+- **Mandate**: NEVER attempt to "clean up," "refactor," or "optimize" existing logic based on AI-standard best practices.
+- **Reasoning**: This application performs high-risk file operations (deletion/overwriting). The existing code contains numerous **empirical and exceptional cases** handled through trial and error. AI-driven "simplification" has historically resulted in a **100% failure rate**, breaking critical edge cases (e.g., source-only plans, indentation logic).
+- **Aesthetics vs. Safety**: Functional correctness and data integrity are infinitely more important than "clean" or "idiomatic" code. Do not touch logic that is already working, even if it looks redundant or "ugly" by AI standards.
+- **Performance**: High performance is NOT a priority. The operation complexity is low enough that safety-first, "slow" logic is preferred over optimized but fragile alternatives.
+- **No Trust**: Do not trust your (AI) internal sense of "better" code. Adhere literally to existing patterns.
 
+### 5.2. Preservation of Functionality
 - **Preserve Existing Functionality**: DO NOT modify or refactor existing features unless it is strictly necessary to fulfill a specific requirement. Avoid "premature optimization" or stylistic "cleanup" of unrelated code blocks.
 - **Minimal Intervention**: Always prefer the smallest possible change. Surgical updates are required to minimize the risk of regression.
 - **Strict Scope**: Only implement what is explicitly requested. Do not add "just-in-case" features or expand the scope without instruction.

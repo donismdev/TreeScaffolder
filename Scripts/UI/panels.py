@@ -5,10 +5,41 @@ panels.py
 UI panel creation logic for the Tree Scaffolder GUI application.
 """
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, font
 from Scripts.UI import options_ui
 from Scripts.Utils.i18n import t
 from Scripts.UI import action_handler
+from Scripts.Utils import logger
+
+def init_fonts(app):
+    """Initializes basic fonts for the application."""
+    if not hasattr(app, 'editor_font'):
+        app.editor_font = font.Font(family="Consolas", size=10)
+    if not hasattr(app, 'treeview_item_font'):
+        app.treeview_item_font = font.Font(family="Segoe UI", size=9)
+    if not hasattr(app, 'treeview_bold_font'):
+        # Slightly larger (size 11) and bold for modified/new/conflict items
+        app.treeview_bold_font = font.Font(family="Segoe UI", size=11, weight="bold")
+
+def configure_tree_tags(app):
+    """Configures tags for all tree widgets. Call after widgets are created."""
+    # Ensure fonts are initialized
+    init_fonts(app)
+        
+    for tree in [app.before_tree, app.after_tree, app.before_list, app.after_list]:
+        if tree:
+            # Highlight colored items with the larger bold font
+            tree.tag_configure('new', foreground='green', font=app.treeview_bold_font)
+            tree.tag_configure('overwrite', foreground='#4682B4', font=app.treeview_bold_font) # Steel Blue
+            tree.tag_configure('conflict', foreground='red', font=app.treeview_bold_font)
+            tree.tag_configure('warning', foreground='#E59400', font=app.treeview_bold_font)
+            # Parent folders containing changes should also be yellowish-orange
+            tree.tag_configure('modified_parent', foreground='#E59400', font=app.treeview_bold_font)
+
+def setup_styles(app):
+    """Legacy helper that does both (if possible)."""
+    init_fonts(app)
+    configure_tree_tags(app)
 
 def create_left_panel(app):
     """Creates all widgets for the left control panel."""
@@ -113,6 +144,7 @@ def create_left_panel(app):
     content_frame.columnconfigure(0, weight=1)
 
     app.content_text = tk.Text(content_frame, wrap=tk.NONE, undo=True, font=app.editor_font, tabs=(app.editor_font.measure('    '),))
+    app.content_text.tag_configure("warning", foreground="red", font=("Segoe UI", 10, "bold"))
     
     content_yscroller = ttk.Scrollbar(content_frame, orient=tk.VERTICAL, command=app.content_text.yview)
     content_xscroller = ttk.Scrollbar(content_frame, orient=tk.HORIZONTAL, command=app.content_text.xview)
@@ -266,7 +298,7 @@ def create_right_panel(app):
     app.widget_map["on_options"] = app.option_button
 
     # Recovery button
-    app.recovery_button = ttk.Button(summary_btns_frame, text=t("ui.recovery") if "ui.recovery" in t("ui") else "Recovery", width=12, command=app.on_recovery)
+    app.recovery_button = ttk.Button(summary_btns_frame, text=t("ui.recovery_btn"), width=12, command=app.on_recovery)
     app.recovery_button.pack(side="left", padx=2)
     app.widget_map["on_recovery"] = app.recovery_button
     
@@ -286,6 +318,11 @@ def create_right_panel(app):
 
     # Bind Space for toggle logic
     app.after_tree.bind("<space>", lambda e: app._on_after_tree_space(e) if hasattr(app, "_on_after_tree_space") else None)
+    app.after_list.bind("<space>", lambda e: app._on_after_tree_space(e) if hasattr(app, "_on_after_tree_space") else None)
+
+    # Reset toggle state when focus leaves
+    app.after_tree.bind("<FocusOut>", lambda e: action_handler.on_after_tree_focus_out(app, e))
+    app.after_list.bind("<FocusOut>", lambda e: action_handler.on_after_tree_focus_out(app, e))
     app.after_list.bind("<space>", lambda e: app._on_after_tree_space(e) if hasattr(app, "_on_after_tree_space") else None)
 
     # Disable double-click expand/collapse for all tree views

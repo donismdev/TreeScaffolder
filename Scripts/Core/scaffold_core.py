@@ -66,28 +66,6 @@ class Plan:
 
 # ---------- Parsing Logic ----------
 
-def _count_raw_indent(line: str) -> int:
-    """Counts raw indentation level from a line, handling tabs and spaces more flexibly."""
-    leading_match = re.match(r"^[	 ]*", line)
-    prefix = leading_match.group(0) if leading_match else ""
-    
-    # Each TAB is one level. 
-    # For spaces, we look for the most common indentation (2, 4, or 8)
-    # but as a fallback, we use 4.
-    tab_count = prefix.count("	")
-    space_count = prefix.count(" ")
-    
-    # If there are only spaces and no tabs, we try to be smart, 
-    # but stick to 4 for consistency unless it's clearly 2.
-    if space_count > 0 and tab_count == 0:
-        if space_count % 4 == 0:
-            return space_count // 4
-        if space_count % 2 == 0:
-            return space_count // 2
-        return space_count // 4
-    
-    return tab_count + (space_count // 4)
-
 def parse_tree_text(text: str) -> tuple[List[NodeItem], Optional[str], Optional[str]]:
     """
     Parses the multiline tree text with strict Python-style indentation validation.
@@ -228,33 +206,71 @@ def generate_plan(root_path: Path, text_input: str, config: dict) -> Plan:
 	Generates a unified plan from a text input that may contain both a
 	scaffold tree and V2 patch blocks.
 	"""
-	# 1. Pre-process the input to remove any text between an END and a BEGIN marker for any keyword.
-	end_begin_junk_pattern = re.compile(r"(@@@[A-Z_]+_END)[\s\S]*?(@@@[A-Z_]+_BEGIN)")
-	text_input = end_begin_junk_pattern.sub(r"\1\n\2", text_input)
-
 	plan = Plan(root_path=root_path, tree_text=text_input, config=config)
 
-	# 2. High-Priority: Validate and parse V2 blocks from the pre-processed text.
-	# This ensures block integrity before we try to separate tree vs. V2 content.
-	try:
-		# Determine a best-guess root marker for substitution later.
-		root_match_in_full_text = re.search(r'@ROOT\s+([^{\s}]+|{{[\w-]+}})', text_input)
-		effective_root_marker = None
-		if root_match_in_full_text:
-			effective_root_marker = root_match_in_full_text.group(1)
-		elif "{{Root}}" in text_input:
-			effective_root_marker = "{{Root}}"
+	# 1. Surgical Split: Only pass text BEFORE the first V2 block to the tree parser.
+	# This ensures source code never interferes with tree parsing.
+	tree_part = text_input
+	v2_start_idx = text_input.find("@@@")
+	if v2_start_idx != -1:
+		tree_part = text_input[:v2_start_idx]
+
+	# 2. Parse the Scaffold Tree structure from the isolated tree part.
+	tree_nodes, root_marker, tree_err = parse_tree_text(tree_part)
+	if tree_err:
+		plan.errors.append(tree_err)
+		return plan
+	
+	plan.nodes = tree_nodes
+
+	# 2. Map Tree Nodes to Paths
+	node_paths: Dict[int, Path] = {} # line_number -> absolute path
+	if tree_nodes:
+		# stack stores (indent_level, path_object)
+		# We start with -1 level for the logical root so that level 0 items (under root) 
+		# correctly append to the root_path.
+		stack: List[tuple[int, Path]] = [(-1, root_path)] 
 		
-		# Pure parsing without string manipulation
+		for node in tree_nodes:
+			# If this is the very first node and it's the root marker, 
+			# just assign root_path and set its indent as the base.
+			if node.name == root_marker and node.indent == 0:
+				node_paths[node.line_number] = root_path
+				# Adjust stack base to this node
+				stack = [(0, root_path)]
+				continue
+
+			# Pop from stack until we find the parent (indent must be less than current)
+			while stack and stack[-1][0] >= node.indent:
+				stack.pop()
+			
+			if not stack:
+				# Should not happen with base -1, but for safety:
+				current_path = root_path / node.name
+			else:
+				current_path = stack[-1][1] / node.name
+			
+			node_paths[node.line_number] = current_path
+			
+			if node.is_dir:
+				plan.planned_dirs.add(current_path)
+				stack.append((node.indent, current_path))
+			else:
+				plan.planned_files.add(current_path)
+				# Default content for files in tree is empty string
+				plan.file_contents[current_path] = ""
+
+	# 3. Parse V2 blocks to identify file contents.
+	try:
 		patch_data = parse_v2_format(text_input)
 	except V2ParserError as e:
 		plan.errors.append(f"{e}") 
 		return plan
 
-	# ... (Step 3, 4, 5 skipped for brevity) ...
-
-	# 6. Process the already-parsed V2 patch data to populate file contents.
-	seen_paths_in_v2: Dict[Path, str] = {}
+	# 4. Process V2 patch data (Overrides/Updates tree definitions)
+	# Determine a best-guess root marker for substitution.
+	effective_root_marker = root_marker if root_marker else "{{Root}}"
+	
 	for item in patch_data:
 		raw_path_str = item['path'].strip()
 		content = item['content']
@@ -263,33 +279,21 @@ def generate_plan(root_path: Path, text_input: str, config: dict) -> Plan:
 			plan.errors.append(f"Invalid path in patch (security): '{raw_path_str}'.")
 			continue
 
-		# --- ROBUST EXPLICIT SUBSTITUTION LOGIC ---
-		# Standardize slashes and trim for consistent matching
 		norm_path = raw_path_str.replace('\\', '/').strip()
-		
-		# Define markers to check (Default {{Root}} and the effective marker)
 		markers = ["{{Root}}"]
 		if effective_root_marker and effective_root_marker.lower() != "{{root}}":
 			markers.insert(0, effective_root_marker)
 		
 		target_path = None
-		matched_marker = None
-		
-		# Check if the path starts with any recognized marker (ignoring leading slashes)
 		temp_path = norm_path.lstrip('/')
 		for m in markers:
 			if temp_path.lower().startswith(m.lower()):
-				matched_marker = m
-				# Strip marker and leading slash from the temporary path
 				rel_part = temp_path[len(m):].lstrip('/')
-				# SUBSTITUTE: Build the absolute path directly
 				target_path = (root_path / rel_part).resolve()
 				break
 		
 		if not target_path:
-			# Fallback logic if no marker is found
 			if Path(norm_path).is_absolute():
-				# Security check for absolute paths
 				try:
 					resolved_abs = Path(norm_path).resolve()
 					if resolved_abs.is_relative_to(root_path):
@@ -301,10 +305,8 @@ def generate_plan(root_path: Path, text_input: str, config: dict) -> Plan:
 					plan.errors.append(f"Invalid absolute path: '{raw_path_str}'")
 					continue
 			else:
-				# Assume relative to root
 				target_path = (root_path / norm_path.lstrip('/')).resolve()
 		
-		# Final Validation: Ensure target_path is actually under root_path
 		try:
 			if not target_path.is_relative_to(root_path):
 				plan.errors.append(f"Path resolves outside of target root: '{raw_path_str}'")
@@ -312,17 +314,11 @@ def generate_plan(root_path: Path, text_input: str, config: dict) -> Plan:
 		except Exception:
 			plan.errors.append(f"Invalid path resolution: '{raw_path_str}'")
 			continue
-		
-		if not target_path:
-			continue
 
-		# Check for duplicates within the source code itself
-		if target_path in seen_paths_in_v2:
-			plan.errors.append(t("message.err_duplicate_v2", path=raw_path_str))
-		
-		seen_paths_in_v2[target_path] = raw_path_str
+		# V2 block content takes precedence over the tree
 		plan.planned_files.add(target_path)
 		plan.file_contents[target_path] = content
+		# Ensure parents are planned as directories
 		for parent in target_path.parents:
 			if parent != root_path and parent.is_relative_to(root_path):
 				plan.planned_dirs.add(parent)
@@ -332,34 +328,58 @@ def generate_plan(root_path: Path, text_input: str, config: dict) -> Plan:
 			plan.errors.append("No valid scaffold tree or V2 patch blocks found in the input.")
 		return plan
 
-	# --- Final Analysis ---
+	# --- 0. Internal Plan Consistency Check ---
+	# Check if the same path is defined as both a file and a directory in the SAME plan.
+	internal_conflicts = plan.planned_dirs.intersection(plan.planned_files)
+	for conflict_path in internal_conflicts:
+		plan.errors.append(f"Internal Plan Error: '{conflict_path.name}' is defined as both a FILE and a DIRECTORY at the same location.")
+
+	# --- 1. Final Analysis and Filesystem Conflict Detection ---
+	# We process all planned paths to determine their state relative to the physical disk.
 	all_planned_paths = plan.planned_dirs.union(plan.planned_files)
-	for path in sorted(list(all_planned_paths), key=lambda p: len(p.parts)):
-		state = ""
+	
+	# Sort by depth so we process parents before children (though states are independent)
+	sorted_planned = sorted(list(all_planned_paths), key=lambda p: len(p.parts))
+	
+	for path in sorted_planned:
+		state = "new"
+		is_planned_dir = path in plan.planned_dirs
+		is_planned_file = path in plan.planned_files
+		
 		if path.exists():
-			is_planned_dir = path in plan.planned_dirs
-			is_planned_file = path in plan.planned_files
 			is_fs_dir = path.is_dir()
-			if is_planned_dir and not is_fs_dir: state = "conflict_file"
-			elif is_planned_file and is_fs_dir: state = "conflict_dir"
-			elif is_planned_file and path.resolve() in plan.file_contents:
-				# Compare content if it's a file and we have planned content
-				try:
-					existing_content = path.read_text(encoding='utf-8', errors='replace')
-					planned_content = plan.file_contents[path.resolve()]
-					if is_content_identical(existing_content, planned_content):
-						state = "identical"
-					else:
+			is_fs_file = path.is_file()
+			
+			if is_planned_dir:
+				if is_fs_dir:
+					state = "exists"
+				else:
+					# Planned as DIR, but a FILE exists on disk
+					state = "conflict_file"
+					plan.errors.append(t("message.conflicts_msg_detail", path=path.name, type="directory", existing="file"))
+			
+			elif is_planned_file:
+				if is_fs_file:
+					# Check content if we have planned content
+					try:
+						planned_content = plan.file_contents.get(path.resolve())
+						if planned_content is not None:
+							existing_content = path.read_text(encoding='utf-8', errors='replace')
+							if is_content_identical(existing_content, planned_content):
+								state = "identical"
+							else:
+								state = "overwrite"
+						else:
+							# File in tree but no source code provided
+							state = "exists"
+					except Exception:
 						state = "overwrite"
-				except Exception:
-					state = "overwrite" # Fallback to overwrite if we can't read it
-			else:
-				state = "exists"
-		else:
-			state = "new"
-		if state: plan.path_states[path] = state
-		if state.startswith("conflict"):
-			plan.errors.append(f"Conflict at '{path}': trying to create { 'dir' if is_planned_dir else 'file' } but a { 'file' if not is_fs_dir else 'dir' } exists.")
+				else:
+					# Planned as FILE, but a DIR exists on disk
+					state = "conflict_dir"
+					plan.errors.append(t("message.conflicts_msg_detail", path=path.name, type="file", existing="directory"))
+		
+		plan.path_states[path] = state
 
 	plan.existing_files = scan_existing_files(root_path, config)
 

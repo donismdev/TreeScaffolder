@@ -6,42 +6,32 @@ A Windows GUI application for scaffolding projects from a tree text description.
 Provides a tree editor, safe folder selection, a before/after diff view,
 and logging. Built with tkinter and ttk.
 """
-import datetime
-import json
-import logging
-import subprocess
-import sys
-import re
 from pathlib import Path
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox, font
+from tkinter import ttk
 
 from Scripts.Core import scaffold_core
 from Scripts.Utils import file_classifier
-from Scripts.Core.v2_parser import V2ParserError
-from Scripts.UI.panels import create_left_panel, create_right_panel
-from Scripts.UI.tree_populator import populate_before_tree, populate_after_tree
+from Scripts.UI.panels import create_left_panel, create_right_panel, setup_styles, init_fonts, configure_tree_tags
+from Scripts.UI.tree_populator import populate_before_tree, populate_after_tree, _clear_tree as clear_tree_function
 from Scripts.UI import app_utils
-from Scripts.UI import scaffold_runner
 from Scripts.UI import key_bindings
-from Scripts.UI import shortcut_hints # Added import
-from Scripts.Utils import tree_generator # Import the new utility
-from Scripts.UI.tree_populator import _clear_tree as clear_tree_function # Import as different name
+from Scripts.UI import shortcut_hints
 from Scripts.Utils.i18n import t
 from Scripts.UI import action_handler
 from Scripts.Utils import logger
 
+from Scripts.UI.action_handler import TEST_DIR, RESOURCE_DIR
+
 # --- Constants ---
 APP_TITLE = "Tree Scaffolder v1.2"
 LOG_DIR = "Log"
-# Configuration and Resource paths
-TEST_DIR = Path("Test")
-RESOURCE_DIR = Path("Resources")
 
 if (TEST_DIR / "config.json").exists():
     CONFIG_FILE = str(TEST_DIR / "config.json")
 else:
     CONFIG_FILE = str(RESOURCE_DIR / "config.json")
+
 DEFAULT_GEOMETRY = "1200x700"
 DEFAULT_TREE_TEMPLATE = """# =========================================================
 # - Use @ROOT to define the logical root marker.
@@ -53,33 +43,6 @@ DEFAULT_TREE_TEMPLATE = """# ===================================================
 
 {{Root}}/
 """
-
-# ... (after imports) ...
-
-# Global variable to hold loggers
-console_logger_instance = None
-editor_logger_instance = None
-
-
-class StreamToLogger(object):
-    """
-    Fake file-like stream object that redirects writes to a logger instance.
-    """
-    def __init__(self, logger, log_level=logging.INFO):
-        self.logger = logger
-        self.log_level = log_level
-        self.linebuf = ''
-
-    def write(self, buf):
-        # Filter out Tkinter messages or empty lines from print()
-        if buf.strip() and "Tkinter is no longer supported" not in buf:
-            for line in buf.rstrip().splitlines():
-                if line:
-                    self.logger.log(self.log_level, line)
-
-    def flush(self):
-        pass
-
 
 class ScaffoldApp:
     """The main application class for the Tree Scaffolder GUI."""
@@ -100,7 +63,6 @@ class ScaffoldApp:
         # --- Style Configuration ---
         self.style = ttk.Style()
         self.style.theme_use('vista')
-        self.setup_styles()
 
         # --- Member Variables ---
         self.target_root_path = tk.StringVar(value=t("ui.no_folder_selected"))
@@ -115,25 +77,28 @@ class ScaffoldApp:
         self.tree_text = None
         self.source_code_text = None
         self.content_text = None
+        self.before_tree = None
+        self.after_tree = None
         self.before_list = None
         self.after_list = None
         self.before_notebook = None
         self.after_notebook = None
+        self.editor_notebook = None
+        self.analysis_notebook = None
         self.before_tree_map = {}
         self.before_list_map = {}
         self.after_tree_map = {}
         self.after_list_map = {}
         self.selected_paths = {} # Track checked state in After View: {Path: bool}
-        self.last_selected_after_item = None # For click-again-to-toggle logic
-        self._in_selection_sync = False # Guard (kept for internal safety, though sync is being removed)
-        self.before_cache = {} # Cache for physical file contents
+        self.last_selected_after_item = None 
+        self._in_selection_sync = False 
+        self.before_cache = {} 
         
         self.widget_map = {} # Map action names to UI widgets for shortcut hints
-        self.key_bindings_map = key_bindings._load_key_bindings_config() # Load keybindings for hint manager
-        self.editor_buttons = [] # Holds the buttons above the editor
+        self.key_bindings_map = key_bindings._load_key_bindings_config()
+        self.editor_buttons = []
 
         # --- Main Layout ---
-        # ttk.PanedWindow 대신 minsize를 지원하는 tk.PanedWindow 사용
         self.main_paned_window = tk.PanedWindow(self.root, orient=tk.HORIZONTAL, sashrelief=tk.RAISED, sashwidth=4)
         self.main_paned_window.pack(fill=tk.BOTH, expand=True)
 
@@ -143,33 +108,19 @@ class ScaffoldApp:
         self.right_frame = ttk.Frame(self.main_paned_window)
         self.main_paned_window.add(self.right_frame, stretch="always", minsize=400)
 
-        self.setup_left_panel()
-        self.setup_right_panel()
+        init_fonts(self)
+        create_left_panel(self)
+        create_right_panel(self)
+
+        configure_tree_tags(self)
 
         # --- Event-based setup ---
-        # This must be done AFTER the UI is created in setup_left_panel
-        self.editor_notebook.bind("<<NotebookTabChanged>>", self._on_editor_tab_changed)
-        self._on_editor_tab_changed(None) # Set initial state
+        self.editor_notebook.bind("<<NotebookTabChanged>>", lambda e: action_handler.on_editor_tab_changed(self, e))
+        action_handler.on_editor_tab_changed(self, None) 
 
-        # Configure Treeview tags AFTER widgets are created
-        self.style.configure('new.Treeview', foreground='green', font=self.treeview_item_font)
-        self.style.configure('conflict.Treeview', foreground='red', font=self.treeview_item_font)
-        self.style.configure('warning.Treeview', foreground='#E59400', font=self.treeview_item_font)
-        self.before_tree.tag_configure('new', foreground='green', font=self.treeview_item_font)
-        self.after_tree.tag_configure('new', foreground='green', font=self.treeview_item_font)
-        self.after_tree.tag_configure('conflict', foreground='red', font=self.treeview_item_font)
-        self.after_tree.tag_configure('warning', foreground='#E59400', font=self.treeview_item_font)
-        self.after_tree.tag_configure('modified_parent', foreground='#DAA520', font=self.treeview_item_font)
-        self.after_tree.tag_configure('overwrite', foreground='#0078D7', font=self.treeview_item_font)
-        self.after_list.tag_configure('new', foreground='green', font=self.treeview_item_font)
-        self.after_list.tag_configure('conflict', foreground='red', font=self.treeview_item_font)
-        self.after_list.tag_configure('warning', foreground='#E59400', font=self.treeview_item_font)
-        self.after_list.tag_configure('modified_parent', foreground='#DAA520', font=self.treeview_item_font)
-        self.after_list.tag_configure('overwrite', foreground='#0078D7', font=self.treeview_item_font)
-
-        self.root.bind("<Destroy>", lambda event: self._save_window_geometry() if event.widget == self.root else None)
-        self._load_window_geometry()  # Load geometry after all relevant widgets are created
-        app_utils.load_last_root_path(self) # Keep this as it's for a different purpose
+        self.root.bind("<Destroy>", lambda event: app_utils.save_window_geometry(self) if event.widget == self.root else None)
+        app_utils.load_window_geometry(self) 
+        app_utils.load_last_root_path(self)
         key_bindings.setup_key_bindings(self)
         
         # --- Shortcut Hint Setup ---
@@ -178,829 +129,77 @@ class ScaffoldApp:
         self.root.bind("<KeyPress-Alt_R>", self.hint_manager.show_hints)
         self.root.bind("<KeyRelease-Alt_L>", self.hint_manager.hide_hints)
         self.root.bind("<KeyRelease-Alt_R>", self.hint_manager.hide_hints)
-        self.root.bind("<FocusOut>", self.hint_manager.hide_hints) # Hide hints when window loses focus
+        self.root.bind("<FocusOut>", self.hint_manager.hide_hints)
+
+        self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
 
         logger.debug("ScaffoldApp.__init__ completed")
 
+    def on_closing(self):
+        """Finalizes the session log and closes the application."""
+        logger.finalize_session_log()
+        self.root.destroy()
+
+    # --- Wrapped Event Handlers (Delegate to action_handler) ---
+    def on_browse_folder(self): action_handler.on_browse_folder(self)
+    def on_previous_folder(self): action_handler.on_previous_folder(self)
+    def on_recompute(self, silent=False): return action_handler.on_recompute(self, silent)
+    def on_apply(self): action_handler.on_apply(self)
+    def on_clear_data(self): action_handler.on_clear_data(self)
+    def on_load_test_data(self): action_handler.on_load_test_data(self)
+    def on_options(self): action_handler.on_options(self)
+    def on_recovery(self): action_handler.on_recovery(self)
+    def on_escape_pressed(self, event=None): action_handler.on_escape_pressed(self, event)
+    def on_before_select(self, event): action_handler.on_before_select(self, event)
+    def on_after_select(self, event): action_handler.on_after_select(self, event)
+    def _on_after_tree_click(self, event): action_handler.on_after_tree_click(self, event)
+    def _on_after_tree_space(self, event): return action_handler.on_after_tree_space(self, event)
+
     def refresh_ui(self):
         """Re-initializes the UI components to apply language changes."""
-        # Store current text/state
         current_tree = self.tree_text.get("1.0", tk.END)
         current_source = self.source_code_text.get("1.0", tk.END)
         current_root = self.target_root_path.get()
         
-        # Destroy main layout
         for child in self.root.winfo_children():
-            # Don't destroy the Options window itself if it's open
             if isinstance(child, tk.Toplevel): continue
             child.destroy()
 
-        # Re-initialize UI
         self.root.title(t("ui.title"))
-        
-        # Reset member variables that are bound to widgets
         self.widget_map = {} 
         self.editor_buttons = []
 
-        self.main_paned_window = ttk.PanedWindow(self.root, orient=tk.HORIZONTAL)
+        self.main_paned_window = tk.PanedWindow(self.root, orient=tk.HORIZONTAL, sashrelief=tk.RAISED, sashwidth=4)
         self.main_paned_window.pack(fill=tk.BOTH, expand=True)
 
         self.left_frame = ttk.Frame(self.main_paned_window, padding=5)
-        self.main_paned_window.add(self.left_frame, weight=1)
+        self.main_paned_window.add(self.left_frame, stretch="always", minsize=400)
 
         self.right_frame = ttk.Frame(self.main_paned_window)
-        self.main_paned_window.add(self.right_frame, weight=2)
+        self.main_paned_window.add(self.right_frame, stretch="always", minsize=400)
 
-        self.setup_left_panel()
-        self.setup_right_panel()
+        init_fonts(self)
+        create_left_panel(self)
+        create_right_panel(self)
 
-        # Restore Prev button state if a last path exists
         if self.last_root_path:
             self.prev_dir_button.config(state=tk.NORMAL)
 
-        # Restore state
         self.tree_text.delete("1.0", tk.END)
         self.tree_text.insert("1.0", current_tree)
         self.source_code_text.delete("1.0", tk.END)
         self.source_code_text.insert("1.0", current_source)
         self.target_root_path.set(current_root)
 
-        # Re-bind events
-        self.editor_notebook.bind("<<NotebookTabChanged>>", self._on_editor_tab_changed)
-        self._on_editor_tab_changed(None)
-
-        # Re-configure tags
-        self.style.configure('new.Treeview', foreground='green', font=self.treeview_item_font)
-        self.style.configure('conflict.Treeview', foreground='red', font=self.treeview_item_font)
-        self.style.configure('warning.Treeview', foreground='#E59400', font=self.treeview_item_font)
-        self.before_tree.tag_configure('new', foreground='green', font=self.treeview_item_font)
-        self.after_tree.tag_configure('new', foreground='green', font=self.treeview_item_font)
-        self.after_tree.tag_configure('conflict', foreground='red', font=self.treeview_item_font)
-        self.after_tree.tag_configure('warning', foreground='#E59400', font=self.treeview_item_font)
-        self.after_tree.tag_configure('modified_parent', foreground='#DAA520', font=self.treeview_item_font)
-        self.after_tree.tag_configure('overwrite', foreground='#0078D7', font=self.treeview_item_font)
-        self.after_list.tag_configure('new', foreground='green', font=self.treeview_item_font)
-        self.after_list.tag_configure('conflict', foreground='red', font=self.treeview_item_font)
-        self.after_list.tag_configure('warning', foreground='#E59400', font=self.treeview_item_font)
-        self.after_list.tag_configure('modified_parent', foreground='#DAA520', font=self.treeview_item_font)
-        self.after_list.tag_configure('overwrite', foreground='#0078D7', font=self.treeview_item_font)
+        self.editor_notebook.bind("<<NotebookTabChanged>>", lambda e: action_handler.on_editor_tab_changed(self, e))
+        action_handler.on_editor_tab_changed(self, None)
 
         key_bindings.setup_key_bindings(self)
         self.hint_manager = shortcut_hints.ShortcutHintManager(self)
-        
-        # --- Restore Tree Views ---
-        # 1. Populate Before Tree based on current target folder
-        current_root_str = self.target_root_path.get()
-        if current_root_str and current_root_str != t("ui.no_folder_selected"):
-            current_root_path = Path(current_root_str)
-            if current_root_path.is_dir():
-                self._populate_before_tree(current_root_path)
-
-        # 2. Populate After Tree if a plan exists
-        if self.current_plan:
-             self._populate_after_tree(self.current_plan)
-             # Update summary via handler to ensure pretty formatting
-             action_handler.handle_diff_computed(self, self.current_plan)
-
-    def setup_styles(self):
-        # Custom Fonts
-        self.editor_font = font.Font(family="Consolas", size=10)
-        self.app_button_font = font.Font(family="Segoe UI", size=9)
-        self.treeview_item_font = font.Font(family="Segoe UI", size=11)
-
-        # Style Configuration
-        # Distinguish between focused and unfocused selection
-        self.style.map("Treeview", 
-            background=[
-                ('selected', 'focus', '#0078D7'),   # Active (Dark Blue)
-                ('selected', '!focus', '#A0A0A0')   # Inactive/Other Pane (Medium Gray)
-            ],
-            foreground=[
-                ('selected', 'focus', 'white'),
-                ('selected', '!focus', 'black')
-            ]
-        )
-        self.style.configure('TButton', font=self.app_button_font)
-
-    def setup_left_panel(self):
-        logger.debug("Calling setup_left_panel")
-        create_left_panel(self)
-        logger.debug("setup_left_panel completed")
-
-    def setup_right_panel(self):
-        logger.debug("Calling setup_right_panel")
-        create_right_panel(self)
-        logger.debug("setup_right_panel completed")
-
-    # --- Event Handlers ---
-    def on_browse_folder(self):
-        logger.debug("on_browse_folder called")
-        path = filedialog.askdirectory(mustexist=True, title="Select a Target Root Folder")
-        if not path:
-            return
-        is_valid, message = self._validate_path(path)
-        if not is_valid:
-            messagebox.showerror(t("message.invalid_folder_title"), message)
-            self.target_root_path.set(t("ui.no_folder_selected"))
-            self.recompute_button.config(state=tk.DISABLED)
-            self._clear_tree(self.before_tree)
-            self._clear_tree(self.after_tree)
-            self._clear_tree(self.before_list)
-            self._clear_tree(self.after_list)
-        else:
-            self.target_root_path.set(message)
-            self._save_last_root_path(message)
-            self.recompute_button.config(state=tk.NORMAL)
-            
-            # THOROUGH CLEANUP on path change
-            self.before_cache = {}
-            self.after_cache = {}
-            self.current_plan = None
-            
-            self._populate_before_tree(Path(message))
-            self._clear_tree(self.after_tree)
-            self._clear_tree(self.after_list)
-            self._clear_tree(self.before_list)
-            
-            self.apply_button.config(state=tk.DISABLED)
-            action_handler.handle_folder_selected(self, message, method="browse")
-        logger.debug("on_browse_folder completed")
-
-    def on_recompute(self, silent=False):
-        logger.debug(f"on_recompute called (silent={silent})")
-        root_path_str = self.target_root_path.get()
-        if not root_path_str or root_path_str == t("ui.no_folder_selected") or not Path(root_path_str).is_dir():
-            messagebox.showerror(t("message.error_title"), t("message.select_root_first"))
-            return False
-        root_path = Path(root_path_str)
-        text_input = self.tree_text.get("1.0", "end-1c") + "\n" + self.source_code_text.get("1.0", "end-1c")
-        if not text_input.strip():
-            messagebox.showinfo("Info", t("message.empty_editors"))
-            return False
-        config = {
-            "DRY_RUN": self.dry_run.get(),
-            "ENABLE_SIMILARITY_SCAN": self.enable_similarity_scan.get(),
-            "SIMILARITY_RATIO_THRESHOLD": self.similarity_threshold.get(),
-        }
-
-        # Clear caches before recomputing to ensure fresh data
-        self.before_cache = {}
-        self.after_cache = {}
-
-        self.current_plan = scaffold_core.generate_plan(root_path, text_input, config)
-        
-        # --- 0. Filter selected_paths to remove stale entries ---
-        # Keep only paths that are present in the new plan's involved paths.
-        if self.current_plan:
-            all_involved = self.current_plan.planned_dirs.union(self.current_plan.planned_files)
-            # Retain existing checkbox states for paths that are still in the plan,
-            # but discard any that were removed (preventing memory leaks/stale data).
-            self.selected_paths = {p: s for p, s in self.selected_paths.items() if p in all_involved}
-        
-        # --- 1. Log 초기화 및 준비 (Silent가 아닐 때만) ---
-        if not silent:
-            self.log_text.config(state=tk.NORMAL)
-            self.log_text.delete('1.0', tk.END)
-            self.log_text.config(state=tk.DISABLED)
-        
-        # --- 2. 일반 오류 확인 (에러는 항상 로그에 남김) ---
-        if self.current_plan.errors:
-            if silent: # Silent 모드였더라도 에러가 나면 로그를 비우고 에러만 보여줌
-                self.log_text.config(state=tk.NORMAL)
-                self.log_text.delete('1.0', tk.END)
-                self.log_text.config(state=tk.DISABLED)
-
-            action_source = "Test Data" if silent else "Editor"
-            self._log(f"\n[ERROR] Plan generation failed during {action_source} processing:", "error")
-            for err in self.current_plan.errors:
-                self._log(f"- {err}", "error")
-            
-            # After View 비우기
-            self._clear_tree(self.after_tree)
-            self._clear_tree(self.after_list)
-            self.apply_button.config(state=tk.DISABLED)
-            
-            error_msg = f"Plan generation failed ({action_source}). Please check the Log tab for details."
-            messagebox.showerror("Scaffold Plan Error", error_msg)
-            self.analysis_notebook.select(1)
-            
-            # 에러 발생 알림 (silent 여부에 따라 다른 키 전달)
-            if silent:
-                action_handler.handle_test_data_loaded(self, success=False)
-            else:
-                action_handler.handle_error(self, "diff")
-            return False
-        else:
-            if not silent:
-                self._log(t("log.recompute_success"), "success")
-
-        # --- 3. 유사성 경고 확인 (Similarity Warnings) ---
-        if self.current_plan.similarity_warnings:
-            self._log(f"\n{t('log.similar_warning')}", "warn")
-            self._log(t("log.similar_desc"), "warn")
-            for planned_path, candidates in self.current_plan.similarity_warnings.items():
-                rel_planned = planned_path.relative_to(root_path)
-                self._log(f"- Target: {rel_planned}", "warn")
-                for exist_name, ratio, exist_paths in candidates:
-                    self._log(f"  ? Similar to: '{exist_name}' (Match: {ratio:.1%})", "warn")
-
-        # --- 4. 동일 내용 및 안내 사항 확인 (Silent가 아닐 때만) ---
-        if not silent:
-            identical_files = [p for p, s in self.current_plan.path_states.items() if s == 'identical']
-            if identical_files:
-                self._log(f"\n{t('log.identical_info')}", "warn")
-                self._log(t("log.identical_desc"), "warn")
-                for p in identical_files:
-                    self._log(f"- {p.relative_to(root_path)}", "warn")
-
-        # --- 4. 정상 진행 시 UI 업데이트 ---
-        self._populate_before_tree(root_path)
-        self._populate_after_tree(self.current_plan)
-        
-        if self.current_plan.has_conflicts:
-            messagebox.showwarning(t("message.conflicts_found_title"), t("message.conflicts_msg"))
-            self.apply_button.config(state=tk.DISABLED)
-            return False
-        else:
-            self.apply_button.config(state=tk.NORMAL)
-            
-            # --- 5. Summary Label 업데이트 ---
-            action_handler.handle_diff_computed(self, self.current_plan)
-
-            self.analysis_notebook.select(0) # 정상일 때만 After View 보여줌
-            return True
-
-    def on_apply(self):
-        logger.debug("on_apply called")
-        if not self.current_plan or self.current_plan.has_conflicts:
-            messagebox.showerror("Cannot Apply", "No valid plan or plan has conflicts.")
-            return
-
-        is_dry_run = self.dry_run.get()
-        
-        # --- Helper for counting effectively selected items ---
-        def is_effectively_selected(path):
-            if not self.selected_paths.get(path, True):
-                return False
-            root_path = self.current_plan.root_path
-            parent = path.parent
-            while parent != root_path and parent.is_relative_to(root_path):
-                if parent in self.selected_paths and not self.selected_paths[parent]:
-                    return False
-                parent = parent.parent
-            return True
-
-        # 변경 사항 카운트 (체크박스 선택 상태 반영)
-        new_files = sum(1 for p, s in self.current_plan.path_states.items() 
-                        if s == 'new' and p in self.current_plan.planned_files and is_effectively_selected(p))
-        new_dirs = sum(1 for p, s in self.current_plan.path_states.items() 
-                       if s == 'new' and p in self.current_plan.planned_dirs and is_effectively_selected(p))
-        overwrites = sum(1 for p, s in self.current_plan.path_states.items() 
-                         if s == 'overwrite' and is_effectively_selected(p))
-
-        if is_dry_run:
-            title = t("message.confirm_dry_run_title")
-            msg = t("message.confirm_dry_run_msg", dirs=new_dirs, files=new_files, overwrites=overwrites)
-            confirmed = messagebox.askyesno(title, msg)
-        else:
-            title = t("message.confirm_apply_title")
-            msg = t("message.confirm_apply_msg", dirs=new_dirs, files=new_files, overwrites=overwrites)
-            # 실제 적용 시에는 좀 더 주의를 끌기 위해 askyesno 대신 경고 아이콘이 있는 창 사용 고려
-            confirmed = messagebox.askyesno(title, msg, icon='warning')
-
-        if confirmed:
-            self.analysis_notebook.select(1)
-            self.recompute_button.config(state=tk.DISABLED)
-            self.apply_button.config(state=tk.DISABLED)
-            self.root.after(100, self._execute_scaffold)
-        
-        logger.debug("on_apply completed")
-
-    def _on_after_tree_click(self, event):
-        """Handles mouse clicks on After View trees to support toggle-on-reclick."""
-        tree = event.widget
-        item_id = tree.identify_row(event.y)
-        if not item_id:
-            return
-
-        # If the clicked item is already selected, toggle it
-        if item_id in tree.selection():
-            self._toggle_path_selection(tree, item_id)
-        
-        # We don't need to manually select here; the default Button-1 behavior 
-        # will trigger <<TreeviewSelect>> if the selection changes.
-
-    def _on_after_tree_space(self, event):
-        """Handles Spacebar press on After View trees to toggle checkbox."""
-        tree = event.widget
-        selection = tree.selection()
-        if not selection:
-            return
-        
-        # Toggle the first selected item
-        self._toggle_path_selection(tree, selection[0])
-        return "break" # Prevent default spacebar scrolling behavior
-
-    def _toggle_path_selection(self, tree, item_id):
-        """Toggles the selection of a path and its children across both After views."""
-        values = tree.item(item_id, "values")
-        if not values: return
-        path = Path(values[0])
-        
-        if path not in self.selected_paths:
-            return
-
-        new_state = not self.selected_paths[path]
-        
-        # 1. Update internal state and both views recursively
-        self._set_path_selection_sync(path, new_state)
-        
-        # 2. If enabled, ensure all parents are also enabled (Sync across both)
-        if new_state:
-            self._select_parents_sync(path)
-
-        # Refresh summary
-        if self.current_plan:
-             action_handler.handle_diff_computed(self, self.current_plan)
-
-    def _select_parents_sync(self, path: Path):
-        """Recursively selects and updates parents in both views."""
-        current = path.parent
-        # Root path is the boundary
-        if not self.current_plan or current == self.current_plan.root_path:
-            return
-            
-        if current in self.selected_paths and not self.selected_paths[current]:
-            self.selected_paths[current] = True
-            self._update_node_visual_sync(current, True)
-        
-        self._select_parents_sync(current)
-
-    def _set_path_selection_sync(self, path: Path, state: bool):
-        """Sets state and updates visuals for a path and all its children in both views."""
-        if path in self.selected_paths:
-            self.selected_paths[path] = state
-            self._update_node_visual_sync(path, state)
-
-        # Find children in the plan to ensure we cover everything, even if not in one of the trees
-        if self.current_plan:
-            for p in self.current_plan.planned_dirs.union(self.current_plan.planned_files):
-                if p.parent == path:
-                    self._set_path_selection_sync(p, state)
-
-    def _update_node_visual_sync(self, path: Path, state: bool):
-        """Updates the checkbox character for a path in both after_tree and after_list."""
-        path_str = str(path)
-        check_char = "☑" if state else "☐"
-        
-        # Update After Tree
-        if hasattr(self, 'after_tree_map') and path_str in self.after_tree_map:
-            node_id = self.after_tree_map[path_str]
-            current_text = self.after_tree.item(node_id, "text")
-            if current_text.startswith("☑") or current_text.startswith("☐"):
-                self.after_tree.item(node_id, text=check_char + current_text[1:])
-        
-        # Update After List (Apply Tree)
-        if hasattr(self, 'after_list_map') and path_str in self.after_list_map:
-            node_id = self.after_list_map[path_str]
-            current_text = self.after_list.item(node_id, "text")
-            if current_text.startswith("☑") or current_text.startswith("☐"):
-                self.after_list.item(node_id, text=check_char + current_text[1:])
-
-    def on_before_select(self, event: tk.Event):
-        """Handler for the 'Before' views (Physical Truth)."""
-        if self._in_selection_sync:
-            return
-
-        widget = event.widget
-        # Safety: Ignore if focus is in After view
-        focused_widget = self.root.focus_get()
-        if hasattr(self, 'after_tree') and focused_widget == self.after_tree:
-            return
-        if hasattr(self, 'after_list') and focused_widget == self.after_list:
-            return
-
-        widget.focus_set()
-        selection = widget.selection()
-        if not selection: return
-        item_id = selection[0]
-        values = widget.item(item_id, "values")
-        if not values: return
-        path = Path(values[0])
-        
-        content_to_show, source_info = "", ""
-        try:
-            if path.is_dir():
-                self.content_text.delete("1.0", tk.END)
-                self.content_text.insert("1.0", f"--- PHYSICAL DIRECTORY ---\nPath: {path}")
-                self.editor_notebook.select(2)
-                return
-
-            if path.exists():
-                if path not in self.before_cache:
-                    self.before_cache[path] = path.read_text(encoding='utf-8', errors='replace')
-                content_to_show = self.before_cache[path]
-                source_info = f"--- PHYSICAL CONTENT (On Disk) ---\nFile: {path}\n"
-            else:
-                source_info = f"--- FILE NOT FOUND ON DISK ---\nFile: {path}\n"
-        except Exception as e:
-            content_to_show = f"Error loading content: {e}"
-
-        self.content_text.delete("1.0", tk.END)
-        self.content_text.insert("1.0", source_info + "="*40 + "\n" + content_to_show)
-        self.editor_notebook.select(2)
-
-    def on_after_select(self, event: tk.Event):
-        """Handler for the 'After' views (Planned Truth)."""
-        if self._in_selection_sync:
-            return
-
-        widget = event.widget
-        widget.focus_set()
-        selection = widget.selection()
-        if not selection: return
-        item_id = selection[0]
-        values = widget.item(item_id, "values")
-        if not values: return
-        path = Path(values[0])
-        
-        content_to_show, source_info = "", ""
-        try:
-            if not self.current_plan: return
-            
-            # --- Visual Sync to Before View (Safe with guard) ---
-            self._in_selection_sync = True
-            try:
-                path_str = str(path)
-                # Sync Before Tree
-                if path_str in self.before_tree_map:
-                    node = self.before_tree_map[path_str]
-                    parent = self.before_tree.parent(node)
-                    while parent:
-                        self.before_tree.item(parent, open=True)
-                        parent = self.before_tree.parent(parent)
-                    self.before_tree.selection_set(node)
-                    self.before_tree.see(node)
-                # Sync Before List
-                if path_str in self.before_list_map:
-                    node = self.before_list_map[path_str]
-                    self.before_list.selection_set(node)
-                    self.before_list.see(node)
-            finally:
-                # Delay reset to ensure triggered events are caught by the guard
-                self.root.after(100, lambda: setattr(self, '_in_selection_sync', False))
-
-            # --- Data Loading ---
-            state = self.current_plan.path_states.get(path)
-            is_dir = (path in self.current_plan.planned_dirs) or (path.exists() and path.is_dir())
-            
-            if is_dir:
-                self.content_text.delete("1.0", tk.END)
-                self.content_text.insert("1.0", f"--- PLANNED DIRECTORY ---\nPath: {path}")
-                self.editor_notebook.select(2)
-                return
-
-            if state in ('new', 'overwrite', 'conflict_file', 'conflict_dir'):
-                planned_content = self._get_planned_content(path)
-                if planned_content is not None:
-                    content_to_show = planned_content
-                    source_info = f"--- PLANNED CONTENT (Memory) ---\nState: {state}\nFile: {path}\n"
-                else:
-                    source_info = f"--- NEW FILE (Empty) ---\nFile: {path}\n"
-            elif state in ('exists', 'identical') or path.exists():
-                if path not in self.after_cache:
-                    self.after_cache[path] = path.read_text(encoding='utf-8', errors='replace')
-                content_to_show = self.after_cache[path]
-                source_info = f"--- EXISTING CONTENT (After View) ---\nState: {state}\nFile: {path}\n"
-            else:
-                source_info = f"--- FILE NOT PLANNED ---\nFile: {path}\n"
-
-        except Exception as e:
-            content_to_show = f"Error loading content: {e}"
-
-        self.content_text.delete("1.0", tk.END)
-        self.content_text.insert("1.0", source_info + "="*40 + "\n" + content_to_show)
-        self.editor_notebook.select(2)
-
-    def _get_planned_content(self, path: Path) -> str | None:
-        """Robustly retrieves planned content from the current plan (case-insensitive)."""
-        if not self.current_plan: return None
-        try:
-            res_path = path.resolve()
-        except Exception:
-            res_path = path
-        
-        # 1. Direct match
-        content = self.current_plan.file_contents.get(res_path)
-        if content is not None: return content
-        content = self.current_plan.file_contents.get(path)
-        if content is not None: return content
-
-        # 2. Case-insensitive search
-        target_lower = str(res_path).lower()
-        for p_obj, p_content in self.current_plan.file_contents.items():
-            try:
-                if str(p_obj.resolve()).lower() == target_lower:
-                    return p_content
-            except Exception:
-                if str(p_obj).lower() == target_lower:
-                    return p_content
-        return None
-
-    def on_load_test_data(self):
-        
-        self.content_text.delete("1.0", tk.END)
-        self.content_text.insert("1.0", source_info + "="*40 + "\n" + content_to_show)
-        self.editor_notebook.select(2)
-        print("DEBUG: on_tree_select completed") # Debug print
-
-    def on_load_test_data(self):
-        logger.debug("on_load_test_data called")
-        try:
-            # Clear log at the start of loading test data
-            self.log_text.config(state=tk.NORMAL)
-            self.log_text.delete('1.0', tk.END)
-            self.log_text.config(state=tk.DISABLED)
-
-            # Determine sample files priority
-            structure_file = TEST_DIR / "sample_structure.txt"
-            if not structure_file.exists():
-                structure_file = RESOURCE_DIR / "sample_structure.txt"
-                
-            blueprint_file = TEST_DIR / "sample_blueprint.txt"
-            if not blueprint_file.exists():
-                blueprint_file = RESOURCE_DIR / "sample_blueprint.txt"
-
-            for file_path, text_widget in [(structure_file, self.tree_text), (blueprint_file, self.source_code_text)]:
-                if file_path.exists():
-                    text_widget.delete("1.0", tk.END)
-                    text_widget.insert("1.0", file_path.read_text(encoding="utf-8"))
-                else:
-                    messagebox.showwarning(t("message.error_title"), t("message.no_test_data", file=str(file_path)))
-            
-            # --- Validation Logic (Immediately check if data is valid) ---
-            root_path_str = self.target_root_path.get()
-            if root_path_str and root_path_str != t("ui.no_folder_selected") and Path(root_path_str).is_dir():
-                root_path = Path(root_path_str)
-                text_input = self.tree_text.get("1.0", "end-1c") + "\n" + self.source_code_text.get("1.0", "end-1c")
-                config = {
-                    "DRY_RUN": self.dry_run.get(),
-                    "ENABLE_SIMILARITY_SCAN": self.enable_similarity_scan.get(),
-                    "SIMILARITY_RATIO_THRESHOLD": self.similarity_threshold.get(),
-                }
-                # Generate plan just for validation
-                val_plan = scaffold_core.generate_plan(root_path, text_input, config)
-                
-                if val_plan.errors:
-                    self._log(f"\n[ERROR] {t('log.test_data_error')} (Validation Failed):", "error")
-                    for err in val_plan.errors:
-                        self._log(f"- {err}", "error")
-                    action_handler.handle_test_data_loaded(self, success=False)
-                    self.analysis_notebook.select(1) # Switch to Log tab to show errors
-                    return # Stop here if data is invalid
-
-            # --- Success Path (Data is valid or no folder selected yet) ---
-            # Clear stale After view data since editor content changed
-            self._clear_tree(self.after_tree)
-            self._clear_tree(self.after_list)
-            self.apply_button.config(state=tk.DISABLED)
-
-            # Tab Switching Logic
-            tree_content = self.tree_text.get("1.0", "end-1c").strip()
-            source_content = self.source_code_text.get("1.0", "end-1c").strip()
-            is_tree_empty = not tree_content or all(line.strip().startswith("#") or not line.strip() for line in tree_content.splitlines())
-            
-            if is_tree_empty and source_content:
-                self.editor_notebook.select(1) # Switch to Source Code tab
-            else:
-                self.editor_notebook.select(0) # Default to Scaffold Tree tab
-
-            self._log(t("log.load_test_data_success"), "success")
-            action_handler.handle_test_data_loaded(self, success=True)
-                
-        except Exception as e:
-            self._log(f"Error loading test data: {e}", "error")
-            messagebox.showerror(t("message.error_title"), f"An error occurred: {e}")
-            action_handler.handle_test_data_loaded(self, success=False)
-        logger.debug("on_load_test_data completed")
-
-    def on_options(self):
-        """Opens the options window."""
-        logger.debug("on_options called")
-        from Scripts.UI import options_ui
-        action_handler.handle_options_opened(self)
-        options_ui.show_options(self.root, self)
-
-    def on_clear_data(self):
-        logger.debug("on_clear_data called")
-        app_utils.log_message(self, t("log.clearing_data"), "info")
-        self.dry_run.set(True)
-        self.enable_similarity_scan.set(True)
-        self.similarity_threshold.set(0.86)
-        self.tree_text.delete("1.0", tk.END)
-        self.tree_text.insert("1.0", self.DEFAULT_TREE_TEMPLATE)
-        self.source_code_text.delete("1.0", tk.END)
-        self.content_text.delete("1.0", tk.END)
-        self.current_plan = None
-        self.before_cache = {}
-        self.after_cache = {}
-        for tree in [self.before_tree, self.after_tree, self.before_list, self.after_list]:
-            self._clear_tree(tree)
-        self.recompute_button.config(state=tk.DISABLED)
-        self.apply_button.config(state=tk.DISABLED)
-        action_handler.handle_data_cleared(self)
-        app_utils.log_message(self, t("log.data_cleared"), "info")
-        logger.debug("on_clear_data completed")
-
-    def on_recovery(self):
-        """Opens the Recovery window to select and apply recovery logs."""
-        logger.debug("on_recovery called")
-        from Scripts.UI import recovery_ui
-        recovery_ui.show_recovery(self.root, self)
-
-    def on_previous_folder(self):
-        logger.debug("on_previous_folder called")
-        if self.last_root_path and Path(self.last_root_path).is_dir():
-            is_valid, message = self._validate_path(self.last_root_path)
-            if is_valid:
-                self.target_root_path.set(message)
-                self.recompute_button.config(state=tk.NORMAL)
-                
-                # THOROUGH CLEANUP on path change
-                self.before_cache = {}
-                self.after_cache = {}
-                self.current_plan = None
-                
-                self._populate_before_tree(Path(message))
-                self._clear_tree(self.after_tree)
-                self._clear_tree(self.after_list)
-                self._clear_tree(self.before_list)
-                
-                self.apply_button.config(state=tk.DISABLED)
-                action_handler.handle_folder_selected(self, message, method="prev")
-            else:
-                messagebox.showerror("Invalid Folder", f"Previous folder is no longer valid: {message}")
-                self.last_root_path = None
-                self.prev_dir_button.config(state=tk.DISABLED)
-        else:
-            messagebox.showinfo("No Previous Folder", "No valid previous folder found.")
-        print("DEBUG: on_previous_folder completed") # Debug print
-
-    def on_escape_pressed(self, event=None):
-        """Resets focus to the root window and closes any open Options window."""
-        print("DEBUG: on_escape_pressed called, resetting focus.")
-        self.root.focus_set()
-        
-        # Check if Options window exists and close it
-        from Scripts.UI.options_ui import OptionsWindow
-        if OptionsWindow._instance and OptionsWindow._instance.window.winfo_exists():
-            OptionsWindow._instance._on_close()
-            
-        return "break" # Prevent further propagation of the Escape key
-
-    def on_make_tree_from_source(self):
-        """
-        Parses the source code editor for V2 blocks and generates a new
-        scaffold tree from the file paths found.
-        """
-        self._log(t("log.make_tree_attempt"), "info")
-        source_text = self.source_code_text.get("1.0", "end-1c")
-        if not source_text.strip():
-            messagebox.showinfo("Info", t("message.empty_editors"))
-            return
-
-        try:
-            # Use the core parser to get file paths
-            # A best-effort root marker is passed, though it's not critical for this operation
-            root_marker_match = re.search(r'@ROOT\s+([^{\s}]+|{{[\w-]+}})', self.tree_text.get("1.0", "end-1c"))
-            root_marker = root_marker_match.group(1) if root_marker_match else "{{Root}}"
-            patch_data = scaffold_core.parse_v2_format(source_text, root_marker=root_marker)
-            paths = [item['path'] for item in patch_data]
-
-            if not paths:
-                messagebox.showinfo("Info", t("message.no_v2_blocks"))
-                return
-            
-            new_tree_text = tree_generator.generate_tree_from_paths(paths, root_marker_name=root_marker)
-
-            # Clear and update the scaffold tree editor
-            self.tree_text.delete("1.0", tk.END)
-            self.tree_text.insert("1.0", new_tree_text)
-            self.editor_notebook.select(0) # Switch focus to the tree tab
-            self._log(t("log.make_tree_success", count=len(paths)), "success")
-            action_handler.handle_make_tree_result(self, success=True)
-
-        except V2ParserError as e:
-            self._log(f"{t('message.v2_parse_error_title')}: {e}", "error")
-            messagebox.showerror(t("message.v2_parse_error_title"), f"{e}")
-            action_handler.handle_make_tree_result(self, success=False)
-        except Exception as e:
-            self._log(f"An unexpected error occurred: {e}", "error")
-            messagebox.showerror(t("message.error_title"), f"An unexpected error occurred:\n\n{e}")
-            action_handler.handle_make_tree_result(self, success=False)
-
-    def _on_editor_tab_changed(self, event):
-        """Called when the editor notebook tab is changed. Configures button states."""
-        if not hasattr(self, 'editor_buttons') or not self.editor_buttons:
-            return
-
-        # Disable buttons 2, 3, 4 and clear their text
-        for i in range(1, 4):
-            self.editor_buttons[i].config(state=tk.DISABLED, text="")
-
-        try:
-            selected_tab_text = self.editor_notebook.tab(self.editor_notebook.select(), "text")
-        except tk.TclError:
-            selected_tab_text = t("ui.tab_scaffold_tree") # Default to first tab during init
-
-        # Configure the first button based on the selected tab
-        if selected_tab_text == t("ui.tab_source_code"):
-            self.editor_buttons[0].config(state=tk.NORMAL, text=t("ui.make_tree"), command=self.on_make_tree_from_source)
-        else: # For "Scaffold Tree" and "Content"
-            self.editor_buttons[0].config(state=tk.DISABLED, text="", command=None)
-
-    # --- Helper Method Stubs ---
-    def _load_window_geometry(self): app_utils.load_window_geometry(self)
-    def _save_window_geometry(self):
-        app_utils.save_window_geometry(self)
-    def _load_last_root_path(self): app_utils.load_last_root_path(self)
-    def _save_last_root_path(self, path: str): app_utils.save_last_root_path(self, path)
-    def _validate_path(self, path: str) -> tuple[bool, str]: return app_utils.validate_path(path)
-    def _log(self, message: str, level: str = "info", buffer_list: list = None): app_utils.log_message(self, message, level, buffer_list)
-    def _execute_scaffold(self): scaffold_runner.execute_scaffold(self)
-    def _clear_tree(self, tree: ttk.Treeview): clear_tree_function(tree) # Using the aliased import
-    def _populate_before_tree(self, root_path: Path): populate_before_tree(self, root_path)
-    def _populate_after_tree(self, plan: scaffold_core.Plan): populate_after_tree(self, plan)
-
-def setup_runtime_logging():
-    global console_logger_instance, editor_logger_instance
-    """Reads config and sets up a file logger if enabled."""
-    try:
-        config_file_path = Path.cwd() / CONFIG_FILE
-        # Load level from config
-        logger.load_config_and_set_level(config_file_path)
-
-        with open(config_file_path, "r", encoding="utf-8") as f:
-            config = json.load(f)
-        
-        # Always initialize console_logger_instance so logger.py can find it
-        console_logger_instance = logging.getLogger('console_output')
-        console_logger_instance.setLevel(logging.DEBUG)
-        console_logger_instance.propagate = False
-
-        if config.get("enable_runtime_logging", False):
-            log_path_dir = Path.cwd() / LOG_DIR
-            log_path_dir.mkdir(exist_ok=True)
-            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            runtime_log_filename = log_path_dir / f"runtime_{timestamp}.log"
-
-            console_file_handler = logging.FileHandler(runtime_log_filename, mode='w', encoding='utf-8')
-            console_file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
-            console_logger_instance.addHandler(console_file_handler)
-
-            # --- Setup Editor Logger ---
-            editor_logger_instance = logging.getLogger('editor_output')
-            editor_logger_instance.setLevel(logging.DEBUG)
-            editor_file_handler = logging.FileHandler(runtime_log_filename, mode='a', encoding='utf-8')
-            editor_file_handler.setFormatter(logging.Formatter('--- editor log ---\n%(asctime)s - %(levelname)s - %(message)s'))
-            editor_logger_instance.addHandler(editor_file_handler)
-            editor_logger_instance.propagate = False
-
-            # Redirect stdout and stderr to the logger
-            sys.stdout = StreamToLogger(console_logger_instance, logging.INFO)
-            sys.stderr = StreamToLogger(console_logger_instance, logging.ERROR)
-
-            logger.info(f"Runtime logging enabled, log file: {runtime_log_filename}")
-        else:
-            # If runtime logging to file is disabled, still add a StreamHandler to console
-            if not any(isinstance(h, logging.StreamHandler) for h in console_logger_instance.handlers):
-                ch = logging.StreamHandler(sys.stdout)
-                ch.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
-                console_logger_instance.addHandler(ch)
-            
-            # Still redirect sys.stdout/stderr so print() goes through our leveling
-            sys.stdout = StreamToLogger(console_logger_instance, logging.INFO)
-            sys.stderr = StreamToLogger(console_logger_instance, logging.ERROR)
-            logger.debug("Runtime logging to file disabled.")
-
-    except (FileNotFoundError, json.JSONDecodeError):
-        # Fallback if config is missing or broken
-        pass
-    except Exception as e:
-        print(f"CRITICAL: Failed to initialize logging: {e}")
-
-def main():
-    setup_runtime_logging() # Set up the logger first
-    try:
-        root = tk.Tk()
-        ScaffoldApp(root)
-        root.mainloop()
-    except Exception as e:
-        if console_logger_instance: # Check if console logger was successfully set up
-            console_logger_instance.critical(f"FATAL: Caught unhandled exception in main: {e}", exc_info=True)
-        else:
-            print(f"FATAL: Caught unhandled exception in main (logger not initialized): {e}")
-        messagebox.showerror("Fatal Error", f"An unhandled exception occurred: {e}")
+        configure_tree_tags(self)
 
 if __name__ == "__main__":
-    main()
+    logger.setup_runtime_logging(CONFIG_FILE, LOG_DIR)
+    root = tk.Tk()
+    app = ScaffoldApp(root)
+    root.mainloop()

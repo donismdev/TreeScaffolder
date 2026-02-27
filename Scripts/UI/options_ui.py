@@ -87,7 +87,7 @@ class OptionsWindow:
         debug_frame = ttk.Frame(main_frame)
         debug_frame.pack(fill=tk.X, pady=5)
         
-        ttk.Label(debug_frame, text=t("ui.debug_level") if "ui.debug_level" in t("ui") else "Debug Level").pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Label(debug_frame, text=t("ui.debug_level")).pack(side=tk.LEFT, padx=(0, 10))
         
         from Scripts.Utils import logger
         self.debug_var = tk.IntVar(value=logger.get_log_level())
@@ -95,39 +95,29 @@ class OptionsWindow:
         debug_combo.pack(side=tk.LEFT)
         debug_combo.bind("<<ComboboxSelected>>", self._on_debug_change)
 
-        # Runtime Logging Toggle
-        config = self._load_config()
-        self.logging_var = tk.BooleanVar(value=config.get("enable_runtime_logging", False))
-        logging_check = ttk.Checkbutton(
-            main_frame, 
-            text=t("ui.runtime_logging"), 
-            variable=self.logging_var,
-            command=lambda: self._save_config("enable_runtime_logging", self.logging_var.get())
-        )
-        logging_check.pack(fill=tk.X, pady=(10, 5))
-
         # Log Cleanup Section
-        cleanup_frame = ttk.LabelFrame(main_frame, text=t("ui.log_cleanup_title") if "ui.log_cleanup_title" in t("ui") else "Log Cleanup", padding=10)
+        config = self._load_config()
+        cleanup_frame = ttk.LabelFrame(main_frame, text=t("ui.log_cleanup_title"), padding=10)
         cleanup_frame.pack(fill=tk.X, pady=10)
 
         limit_frame = ttk.Frame(cleanup_frame)
         limit_frame.pack(fill=tk.X)
         
-        limit_label_text = t("ui.keep_n_logs") if "ui.keep_n_logs" in t("ui") else "Keep last N logs:"
-        self.limit_label = ttk.Label(limit_frame, text=f"{limit_label_text} {config.get('log_cleanup_limit', 5)}")
+        limit_label_prefix = t("ui.keep_n_logs")
+        self.limit_label = ttk.Label(limit_frame, text=f"{limit_label_prefix} {config.get('log_cleanup_limit', 5)}")
         self.limit_label.pack(side=tk.LEFT)
 
         self.cleanup_limit_var = tk.IntVar(value=config.get("log_cleanup_limit", 5))
         
         def on_slider_move(val):
             val = int(float(val))
-            self.limit_label.config(text=f"{limit_label_text} {val}")
+            self.limit_label.config(text=f"{limit_label_prefix} {val}")
             self._save_config("log_cleanup_limit", val)
 
         limit_slider = ttk.Scale(cleanup_frame, from_=1, to=50, variable=self.cleanup_limit_var, orient=tk.HORIZONTAL, command=on_slider_move)
         limit_slider.pack(fill=tk.X, pady=5)
 
-        cleanup_btn = ttk.Button(cleanup_frame, text=t("ui.cleanup_now") if "ui.cleanup_now" in t("ui") else "Clean up logs", command=self._on_cleanup_logs)
+        cleanup_btn = ttk.Button(cleanup_frame, text=t("ui.cleanup_now"), command=self._on_cleanup_logs)
         cleanup_btn.pack(pady=(5, 0))
 
         # Close button at the bottom
@@ -159,42 +149,136 @@ class OptionsWindow:
     def _on_cleanup_logs(self):
         from pathlib import Path
         import os
+        import shutil
+        import re
+        import stat
+        from Scripts.Utils import logger
+        from datetime import date
         
         limit = self.cleanup_limit_var.get()
-        title = t("message.confirm_cleanup_title") if "message.confirm_cleanup_title" in t("message") else "Confirm Cleanup"
-        msg = t("message.confirm_cleanup_msg") if "message.confirm_cleanup_msg" in t("message") else f"This will delete all but the last {limit} logs of each type.\nAre you sure? This cannot be undone."
-        msg = msg.format(n=limit) # Support {n} in translation
+        title = t("message.confirm_cleanup_title")
+        msg = t("message.confirm_cleanup_msg", n=limit)
 
         if not messagebox.askyesno(title, msg, icon='warning'):
             return
 
-        log_dir = Path.cwd() / "Log"
-        if not log_dir.exists():
+        # 1. Path Safety: Resolve the absolute path of the Log directory strictly
+        try:
+            log_dir = (Path.cwd() / "Log").resolve(strict=True)
+            if not log_dir.exists() or not log_dir.is_dir():
+                logger.debug(f"Cleanup skipped: Log directory '{log_dir}' not found or is not a directory.")
+                return
+        except Exception as e:
+            logger.error(f"Cleanup Safety Critical Error: Could not resolve Log directory: {e}")
             return
 
-        prefixes = ["runtime_", "scaffold_execution_", "scaffold_recovery_"]
         deleted_count = 0
+        session_pattern = re.compile(r"^Session_(\d{4})(\d{2})(\d{2})_\d{2}h\d{2}m(_\d+)?$")
         
-        for prefix in prefixes:
-            # Find files matching prefix
-            files = [f for f in log_dir.glob(f"{prefix}*.log")]
-            # Also catch .txt for recovery
-            if prefix == "scaffold_recovery_":
-                files.extend([f for f in log_dir.glob(f"{prefix}*.txt")])
-            
-            # Sort by modification time (newest first)
-            files.sort(key=lambda x: x.stat().st_mtime, reverse=True)
-            
-            # Keep only the first 'limit' files
-            to_delete = files[limit:]
-            for f in to_delete:
+        # --- Robust Active Session Resolution ---
+        active_session_dir = None
+        try:
+            temp_active = logger.get_session_dir()
+            if temp_active:
+                # Ensure it's a Path object and exists
+                temp_path = Path(temp_active).resolve(strict=False)
+                if temp_path.exists():
+                    active_session_dir = temp_path
+        except Exception:
+            pass # Safety fallback
+
+        # ==================== Core Safety & Helper Functions ====================
+        def _is_safe_session_dir(path: Path) -> bool:
+            """Hyper-strict validation for session folders."""
+            try:
+                # 1. Type and Symlink Check
+                if not path.is_dir() or path.is_symlink():
+                    return False
+
+                name = path.name
+                match = session_pattern.match(name)
+                if not match:
+                    return False
+
+                # 2. Date Validation (Must be a real date between 2020-2035)
                 try:
-                    f.unlink()
-                    deleted_count += 1
-                except Exception:
-                    pass
+                    y, m, d = int(match.group(1)), int(match.group(2)), int(match.group(3))
+                    if not (2020 <= y <= 2035 and 1 <= m <= 12 and 1 <= d <= 31):
+                        return False
+                    date(y, m, d) # Raises ValueError if invalid date
+                except ValueError:
+                    return False
+
+                # 3. Path Depth and Parent Verification
+                if path.parent.resolve() != log_dir:
+                    return False
+
+                abs_path = path.resolve()
+                if not abs_path.is_relative_to(log_dir) or abs_path == log_dir:
+                    logger.warn(f"Cleanup Safety Block: Outside path {abs_path}")
+                    return False
+
+                # Exactly 1 depth below log_dir
+                if len(abs_path.relative_to(log_dir).parts) != 1:
+                    return False
+
+                # 4. Filesystem Boundary Check
+                if log_dir.stat().st_dev != abs_path.stat().st_dev:
+                    logger.warn(f"Cleanup Safety Block: Different filesystem detected for {abs_path}")
+                    return False
+                
+                # 5. Active Session Protection
+                if active_session_dir and abs_path == active_session_dir:
+                    logger.debug(f"Cleanup: Skipping active session {abs_path.name}")
+                    return False
+
+                return True
+            except Exception as e:
+                logger.error(f"Safety check failed for {path}: {e}")
+                return False
+
+        def _remove_readonly(func, path, excinfo):
+            """Error handler for shutil.rmtree to handle read-only files on Windows."""
+            os.chmod(path, stat.S_IWRITE)
+            func(path)
+
+        # ==================== Execution ====================
+        try:
+            all_items = list(log_dir.iterdir())
+            session_dirs = [item for item in all_items if _is_safe_session_dir(item)]
+
+            # Sort by modification time (newest first)
+            session_dirs.sort(key=lambda x: x.stat().st_mtime, reverse=True)
+            to_delete_sessions = session_dirs[limit:]
+            
+            # --- Deletion Preview (Enhanced UX and Safety) ---
+            if not to_delete_sessions:
+                messagebox.showinfo(t("ui.log_cleanup_title"), t("message.no_old_sessions"))
+                return
+            
+            preview_list = "\n".join([f"• {p.name}" for p in to_delete_sessions])
+            preview_msg = t("message.cleanup_preview", count=len(to_delete_sessions), list=preview_list)
+            if not messagebox.askyesno(title, preview_msg, icon='warning'):
+                return
+
+            for session_path in to_delete_sessions:
+                try:
+                    # Final verification right before deletion
+                    if _is_safe_session_dir(session_path):
+                        abs_session = session_path.resolve()
+                        # Use onerror handler for read-only files
+                        shutil.rmtree(abs_session, onerror=_remove_readonly)
+                        deleted_count += 1
+                        logger.debug(f"Cleanup: Successfully deleted session folder: {abs_session.name}")
+                except Exception as e:
+                    logger.error(f"Cleanup: Failed to delete session folder {session_path.name}: {e}")
+            
+        except Exception as e:
+            logger.error(f"Cleanup: Error during directory scanning: {e}")
+            messagebox.showerror("Cleanup Error", f"An error occurred during cleanup: {e}")
+            return
         
-        messagebox.showinfo(t("message.success_title"), t("message.cleanup_success").format(count=deleted_count) if "message.cleanup_success" in t("message") else f"Successfully deleted {deleted_count} old log files.")
+        messagebox.showinfo(t("message.success_title"), t("message.cleanup_success", count=deleted_count))
 
 def show_options(parent, app_instance):
     OptionsWindow(parent, app_instance)

@@ -6,6 +6,24 @@ Provides functionality to generate a scaffold tree text structure from a list of
 """
 from pathlib import PurePath
 from collections.abc import Iterable
+from Scripts.Core.v2_parser import parse_v2_format
+
+def generate_tree_from_v2(v2_text: str) -> str:
+    """
+    Parses V2 format text and generates a scaffold tree structure.
+    
+    Args:
+        v2_text: The source code text in V2 multipatch format.
+        
+    Returns:
+        A string representing the scaffold tree.
+    """
+    try:
+        patch_data = parse_v2_format(v2_text)
+        paths = [item['path'] for item in patch_data]
+        return generate_tree_from_paths(paths)
+    except Exception:
+        return ""
 
 def generate_tree_from_paths(paths: Iterable[str], root_marker_name: str = "{{Root}}") -> str:
     """
@@ -26,7 +44,16 @@ def generate_tree_from_paths(paths: Iterable[str], root_marker_name: str = "{{Ro
         if not path_str:
             continue
         
-        p = PurePath(path_str)
+        # Standardize separators and trim
+        norm_path = path_str.replace('\\', '/').strip().lstrip('/')
+        
+        # Strip root marker if present at start
+        if norm_path.startswith(root_marker_name):
+            norm_path = norm_path[len(root_marker_name):].lstrip('/')
+        elif norm_path.lower().startswith("{{root}}"): # Case-insensitive check for default
+            norm_path = norm_path[len("{{root}}"):].lstrip('/')
+
+        p = PurePath(norm_path)
         parts = p.parts
         
         current_level = tree
@@ -34,15 +61,13 @@ def generate_tree_from_paths(paths: Iterable[str], root_marker_name: str = "{{Ro
             current_level = current_level.setdefault(part, {})
         
         # Handle the last part (file or directory)
-        last_part = parts[-1]
-        # Treat paths ending in a separator as directories
-        is_dir = path_str.endswith(('/', '\\')) or (not last_part and path_str)
-
-        if is_dir:
-            if last_part: # Avoid adding an empty key if path ends with /
+        if parts:
+            last_part = parts[-1]
+            is_dir = path_str.endswith(('/', '\\'))
+            if is_dir:
                 current_level.setdefault(last_part, {})
-        else:
-            current_level.setdefault(last_part, None) # Use None to signify a file
+            else:
+                current_level.setdefault(last_part, None) # Use None to signify a file
 
     def build_string_recursive(subtree: dict, indent_level: int) -> str:
         """Recursively builds the string representation of the tree."""

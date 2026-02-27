@@ -110,5 +110,3 @@ def parse_v2_format(text: str, root_marker: str | None = None, root_marker_name:
             file_blocks.append({'path': path, 'content': content})
 
     return file_blocks
-
-    return file_blocks

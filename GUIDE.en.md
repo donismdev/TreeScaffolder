@@ -167,15 +167,17 @@ At the top of the text editor in the "Define Scaffold Tree" panel, there is a to
 
 A configuration file that controls the operation of the application.
 
--   `enable_runtime_logging` (boolean)
-    -   **`true`**: When the application runs, it creates a `runtime.log` file that records all operations and errors. This log is more detailed than the GUI's log panel and is useful for troubleshooting.
-    -   **`false`**: Does not create a `runtime.log` file.
--   `debug_level` (integer, 0 to 3)
+-   `debug_level` (integer, 1 to 3)
     -   Controls the verbosity of the logs.
     -   **`0` (Release)**: Only critical errors and warnings.
     -   **`1` (Info)**: Default. Shows major execution steps and results.
     -   **`2` (Debug)**: Detailed information for development and troubleshooting.
     -   **`3` (Trace)**: Maximum verbosity, showing every minor operation.
+-   **Runtime Logging (Automatic)**
+    -   When the application runs, it always creates a runtime log that records all operations and errors.
+    -   Each execution session is stored independently in the `Log/Session_YYYYMMDD_HHMMSS/` folder.
+    -   Upon application exit, the scaffold application status (Executed/Not Executed) is automatically added to the top of the log file.
+-   `log_cleanup_limit` (integer): Number of recent log session folders to keep when performing log cleanup in the Options UI. Default is 5.
 
 ---
 
@@ -193,11 +195,13 @@ The list of currently defined shortcuts is as follows:
 | `1`            | `Cycle Before Notebook Tabs`    | Cycles through 'Before' panel tabs.                          |
 | `2`            | `Cycle After Notebook Tabs`     | Cycles through 'After' panel tabs.                           |
 | `3`            | `Cycle Editor Notebook Tabs`    | Cycles through 'Editor' panel tabs.                          |
-| `v`            | `Previous Folder`               | Returns to the previously selected root folder.               |
-| `b`            | `Browse Folder`                 | Opens folder browser for a new root folder.                  |
-| `c`            | `Clear Data`                    | Clears all editor content and planned data.                  |
+| `e`            | `Previous Folder`               | Returns to the previously selected root folder.               |
+| `w`            | `Browse Folder`                 | Opens folder browser for a new root folder.                  |
+| `r`            | `Clear Data`                    | Clears all editor content and planned data.                  |
 | `d`            | `Compute Diff`                  | Calculates the scaffolding plan based on current inputs.      |
 | `f`            | `Apply Scaffold`                | Applies the scaffolding plan to the file system.             |
+| `q`            | `Recovery`                      | Opens the Recovery log selection window.                      |
+| `o`            | `Options`                       | Opens the application options (Language, Debug Level, etc.).  |
 
 ---
 
@@ -259,3 +263,17 @@ Refer to the following rules and limitations when defining shortcuts in the `Res
     -   Due to limitations of Tkinter and the operating system, some key combinations may be impossible to bind or may show inconsistent behavior.
 
 This document is a guide for the shortcut notation used in the `key_bindings_map.json` file.
+
+---
+
+## 10. Design Philosophy & Maintenance Principles
+
+### 10.1. Safety Over Aesthetics
+This application performs high-risk operations like file deletion and overwriting. Therefore, we prioritize **empirical logic** proven through trial and error over "clean" or "efficient-looking" code.
+
+- **Prohibition of AI Refactoring**: Historical evidence shows a 100% failure rate when AI attempts to "simplify" or "optimize" this codebase, consistently breaking critical edge cases. Do not trust AI-standard best practices for this project.
+- **Correctness Over Performance**: Micro-optimizations for speed are meaningless here. Since the operations are not computationally heavy, we prefer the safest and most literal implementation over an optimized but fragile one.
+
+### 10.2. Support & Bug Reports
+If you encounter any issues, have feature suggestions, or want to report a bug, please contact us via email.
+*   **Email**: donism.dev@gmail.com

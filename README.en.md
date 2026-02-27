@@ -149,18 +149,20 @@ You can quickly execute various functions within the application using keyboard 
 *   **Space**: (In After View) Toggle checkbox for selected item
 *   **d**: Compute Diff
 *   **f**: Apply Scaffold
-*   **v**: Go to previous folder
-*   **b**: Browse folder
-*   **c**: Clear data
+*   **q**: Open Recovery window
+*   **o**: Open Options window
+*   **e**: Go to previous folder
+*   **w**: Browse folder
+*   **r**: Clear data
 *   **`** (Grave): Cycle analysis panel tabs
 *   **1, 2, 3**: Cycle tabs in each area
 *   **Alt**: Display shortcut hints (hold to show yellow overlays)
 
 ---
 
-## 9. Precautions
+## 10. Support & Bug Reports
 
-*   **Data Backup**: Since the `Apply Scaffold` function can overwrite existing files, please make it a habit to always back up important data in advance.
-*   **Utilize `Dry Run`**: Be sure to use the `Dry Run` option to preview all changes before applying the actual scaffolding.
+If you encounter any issues, have feature suggestions, or want to report a bug, please contact us via email.
+*   **Email**: donism.dev@gmail.com
 
 ---

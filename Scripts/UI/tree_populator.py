@@ -81,8 +81,8 @@ def populate_after_tree(app, plan):
 
         state = plan.path_states.get(p_path)
         
-        # A path contributes to modified parents if its current state is 'new', 'overwrite', or 'conflict'
-        if state in ('new', 'overwrite', 'conflict_file', 'conflict_dir'):
+        # A path contributes to modified parents if its current state is 'new', 'overwrite', 'conflict', OR 'identical'
+        if state in ('new', 'overwrite', 'conflict_file', 'conflict_dir', 'identical'):
             current_parent = p_path.parent
             while current_parent != root_path and current_parent.is_relative_to(root_path):
                 modified_parent_dirs.add(current_parent)
@@ -97,11 +97,29 @@ def populate_after_tree(app, plan):
                                      lambda p, plan_obj, mpd: True, modified_parent_dirs, auto_open_modified=True, should_show_root=True, node_map=app.after_tree_map)
     
     # Populate the 'Apply Tree' (after_list) (Changes Only View)
-    # Filter: Only show items that are modified (new, overwrite, conflict, identical) or are parents of such items.
-    # We exclude 'exists' because it represents files that are NOT being touched by the scaffold.
+    # Filter: Show items that are part of the plan (new, overwrite, conflict, identical, OR recently applied 'exists')
+    # and parents of such items.
     app.after_list_map = {}
+    
+    def apply_tree_filter(p, plan_obj, mpd):
+        # 1. Show if it's a modified/planned state (New, Overwrite, Conflict, Identical)
+        state = plan_obj.path_states.get(p)
+        if state in ('new', 'overwrite', 'conflict_file', 'conflict_dir', 'identical'):
+            return True
+        
+        # 2. Show if it's a parent of a modified item (highlighted folder)
+        if p in mpd:
+            return True
+            
+        # 3. Show if it's 'exists' but was explicitly part of the planned structure
+        # This includes files from Tree editor or Source blocks that are now applied.
+        if p in plan_obj.planned_files or p in plan_obj.planned_dirs:
+            return True
+            
+        return False
+
     _populate_treeview_from_plan(app, app.after_list, plan, root_path, 
-                                     lambda p, plan_obj, mpd: plan_obj.path_states.get(p) in ('new', 'overwrite', 'conflict_file', 'conflict_dir', 'identical') or p in mpd, modified_parent_dirs, auto_open_modified=True, should_show_root=False, node_map=app.after_list_map)
+                                     apply_tree_filter, modified_parent_dirs, auto_open_modified=True, should_show_root=False, node_map=app.after_list_map)
 
 def _populate_treeview_from_plan(app, tree_widget: ttk.Treeview, plan_obj, root_path_param: Path, filter_func, modified_parent_dirs: set, auto_open_modified: bool, should_show_root: bool = True, node_map: dict = None):
     dir_nodes = {}
@@ -170,7 +188,13 @@ def _populate_treeview_from_plan(app, tree_widget: ttk.Treeview, plan_obj, root_
             tags = []
             state = plan_obj.path_states.get(path)
             if state == 'new': tags.append('new')
-            elif state == 'overwrite': tags.append('overwrite')
+            elif state == 'overwrite':
+                # SPECIAL: If overwriting with EMPTY content, show as red (conflict)
+                planned_content = plan_obj.file_contents.get(path.resolve())
+                if planned_content is not None and not planned_content.strip():
+                    tags.append('conflict')
+                else:
+                    tags.append('overwrite')
             elif state == 'identical': tags.append('warning')
             elif state in ('conflict_file', 'conflict_dir'): tags.append('conflict')
             if path in modified_parent_dirs: tags.append('modified_parent')
