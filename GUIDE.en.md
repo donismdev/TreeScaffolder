@@ -225,6 +225,17 @@ The list of currently defined shortcuts is as follows:
 - **Automatic Recovery Log**: As a last line of defense, whenever a file is about to be overwritten during the application phase (excluding Dry Run), the original contents of all such files are collected into a single V2-style log file in the `Log` folder.
 - **Purpose**: This ensures that even if you mistakenly apply a scaffold that overwrites important work, you can still recover the previous content manually using the Recovery tool.
 
+### 8.4. Recovery Tool
+- **Overview**: A built-in utility to restore files or source code from the automatic backup logs (`scaffold_recovery_*.txt`) generated during execution.
+- **How to Use**:
+    1. Click the **"Recovery"** button in the bottom summary panel.
+    2. The Recovery window scans the `Log` folder and displays a list of available recovery logs.
+    3. Select a log file to view its contents (the state of files before they were overwritten).
+    4. **Selective Restoration**: Use the checkboxes in the After View to select specific files or folders you want to restore.
+    5. Click **"Apply Recovery"** to revert the selected items to their original state.
+- **Source Code Recovery**: When a recovery log is loaded, the "Source Code" editor in the main window is also populated with the V2-formatted content from the log. This allows you to manually copy or modify the previous code if needed.
+- **Safety**: The Recovery tool follows the same "Preview -> Confirm" workflow as the main application to prevent accidental data loss during the restoration process.
+
 ---
 
 ## 9. Shortcut Binding Rules and Limitations

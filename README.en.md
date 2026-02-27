@@ -17,6 +17,8 @@
 *   **Safe Operation**: Prevents accidental modification of important system folders and displays a warning message with a detailed summary of changes before overwriting existing files.
 *   **Shortcut Support**: Quickly execute frequently used functions with shortcuts, and shortcut hints appear on the screen when you press the `Alt` key.
 *   **Log Recording**: All operation history can be checked in detailed logs, which helps identify the cause when problems occur.
+*   **Automatic Recovery Logs**: For your safety, the original content of any file being overwritten is automatically backed up to a recovery log in the `Log` folder.
+*   **One-Click Recovery**: A dedicated "Recovery" tool allows you to easily restore files or source code to their previous state using these logs.
 
 ---
 
@@ -126,6 +128,16 @@ If you have confirmed that there are no problems with the planned structure in t
 ### Step 7: Check Operation Log (`Log` Tab)
 
 The progress, errors, and warning messages of all scaffolding operations are recorded in detail in the 'Log' tab. If a problem occurs, you can check this log to identify the cause.
+
+### Step 8: Recovery (If needed)
+
+If you mistakenly overwritten important files, you can use the Recovery tool to restore them.
+
+1.  Click the **`Recovery`** button in the bottom summary panel.
+2.  The Recovery window scans the `Log` folder for files named `scaffold_recovery_YYYYMMDD_HHMMSS.txt`.
+3.  Select a recovery log from the list to view its contents (the state of files before they were overwritten).
+4.  Check the files you want to restore in the After view.
+5.  Click **`Apply Recovery`** to revert changes.
 
 ---
 
