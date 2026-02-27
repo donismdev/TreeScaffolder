@@ -33,7 +33,14 @@ from Scripts.UI import action_handler
 # --- Constants ---
 APP_TITLE = "Tree Scaffolder v1.2"
 LOG_DIR = "Log"
-CONFIG_FILE = "Resources/config.json"
+# Configuration and Resource paths
+TEST_DIR = Path("Test")
+RESOURCE_DIR = Path("Resources")
+
+if (TEST_DIR / "config.json").exists():
+    CONFIG_FILE = str(TEST_DIR / "config.json")
+else:
+    CONFIG_FILE = str(RESOURCE_DIR / "config.json")
 DEFAULT_GEOMETRY = "1200x700"
 DEFAULT_TREE_TEMPLATE = """# =========================================================
 # - Use @ROOT to define the logical root marker.
@@ -111,6 +118,10 @@ class ScaffoldApp:
         self.after_list = None
         self.before_notebook = None
         self.after_notebook = None
+        self.before_tree_map = {}
+        self.before_list_map = {}
+        self.selected_paths = {} # Track checked state in After View: {Path: bool}
+        self.last_selected_after_item = None # For click-again-to-toggle logic
         
         self.widget_map = {} # Map action names to UI widgets for shortcut hints
         self.key_bindings_map = key_bindings._load_key_bindings_config() # Load keybindings for hint manager
@@ -151,7 +162,7 @@ class ScaffoldApp:
         self.after_list.tag_configure('modified_parent', foreground='#DAA520', font=self.treeview_item_font)
         self.after_list.tag_configure('overwrite', foreground='#0078D7', font=self.treeview_item_font)
 
-        self.root.bind("<Destroy>", lambda event: self._save_window_geometry())
+        self.root.bind("<Destroy>", lambda event: self._save_window_geometry() if event.widget == self.root else None)
         self._load_window_geometry()  # Load geometry after all relevant widgets are created
         app_utils.load_last_root_path(self) # Keep this as it's for a different purpose
         key_bindings.setup_key_bindings(self)
@@ -424,6 +435,99 @@ class ScaffoldApp:
         
         print("DEBUG: on_apply completed") # Debug print
 
+    def _on_after_tree_click(self, event):
+        """Handles mouse clicks on After View trees to support toggle-on-reclick."""
+        tree = event.widget
+        item_id = tree.identify_row(event.y)
+        if not item_id:
+            return
+
+        # If the clicked item is already selected, toggle it
+        if item_id in tree.selection():
+            self._toggle_path_selection(tree, item_id)
+        
+        # We don't need to manually select here; the default Button-1 behavior 
+        # will trigger <<TreeviewSelect>> if the selection changes.
+
+    def _on_after_tree_space(self, event):
+        """Handles Spacebar press on After View trees to toggle checkbox."""
+        tree = event.widget
+        selection = tree.selection()
+        if not selection:
+            return
+        
+        # Toggle the first selected item
+        self._toggle_path_selection(tree, selection[0])
+        return "break" # Prevent default spacebar scrolling behavior
+
+    def _toggle_path_selection(self, tree, item_id):
+        """Toggles the selection of a path and its children."""
+        values = tree.item(item_id, "values")
+        if not values: return
+        path = Path(values[0])
+        
+        # If this path is not selectable (no checkbox), ignore
+        if path not in self.selected_paths:
+            return
+
+        new_state = not self.selected_paths[path]
+        self._set_path_selection_recursive(tree, item_id, new_state)
+        
+        # If we just enabled an item, we should also enable all its parents
+        # to ensure the path to this item is valid.
+        if new_state:
+            self._select_parents_recursive(tree, item_id)
+
+        # Refresh summary
+        if self.current_plan:
+             action_handler.handle_diff_computed(self, self.current_plan)
+
+    def _select_parents_recursive(self, tree, item_id):
+        """Recursively selects parent nodes if they are selectable."""
+        parent_id = tree.parent(item_id)
+        if not parent_id:
+            return
+            
+        values = tree.item(parent_id, "values")
+        if not values: return
+        path = Path(values[0])
+        
+        # If the parent is a selectable item (has a checkbox) and is currently unchecked
+        if path in self.selected_paths and not self.selected_paths[path]:
+            self.selected_paths[path] = True
+            
+            # Update Visual
+            current_text = tree.item(parent_id, "text")
+            if current_text.startswith("☐"):
+                new_text = "☑" + current_text[1:]
+                tree.item(parent_id, text=new_text)
+        
+        # Continue up the tree
+        self._select_parents_recursive(tree, parent_id)
+
+    def _set_path_selection_recursive(self, tree, item_id, state):
+        """Helper to recursively set selection state and update UI text."""
+        values = tree.item(item_id, "values")
+        if not values: return
+        path = Path(values[0])
+        
+        # Update state if this item is a selectable item
+        if path in self.selected_paths:
+            self.selected_paths[path] = state
+            
+            # Update Visual
+            current_text = tree.item(item_id, "text")
+            check_char = "☑" if state else "☐"
+            
+            # Replace old checkbox char with new one
+            if current_text.startswith("☑") or current_text.startswith("☐"):
+                new_text = check_char + current_text[1:]
+                tree.item(item_id, text=new_text)
+
+        # Recursively update children
+        for child_id in tree.get_children(item_id):
+            self._set_path_selection_recursive(tree, child_id, state)
+
     def on_tree_select(self, event: tk.Event):
         print("DEBUG: on_tree_select called") # Debug print
         widget = event.widget
@@ -431,6 +535,7 @@ class ScaffoldApp:
         selection = widget.selection()
         if not selection: return
         item_id = selection[0]
+
         values = widget.item(item_id, "values")
         if not values: return
         path = Path(values[0])
@@ -445,6 +550,27 @@ class ScaffoldApp:
             
             # Check if we are in one of the 'After' views
             is_after_view = widget in (self.after_tree, self.after_list)
+
+            # --- Synchronize with Before View ---
+            if is_after_view:
+                path_str = str(path)
+                # Sync Before Tree
+                if path_str in self.before_tree_map:
+                    target_node = self.before_tree_map[path_str]
+                    # Expand all parents
+                    parent = self.before_tree.parent(target_node)
+                    while parent:
+                        self.before_tree.item(parent, open=True)
+                        parent = self.before_tree.parent(parent)
+                    # Select and see
+                    self.before_tree.selection_set(target_node)
+                    self.before_tree.see(target_node)
+                
+                # Sync Before List
+                if path_str in self.before_list_map:
+                    target_node = self.before_list_map[path_str]
+                    self.before_list.selection_set(target_node)
+                    self.before_list.see(target_node)
             
             if is_after_view and self.current_plan:
                 # Try to get planned content using various path representations for robustness
@@ -480,12 +606,21 @@ class ScaffoldApp:
             self.log_text.delete('1.0', tk.END)
             self.log_text.config(state=tk.DISABLED)
 
-            for file, text_widget in [("Resources/test_tree.txt", self.tree_text), ("Resources/test_data.txt", self.source_code_text)]:
-                if Path(file).exists():
+            # Determine sample files priority
+            structure_file = TEST_DIR / "sample_structure.txt"
+            if not structure_file.exists():
+                structure_file = RESOURCE_DIR / "sample_structure.txt"
+                
+            blueprint_file = TEST_DIR / "sample_blueprint.txt"
+            if not blueprint_file.exists():
+                blueprint_file = RESOURCE_DIR / "sample_blueprint.txt"
+
+            for file_path, text_widget in [(structure_file, self.tree_text), (blueprint_file, self.source_code_text)]:
+                if file_path.exists():
                     text_widget.delete("1.0", tk.END)
-                    text_widget.insert("1.0", Path(file).read_text(encoding="utf-8"))
+                    text_widget.insert("1.0", file_path.read_text(encoding="utf-8"))
                 else:
-                    messagebox.showwarning(t("message.error_title"), t("message.no_test_data", file=file))
+                    messagebox.showwarning(t("message.error_title"), t("message.no_test_data", file=str(file_path)))
             
             # --- Validation Logic (Immediately check if data is valid) ---
             root_path_str = self.target_root_path.get()
@@ -654,7 +789,6 @@ class ScaffoldApp:
     # --- Helper Method Stubs ---
     def _load_window_geometry(self): app_utils.load_window_geometry(self)
     def _save_window_geometry(self):
-        print("DEBUG: _save_window_geometry called.")
         app_utils.save_window_geometry(self)
     def _load_last_root_path(self): app_utils.load_last_root_path(self)
     def _save_last_root_path(self, path: str): app_utils.save_last_root_path(self, path)

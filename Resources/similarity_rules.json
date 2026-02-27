@@ -1,0 +1,11 @@
+{
+    "allowed_extension_pairs": [
+        [".h", ".cpp"],
+        [".h", ".c"],
+        [".hpp", ".cpp"],
+        [".js", ".test.js"],
+        [".ts", ".test.ts"]
+    ],
+    "ignored_filenames": [],
+    "comment": "Files with the same stem and extensions in the same pair are not flagged as similar."
+}

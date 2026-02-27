@@ -274,3 +274,15 @@ def create_right_panel(app):
     app.after_tree.bind("<<TreeviewSelect>>", app.on_tree_select)
     app.before_list.bind("<<TreeviewSelect>>", app.on_tree_select)
     app.after_list.bind("<<TreeviewSelect>>", app.on_tree_select)
+
+    # Bind click for toggle logic
+    app.after_tree.bind("<Button-1>", lambda e: app._on_after_tree_click(e) if hasattr(app, "_on_after_tree_click") else None)
+    app.after_list.bind("<Button-1>", lambda e: app._on_after_tree_click(e) if hasattr(app, "_on_after_tree_click") else None)
+
+    # Bind Space for toggle logic
+    app.after_tree.bind("<space>", lambda e: app._on_after_tree_space(e) if hasattr(app, "_on_after_tree_space") else None)
+    app.after_list.bind("<space>", lambda e: app._on_after_tree_space(e) if hasattr(app, "_on_after_tree_space") else None)
+
+    # Disable double-click expand/collapse for all tree views
+    for tree in [app.before_tree, app.after_tree, app.before_list, app.after_list]:
+        tree.bind("<Double-1>", lambda e: "break")

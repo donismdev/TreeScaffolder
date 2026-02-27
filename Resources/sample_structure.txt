@@ -1,0 +1,35 @@
+# =========================================================
+# Scaffold Tree - Unreal Engine Style Example
+# =========================================================
+
+@ROOT {{Root}}
+
+{{Root}}/
+	Source/
+		MyGame/
+			MyGame.Build.cs
+			Public/
+				Core/
+					MyGameGameModeBase.h
+				Characters/
+					BaseCharacter.h
+					PlayerCharacter.h
+				Items/
+					BaseItem.h
+			Private/
+				Core/
+					MyGameGameModeBase.cpp
+				Characters/
+					BaseCharacter.cpp
+					PlayerCharacter.cpp
+				Items/
+					BaseItem.cpp
+	Plugins/
+		UtilityPlugin/
+			UtilityPlugin.uplugin
+			Source/
+				UtilityPlugin/
+					Public/
+						LogUtils.h
+					Private/
+						LogUtils.cpp

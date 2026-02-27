@@ -12,6 +12,7 @@
 
 *   **Text-Based Design**: Intuitively manage folder structures and file contents by writing them in text.
 *   **Visual Comparison (Diff View)**: Check the changes in folder structure before and after scaffolding (file creation) at a glance. It provides a preview of which files will be created or changed depending on where you click.
+*   **Interactive Item Selection & Sync**: Selectively apply specific items using checkboxes (`☑`/`☐`) in the After view. Clicking an item in the After view instantly locates and expands it in the Before view.
 *   **Intuitive Focus Highlight**: Clearly distinguish whether you are checking the Before or After view through blue (active) and gray (inactive) color coding.
 *   **Safe Operation**: Prevents accidental modification of important system folders and displays a warning message with a detailed summary of changes before overwriting existing files.
 *   **Shortcut Support**: Quickly execute frequently used functions with shortcuts, and shortcut hints appear on the screen when you press the `Alt` key.
@@ -89,6 +90,12 @@ Follow these steps to get started:
 
 > 💡 **Important**: All content (including line breaks and spaces) between `@@@FILE_BEGIN` and `@@@FILE_END` is saved to the file exactly as written.
 
+> 💡 **Auto-Merge Logic**: 
+> The structure defined in the 'Scaffold Tree' tab and the `@@@FILE_BEGIN` blocks in the 'Source Code' tab are **automatically merged during execution.** 
+> - Files only in the Tree: Created as empty files (0-byte).
+> - Files only in Source Code: Created according to the path and content defined in the source code (necessary parent folders are also created).
+> - Files in both: Created with the content defined in the source code.
+
 > 💡 **Quick Tree Generation Tip: `make tree` button**
 > When you select the 'Source Code' tab, the `make tree` button above the editor becomes active. If the `@@@FILE_BEGIN...END` blocks are already written, you can click this button to automatically generate the structure of 'Scaffold Tree' based on those file paths. This is a convenient feature that shortens the process of manually writing the tree structure.
 
@@ -126,8 +133,16 @@ The progress, errors, and warning messages of all scaffolding operations are rec
 
 You can quickly execute various functions within the application using keyboard shortcuts.
 
-*   **Display Shortcut Hints**: If you hold down the `Alt` key, the shortcut assigned to that function appears in yellow above the buttons displayed on the current screen. When you release the `Alt` key, the hints disappear.
-*   **Shortcut List**: For a detailed list of shortcuts, please refer to the [Technical Manual (GUIDE.en.md)](GUIDE.en.md).
+*   **t**: Load test data (when editor is not focused)
+*   **Space**: (In After View) Toggle checkbox for selected item
+*   **d**: Compute Diff
+*   **f**: Apply Scaffold
+*   **v**: Go to previous folder
+*   **b**: Browse folder
+*   **c**: Clear data
+*   **`** (Grave): Cycle analysis panel tabs
+*   **1, 2, 3**: Cycle tabs in each area
+*   **Alt**: Display shortcut hints (hold to show yellow overlays)
 
 ---
 

@@ -8,7 +8,6 @@ and it performs NO filesystem writes.
 """
 from __future__ import annotations
 
-import difflib
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -16,6 +15,7 @@ from typing import List, Dict, Set, Optional
 
 from .v2_parser import parse_v2_format, V2ParserError
 from Scripts.Utils.i18n import t
+from Scripts.Utils.similarity_checker import find_similar_candidates
 
 # ---------- Data Structures ----------
 
@@ -193,12 +193,6 @@ def parse_tree_text(text: str) -> tuple[List[NodeItem], Optional[str], Optional[
     return items, root_marker_name, None
 
 # ---------- Planning and Analysis Logic (unchanged) ----------
-def _normalize_filename(name: str, config: dict) -> str:
-    n = name
-    if config.get("NORMALIZE_LOWER", True): n = n.lower()
-    if config.get("NORMALIZE_REMOVE_NONALNUM", True): n = re.sub(r"[^a-z0-9]", "", n)
-    return n
-
 def _is_interesting_file(path: Path, config: dict) -> bool:
     extensions = config.get("SCAN_INCLUDE_EXTENSIONS", {".h", ".cpp", ".cs"})
     name = path.name
@@ -213,22 +207,6 @@ def scan_existing_files(root: Path, config: dict) -> Dict[str, List[Path]]:
     except OSError as e:
         print(f"Warning: Could not scan directory fully: {e}")
     return result
-
-def find_similar_candidates(existing_map: Dict[str, List[Path]], target_name: str, config: dict) -> List[tuple[str, float, List[Path]]]:
-    if not config.get("ENABLE_SIMILARITY_SCAN", True): return []
-    threshold = config.get("SIMILARITY_RATIO_THRESHOLD", 0.86)
-    target_norm = _normalize_filename(target_name, config)
-    if not target_norm: return []
-    out = []
-    for exist_name, paths in existing_map.items():
-        exist_norm = _normalize_filename(exist_name, config)
-        if not exist_norm: continue
-        ratio = difflib.SequenceMatcher(a=target_norm, b=exist_norm).ratio()
-        if ratio >= threshold:
-            out.append((exist_name, ratio, paths))
-    out.sort(key=lambda x: x[1], reverse=True)
-    return out
-# -------------------------------------------------------------
 
 def is_content_identical(actual: str, planned: str) -> bool:
     """Compares actual and planned content with normalization."""
