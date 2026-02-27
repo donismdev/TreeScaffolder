@@ -26,6 +26,12 @@ def _is_excluded_by_parent(app, path):
         parent = parent.parent
     return False
 
+def _is_effectively_selected(app, path):
+    """Checks if a path is directly or indirectly (via parent) unchecked."""
+    if not app.selected_paths.get(path, True):
+        return False
+    return not _is_excluded_by_parent(app, path)
+
 def execute_scaffold(app):
     """Performs the actual file and directory creation."""
     plan = app.current_plan
@@ -43,11 +49,16 @@ def execute_scaffold(app):
     else:
         app._log("Starting scaffold operation...", "info")
     
-    total_content_lines = sum(len(content.splitlines()) for content in plan.file_contents.values())
+    # Only count lines from files that are effectively selected
+    total_content_lines = sum(
+        len(content.splitlines()) 
+        for path, content in plan.file_contents.items() 
+        if _is_effectively_selected(app, path)
+    )
 
-    num_planned_new_dirs = len([p for p in plan.planned_dirs if plan.path_states.get(p) == 'new'])
-    num_planned_new_files = len([p for p in plan.planned_files if plan.path_states.get(p) == 'new'])
-    num_planned_overwrite_files = len([p for p in plan.planned_files if plan.path_states.get(p) == 'overwrite'])
+    num_planned_new_dirs = len([p for p in plan.planned_dirs if plan.path_states.get(p) == 'new' and _is_effectively_selected(app, p)])
+    num_planned_new_files = len([p for p in plan.planned_files if plan.path_states.get(p) == 'new' and _is_effectively_selected(app, p)])
+    num_planned_overwrite_files = len([p for p in plan.planned_files if plan.path_states.get(p) == 'overwrite' and _is_effectively_selected(app, p)])
 
     app._log(f"\nPlanned Actions Summary:")
     app._log(f"- New directories: {num_planned_new_dirs}")

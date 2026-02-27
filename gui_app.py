@@ -349,6 +349,14 @@ class ScaffoldApp:
 
         self.current_plan = scaffold_core.generate_plan(root_path, text_input, config)
         
+        # --- 0. Filter selected_paths to remove stale entries ---
+        # Keep only paths that are present in the new plan's involved paths.
+        if self.current_plan:
+            all_involved = self.current_plan.planned_dirs.union(self.current_plan.planned_files)
+            # Retain existing checkbox states for paths that are still in the plan,
+            # but discard any that were removed (preventing memory leaks/stale data).
+            self.selected_paths = {p: s for p, s in self.selected_paths.items() if p in all_involved}
+        
         # --- 1. Log 초기화 및 준비 (Silent가 아닐 때만) ---
         if not silent:
             self.log_text.config(state=tk.NORMAL)
@@ -430,10 +438,25 @@ class ScaffoldApp:
 
         is_dry_run = self.dry_run.get()
         
-        # 변경 사항 카운트
-        new_files = sum(1 for p, s in self.current_plan.path_states.items() if s == 'new' and p in self.current_plan.planned_files)
-        new_dirs = sum(1 for p, s in self.current_plan.path_states.items() if s == 'new' and p in self.current_plan.planned_dirs)
-        overwrites = sum(1 for s in self.current_plan.path_states.values() if s == 'overwrite')
+        # --- Helper for counting effectively selected items ---
+        def is_effectively_selected(path):
+            if not self.selected_paths.get(path, True):
+                return False
+            root_path = self.current_plan.root_path
+            parent = path.parent
+            while parent != root_path and parent.is_relative_to(root_path):
+                if parent in self.selected_paths and not self.selected_paths[parent]:
+                    return False
+                parent = parent.parent
+            return True
+
+        # 변경 사항 카운트 (체크박스 선택 상태 반영)
+        new_files = sum(1 for p, s in self.current_plan.path_states.items() 
+                        if s == 'new' and p in self.current_plan.planned_files and is_effectively_selected(p))
+        new_dirs = sum(1 for p, s in self.current_plan.path_states.items() 
+                       if s == 'new' and p in self.current_plan.planned_dirs and is_effectively_selected(p))
+        overwrites = sum(1 for p, s in self.current_plan.path_states.items() 
+                         if s == 'overwrite' and is_effectively_selected(p))
 
         if is_dry_run:
             title = t("message.confirm_dry_run_title")
@@ -477,28 +500,6 @@ class ScaffoldApp:
         # Toggle the first selected item
         self._toggle_path_selection(tree, selection[0])
         return "break" # Prevent default spacebar scrolling behavior
-
-    def _toggle_path_selection(self, tree, item_id):
-        """Toggles the selection of a path and its children."""
-        values = tree.item(item_id, "values")
-        if not values: return
-        path = Path(values[0])
-        
-        # If this path is not selectable (no checkbox), ignore
-        if path not in self.selected_paths:
-            return
-
-        new_state = not self.selected_paths[path]
-        self._set_path_selection_recursive(tree, item_id, new_state)
-        
-        # If we just enabled an item, we should also enable all its parents
-        # to ensure the path to this item is valid.
-        if new_state:
-            self._select_parents_recursive(tree, item_id)
-
-        # Refresh summary
-        if self.current_plan:
-             action_handler.handle_diff_computed(self, self.current_plan)
 
     def _toggle_path_selection(self, tree, item_id):
         """Toggles the selection of a path and its children across both After views."""
