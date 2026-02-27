@@ -265,19 +265,20 @@ def create_right_panel(app):
     app.option_button.pack(side="left", padx=2)
     app.widget_map["on_options"] = app.option_button
 
-    # Recovery button (stub for now)
-    app.recovery_button = ttk.Button(summary_btns_frame, text=t("ui.recovery") if "ui.recovery" in t("ui") else "Recovery", width=12, command=lambda: app._log("Recovery feature coming soon!", "info"))
+    # Recovery button
+    app.recovery_button = ttk.Button(summary_btns_frame, text=t("ui.recovery") if "ui.recovery" in t("ui") else "Recovery", width=12, command=app.on_recovery)
     app.recovery_button.pack(side="left", padx=2)
+    app.widget_map["on_recovery"] = app.recovery_button
     
     app.clear_button = ttk.Button(summary_btns_frame, text=t("ui.clear"), command=app.on_clear_data, width=8)
     app.clear_button.pack(side="left", padx=2)
     app.widget_map["on_clear_data"] = app.clear_button
 
-    # Bind selection event
-    app.before_tree.bind("<<TreeviewSelect>>", app.on_tree_select)
-    app.after_tree.bind("<<TreeviewSelect>>", app.on_tree_select)
-    app.before_list.bind("<<TreeviewSelect>>", app.on_tree_select)
-    app.after_list.bind("<<TreeviewSelect>>", app.on_tree_select)
+    # Bind selection events to separate handlers to ensure absolute isolation
+    app.before_tree.bind("<<TreeviewSelect>>", app.on_before_select)
+    app.before_list.bind("<<TreeviewSelect>>", app.on_before_select)
+    app.after_tree.bind("<<TreeviewSelect>>", app.on_after_select)
+    app.after_list.bind("<<TreeviewSelect>>", app.on_after_select)
 
     # Bind click for toggle logic
     app.after_tree.bind("<Button-1>", lambda e: app._on_after_tree_click(e) if hasattr(app, "_on_after_tree_click") else None)

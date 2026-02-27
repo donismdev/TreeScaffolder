@@ -91,21 +91,32 @@ def populate_after_tree(app, plan):
             if root_path in p_path.parents:
                 modified_parent_dirs.add(root_path)
 
-    # Populate the main 'After (Planned State)' tree
+    # Populate the main 'After (Planned State)' tree (Full View)
+    app.after_tree_map = {}
     _populate_treeview_from_plan(app, app.after_tree, plan, root_path, 
-                                     lambda p, plan_obj, mpd: True, modified_parent_dirs, auto_open_modified=True)
+                                     lambda p, plan_obj, mpd: True, modified_parent_dirs, auto_open_modified=True, should_show_root=True, node_map=app.after_tree_map)
     
-    # Populate the 'Apply Tree' (after_list)
+    # Populate the 'Apply Tree' (after_list) (Changes Only View)
+    # Filter: Only show items that are modified (new, overwrite, conflict, identical) or are parents of such items.
+    # We exclude 'exists' because it represents files that are NOT being touched by the scaffold.
+    app.after_list_map = {}
     _populate_treeview_from_plan(app, app.after_list, plan, root_path, 
-                                     lambda p, plan_obj, mpd: plan_obj.path_states.get(p) in ('new', 'overwrite', 'conflict_file', 'conflict_dir', 'exists', 'identical') or p in mpd, modified_parent_dirs, auto_open_modified=True)
+                                     lambda p, plan_obj, mpd: plan_obj.path_states.get(p) in ('new', 'overwrite', 'conflict_file', 'conflict_dir', 'identical') or p in mpd, modified_parent_dirs, auto_open_modified=True, should_show_root=False, node_map=app.after_list_map)
 
-def _populate_treeview_from_plan(app, tree_widget: ttk.Treeview, plan_obj, root_path_param: Path, filter_func, modified_parent_dirs: set, auto_open_modified: bool):
+def _populate_treeview_from_plan(app, tree_widget: ttk.Treeview, plan_obj, root_path_param: Path, filter_func, modified_parent_dirs: set, auto_open_modified: bool, should_show_root: bool = True, node_map: dict = None):
     dir_nodes = {}
 
-    # 1. Insert the root node
-    icon = app.classifier.classify_path(root_path_param)
-    root_node_id = tree_widget.insert("", "end", text=f"{icon} {root_path_param.name}", open=True, values=[str(root_path_param)])
-    dir_nodes[root_path_param] = root_node_id
+    # 1. Insert the root node if requested
+    root_node_id = ""
+    if should_show_root:
+        icon = app.classifier.classify_path(root_path_param)
+        root_node_id = tree_widget.insert("", "end", text=f"{icon} {root_path_param.name}", open=True, values=[str(root_path_param)])
+        dir_nodes[root_path_param] = root_node_id
+        if node_map is not None:
+            node_map[str(root_path_param)] = root_node_id
+    else:
+        # If not showing root, use the empty string as parent for top-level items
+        dir_nodes[root_path_param] = ""
 
     # Gather all relevant paths
     all_paths_to_consider = set(plan_obj.planned_dirs).union(plan_obj.planned_files)
@@ -136,12 +147,21 @@ def _populate_treeview_from_plan(app, tree_widget: ttk.Treeview, plan_obj, root_
             for ancestor_path in ancestors_to_process:
                 parent_of_ancestor_id = dir_nodes.get(ancestor_path.parent, root_node_id)
 
-                intermediate_icon = app.classifier.classify_path(ancestor_path, is_planned_dir=ancestor_path.is_dir() or ancestor_path in plan_obj.planned_dirs)
+                # Robust directory check (case-insensitive) for icon classification
+                try:
+                    anc_res_lower = str(ancestor_path.resolve()).lower()
+                except Exception:
+                    anc_res_lower = str(ancestor_path).lower()
+                
+                is_actually_planned_dir = any(str(p.resolve()).lower() == anc_res_lower for p in plan_obj.planned_dirs) if plan_obj.planned_dirs else False
+                intermediate_icon = app.classifier.classify_path(ancestor_path, is_planned_dir=ancestor_path.is_dir() or is_actually_planned_dir)
                 intermediate_tags = ['modified_parent'] if ancestor_path in modified_parent_dirs else []
                 
                 if ancestor_path not in dir_nodes:
                     node = tree_widget.insert(parent_of_ancestor_id, "end", text=f"{intermediate_icon} {ancestor_path.name}", open=auto_open_modified, tags=intermediate_tags, values=[str(ancestor_path)])
                     dir_nodes[ancestor_path] = node
+                    if node_map is not None:
+                        node_map[str(ancestor_path)] = node
                 elif auto_open_modified:
                     tree_widget.item(dir_nodes[ancestor_path], open=True)
             
@@ -155,7 +175,16 @@ def _populate_treeview_from_plan(app, tree_widget: ttk.Treeview, plan_obj, root_
             elif state in ('conflict_file', 'conflict_dir'): tags.append('conflict')
             if path in modified_parent_dirs: tags.append('modified_parent')
             
-            icon = app.classifier.classify_path(path, is_planned_dir=path.is_dir() or path in plan_obj.planned_dirs)
+            # Robust directory check (case-insensitive)
+            try:
+                path_res_lower = str(path.resolve()).lower()
+            except Exception:
+                path_res_lower = str(path).lower()
+            
+            is_actually_planned_dir = any(str(p.resolve()).lower() == path_res_lower for p in plan_obj.planned_dirs) if plan_obj.planned_dirs else False
+            item_is_directory = path.is_dir() or is_actually_planned_dir
+
+            icon = app.classifier.classify_path(path, is_planned_dir=item_is_directory)
             
             # --- Checkbox Logic ---
             prefix = ""
@@ -167,10 +196,12 @@ def _populate_treeview_from_plan(app, tree_widget: ttk.Treeview, plan_obj, root_
                 check_char = "☑" if app.selected_paths[path] else "☐"
                 prefix = f"{check_char} "
 
-            item_is_directory = path.is_dir() or path in plan_obj.planned_dirs
             should_open_this_item = auto_open_modified and item_is_directory
             
             node_id = tree_widget.insert(parent_node_id, "end", text=f"{prefix}{icon} {path.name}", tags=tags, values=[str(path)], open=should_open_this_item)
+            
+            if node_map is not None:
+                node_map[str(path)] = node_id
             
             if item_is_directory:
                 dir_nodes[path] = node_id

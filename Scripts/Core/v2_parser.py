@@ -110,6 +110,9 @@ def parse_v2_format(text: str, root_marker: str | None = None, root_marker_name:
             # Apply root marker replacement
             if root_marker and path.startswith(root_marker):
                 path = path.replace(root_marker, '', 1).lstrip('/\\')
+            # Hardcoded fallback for {{Root}} marker to ensure portability
+            elif path.startswith("{{Root}}"):
+                path = path.replace("{{Root}}", '', 1).lstrip('/\\')
             
             file_blocks.append({'path': path, 'content': content})
 

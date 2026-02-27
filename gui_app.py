@@ -121,8 +121,12 @@ class ScaffoldApp:
         self.after_notebook = None
         self.before_tree_map = {}
         self.before_list_map = {}
+        self.after_tree_map = {}
+        self.after_list_map = {}
         self.selected_paths = {} # Track checked state in After View: {Path: bool}
         self.last_selected_after_item = None # For click-again-to-toggle logic
+        self._in_selection_sync = False # Guard (kept for internal safety, though sync is being removed)
+        self.before_cache = {} # Cache for physical file contents
         
         self.widget_map = {} # Map action names to UI widgets for shortcut hints
         self.key_bindings_map = key_bindings._load_key_bindings_config() # Load keybindings for hint manager
@@ -307,9 +311,17 @@ class ScaffoldApp:
             self.target_root_path.set(message)
             self._save_last_root_path(message)
             self.recompute_button.config(state=tk.NORMAL)
+            
+            # THOROUGH CLEANUP on path change
+            self.before_cache = {}
+            self.after_cache = {}
+            self.current_plan = None
+            
             self._populate_before_tree(Path(message))
             self._clear_tree(self.after_tree)
             self._clear_tree(self.after_list)
+            self._clear_tree(self.before_list)
+            
             self.apply_button.config(state=tk.DISABLED)
             action_handler.handle_folder_selected(self, message, method="browse")
         logger.debug("on_browse_folder completed")
@@ -330,6 +342,11 @@ class ScaffoldApp:
             "ENABLE_SIMILARITY_SCAN": self.enable_similarity_scan.get(),
             "SIMILARITY_RATIO_THRESHOLD": self.similarity_threshold.get(),
         }
+
+        # Clear caches before recomputing to ensure fresh data
+        self.before_cache = {}
+        self.after_cache = {}
+
         self.current_plan = scaffold_core.generate_plan(root_path, text_input, config)
         
         # --- 1. Log 초기화 및 준비 (Silent가 아닐 때만) ---
@@ -483,116 +500,213 @@ class ScaffoldApp:
         if self.current_plan:
              action_handler.handle_diff_computed(self, self.current_plan)
 
-    def _select_parents_recursive(self, tree, item_id):
-        """Recursively selects parent nodes if they are selectable."""
-        parent_id = tree.parent(item_id)
-        if not parent_id:
-            return
-            
-        values = tree.item(parent_id, "values")
-        if not values: return
-        path = Path(values[0])
-        
-        # If the parent is a selectable item (has a checkbox) and is currently unchecked
-        if path in self.selected_paths and not self.selected_paths[path]:
-            self.selected_paths[path] = True
-            
-            # Update Visual
-            current_text = tree.item(parent_id, "text")
-            if current_text.startswith("☐"):
-                new_text = "☑" + current_text[1:]
-                tree.item(parent_id, text=new_text)
-        
-        # Continue up the tree
-        self._select_parents_recursive(tree, parent_id)
-
-    def _set_path_selection_recursive(self, tree, item_id, state):
-        """Helper to recursively set selection state and update UI text."""
+    def _toggle_path_selection(self, tree, item_id):
+        """Toggles the selection of a path and its children across both After views."""
         values = tree.item(item_id, "values")
         if not values: return
         path = Path(values[0])
         
-        # Update state if this item is a selectable item
+        if path not in self.selected_paths:
+            return
+
+        new_state = not self.selected_paths[path]
+        
+        # 1. Update internal state and both views recursively
+        self._set_path_selection_sync(path, new_state)
+        
+        # 2. If enabled, ensure all parents are also enabled (Sync across both)
+        if new_state:
+            self._select_parents_sync(path)
+
+        # Refresh summary
+        if self.current_plan:
+             action_handler.handle_diff_computed(self, self.current_plan)
+
+    def _select_parents_sync(self, path: Path):
+        """Recursively selects and updates parents in both views."""
+        current = path.parent
+        # Root path is the boundary
+        if not self.current_plan or current == self.current_plan.root_path:
+            return
+            
+        if current in self.selected_paths and not self.selected_paths[current]:
+            self.selected_paths[current] = True
+            self._update_node_visual_sync(current, True)
+        
+        self._select_parents_sync(current)
+
+    def _set_path_selection_sync(self, path: Path, state: bool):
+        """Sets state and updates visuals for a path and all its children in both views."""
         if path in self.selected_paths:
             self.selected_paths[path] = state
-            
-            # Update Visual
-            current_text = tree.item(item_id, "text")
-            check_char = "☑" if state else "☐"
-            
-            # Replace old checkbox char with new one
+            self._update_node_visual_sync(path, state)
+
+        # Find children in the plan to ensure we cover everything, even if not in one of the trees
+        if self.current_plan:
+            for p in self.current_plan.planned_dirs.union(self.current_plan.planned_files):
+                if p.parent == path:
+                    self._set_path_selection_sync(p, state)
+
+    def _update_node_visual_sync(self, path: Path, state: bool):
+        """Updates the checkbox character for a path in both after_tree and after_list."""
+        path_str = str(path)
+        check_char = "☑" if state else "☐"
+        
+        # Update After Tree
+        if hasattr(self, 'after_tree_map') and path_str in self.after_tree_map:
+            node_id = self.after_tree_map[path_str]
+            current_text = self.after_tree.item(node_id, "text")
             if current_text.startswith("☑") or current_text.startswith("☐"):
-                new_text = check_char + current_text[1:]
-                tree.item(item_id, text=new_text)
+                self.after_tree.item(node_id, text=check_char + current_text[1:])
+        
+        # Update After List (Apply Tree)
+        if hasattr(self, 'after_list_map') and path_str in self.after_list_map:
+            node_id = self.after_list_map[path_str]
+            current_text = self.after_list.item(node_id, "text")
+            if current_text.startswith("☑") or current_text.startswith("☐"):
+                self.after_list.item(node_id, text=check_char + current_text[1:])
 
-        # Recursively update children
-        for child_id in tree.get_children(item_id):
-            self._set_path_selection_recursive(tree, child_id, state)
+    def on_before_select(self, event: tk.Event):
+        """Handler for the 'Before' views (Physical Truth)."""
+        if self._in_selection_sync:
+            return
 
-    def on_tree_select(self, event: tk.Event):
-        print("DEBUG: on_tree_select called") # Debug print
         widget = event.widget
-        widget.focus_set() # Set focus to the clicked widget for visual highlighting
+        # Safety: Ignore if focus is in After view
+        focused_widget = self.root.focus_get()
+        if hasattr(self, 'after_tree') and focused_widget == self.after_tree:
+            return
+        if hasattr(self, 'after_list') and focused_widget == self.after_list:
+            return
+
+        widget.focus_set()
         selection = widget.selection()
         if not selection: return
         item_id = selection[0]
-
         values = widget.item(item_id, "values")
         if not values: return
         path = Path(values[0])
+        
         content_to_show, source_info = "", ""
         try:
-            is_dir = path.is_dir() or (self.current_plan and path in self.current_plan.planned_dirs)
-            if is_dir:
+            if path.is_dir():
                 self.content_text.delete("1.0", tk.END)
-                self.content_text.insert("1.0", f"Directory selected:\n{path}")
+                self.content_text.insert("1.0", f"--- PHYSICAL DIRECTORY ---\nPath: {path}")
                 self.editor_notebook.select(2)
                 return
-            
-            # Check if we are in one of the 'After' views
-            is_after_view = widget in (self.after_tree, self.after_list)
 
-            # --- Synchronize with Before View ---
-            if is_after_view:
+            if path.exists():
+                if path not in self.before_cache:
+                    self.before_cache[path] = path.read_text(encoding='utf-8', errors='replace')
+                content_to_show = self.before_cache[path]
+                source_info = f"--- PHYSICAL CONTENT (On Disk) ---\nFile: {path}\n"
+            else:
+                source_info = f"--- FILE NOT FOUND ON DISK ---\nFile: {path}\n"
+        except Exception as e:
+            content_to_show = f"Error loading content: {e}"
+
+        self.content_text.delete("1.0", tk.END)
+        self.content_text.insert("1.0", source_info + "="*40 + "\n" + content_to_show)
+        self.editor_notebook.select(2)
+
+    def on_after_select(self, event: tk.Event):
+        """Handler for the 'After' views (Planned Truth)."""
+        if self._in_selection_sync:
+            return
+
+        widget = event.widget
+        widget.focus_set()
+        selection = widget.selection()
+        if not selection: return
+        item_id = selection[0]
+        values = widget.item(item_id, "values")
+        if not values: return
+        path = Path(values[0])
+        
+        content_to_show, source_info = "", ""
+        try:
+            if not self.current_plan: return
+            
+            # --- Visual Sync to Before View (Safe with guard) ---
+            self._in_selection_sync = True
+            try:
                 path_str = str(path)
                 # Sync Before Tree
                 if path_str in self.before_tree_map:
-                    target_node = self.before_tree_map[path_str]
-                    # Expand all parents
-                    parent = self.before_tree.parent(target_node)
+                    node = self.before_tree_map[path_str]
+                    parent = self.before_tree.parent(node)
                     while parent:
                         self.before_tree.item(parent, open=True)
                         parent = self.before_tree.parent(parent)
-                    # Select and see
-                    self.before_tree.selection_set(target_node)
-                    self.before_tree.see(target_node)
-                
+                    self.before_tree.selection_set(node)
+                    self.before_tree.see(node)
                 # Sync Before List
                 if path_str in self.before_list_map:
-                    target_node = self.before_list_map[path_str]
-                    self.before_list.selection_set(target_node)
-                    self.before_list.see(target_node)
+                    node = self.before_list_map[path_str]
+                    self.before_list.selection_set(node)
+                    self.before_list.see(node)
+            finally:
+                # Delay reset to ensure triggered events are caught by the guard
+                self.root.after(100, lambda: setattr(self, '_in_selection_sync', False))
+
+            # --- Data Loading ---
+            state = self.current_plan.path_states.get(path)
+            is_dir = (path in self.current_plan.planned_dirs) or (path.exists() and path.is_dir())
             
-            if is_after_view and self.current_plan:
-                # Try to get planned content using various path representations for robustness
-                resolved_path = path.resolve()
-                planned_content = self.current_plan.file_contents.get(resolved_path)
-                
-                # Fallback: some paths might be stored in planned_files but not yet resolved in the same way
-                if planned_content is None:
-                    # Try direct match if not already matching
-                    planned_content = self.current_plan.file_contents.get(path)
-                
+            if is_dir:
+                self.content_text.delete("1.0", tk.END)
+                self.content_text.insert("1.0", f"--- PLANNED DIRECTORY ---\nPath: {path}")
+                self.editor_notebook.select(2)
+                return
+
+            if state in ('new', 'overwrite', 'conflict_file', 'conflict_dir'):
+                planned_content = self._get_planned_content(path)
                 if planned_content is not None:
-                    content_to_show, source_info = planned_content, f"--- PLANNED CONTENT ---\nFile: {path}\n"
-                elif path.exists():
-                    content_to_show, source_info = path.read_text(encoding='utf-8', errors='replace'), f"--- EXISTING CONTENT (Unchanged) ---\nFile: {path}\n"
+                    content_to_show = planned_content
+                    source_info = f"--- PLANNED CONTENT (Memory) ---\nState: {state}\nFile: {path}\n"
                 else:
-                    content_to_show, source_info = "", f"--- NEW FILE (Empty) ---\nFile: {path}\n"
-            elif path.exists():
-                content_to_show, source_info = path.read_text(encoding='utf-8', errors='replace'), f"--- CURRENT CONTENT ---\nFile: {path}\n"
+                    source_info = f"--- NEW FILE (Empty) ---\nFile: {path}\n"
+            elif state in ('exists', 'identical') or path.exists():
+                if path not in self.after_cache:
+                    self.after_cache[path] = path.read_text(encoding='utf-8', errors='replace')
+                content_to_show = self.after_cache[path]
+                source_info = f"--- EXISTING CONTENT (After View) ---\nState: {state}\nFile: {path}\n"
+            else:
+                source_info = f"--- FILE NOT PLANNED ---\nFile: {path}\n"
+
         except Exception as e:
-            content_to_show = f"Error reading file content:\n{e}"
+            content_to_show = f"Error loading content: {e}"
+
+        self.content_text.delete("1.0", tk.END)
+        self.content_text.insert("1.0", source_info + "="*40 + "\n" + content_to_show)
+        self.editor_notebook.select(2)
+
+    def _get_planned_content(self, path: Path) -> str | None:
+        """Robustly retrieves planned content from the current plan (case-insensitive)."""
+        if not self.current_plan: return None
+        try:
+            res_path = path.resolve()
+        except Exception:
+            res_path = path
+        
+        # 1. Direct match
+        content = self.current_plan.file_contents.get(res_path)
+        if content is not None: return content
+        content = self.current_plan.file_contents.get(path)
+        if content is not None: return content
+
+        # 2. Case-insensitive search
+        target_lower = str(res_path).lower()
+        for p_obj, p_content in self.current_plan.file_contents.items():
+            try:
+                if str(p_obj.resolve()).lower() == target_lower:
+                    return p_content
+            except Exception:
+                if str(p_obj).lower() == target_lower:
+                    return p_content
+        return None
+
+    def on_load_test_data(self):
         
         self.content_text.delete("1.0", tk.END)
         self.content_text.insert("1.0", source_info + "="*40 + "\n" + content_to_show)
@@ -687,6 +801,8 @@ class ScaffoldApp:
         self.source_code_text.delete("1.0", tk.END)
         self.content_text.delete("1.0", tk.END)
         self.current_plan = None
+        self.before_cache = {}
+        self.after_cache = {}
         for tree in [self.before_tree, self.after_tree, self.before_list, self.after_list]:
             self._clear_tree(tree)
         self.recompute_button.config(state=tk.DISABLED)
@@ -695,6 +811,90 @@ class ScaffoldApp:
         app_utils.log_message(self, t("log.data_cleared"), "info")
         logger.debug("on_clear_data completed")
 
+    def on_recovery(self):
+        """Opens a recovery log file and restores the original contents."""
+        logger.debug("on_recovery called")
+        
+        log_dir = Path.cwd() / self.LOG_DIR
+        file_path = filedialog.askopenfilename(
+            initialdir=log_dir if log_dir.exists() else Path.cwd(),
+            title=t("ui.recovery_title"),
+            filetypes=[("Recovery Log", "scaffold_recovery_*.txt"), ("Text files", "*.txt"), ("All files", "*.*")]
+        )
+        
+        if not file_path:
+            return
+
+        try:
+            content = Path(file_path).read_text(encoding='utf-8')
+            
+            # --- 1. Extract Target Root from @ROOT directive ---
+            target_root = None
+            root_match = re.search(r'^@ROOT\s+(.*)$', content, re.MULTILINE)
+            if root_match:
+                target_root = Path(root_match.group(1).strip())
+
+            # --- 2. Confirm Target Folder with User ---
+            if not target_root:
+                # Fallback to current target if log doesn't have @ROOT (for older logs)
+                current_root_str = self.target_root_path.get()
+                if current_root_str and current_root_str != t("ui.no_folder_selected"):
+                    target_root = Path(current_root_str)
+
+            # If still no target, or to be safe, ask user to confirm/select
+            confirm_msg = f"Recovery Target Root: {target_root}\n\nDo you want to restore files to this folder?"
+            if not target_root or not messagebox.askyesno(t("ui.recovery_title"), confirm_msg):
+                selected_path = filedialog.askdirectory(title="Select Target Folder for Recovery")
+                if not selected_path:
+                    return
+                target_root = Path(selected_path)
+
+            if not target_root.exists() or not target_root.is_dir():
+                messagebox.showerror(t("message.error_title"), "Invalid recovery target folder.")
+                return
+
+            # --- 3. Parse Blocks ---
+            # Using v2_parser (which now handles {{Root}} robustly)
+            blocks = scaffold_core.parse_v2_format(content)
+            if not blocks:
+                messagebox.showinfo(t("ui.recovery_title"), "No restorable file blocks found in the log.")
+                return
+
+            # --- 4. Confirm Restoration ---
+            if not messagebox.askyesno(t("ui.recovery_title"), f"Found {len(blocks)} files to restore. Proceed?"):
+                return
+
+            # --- 5. Apply Restoration ---
+            restored_count = 0
+            error_count = 0
+            
+            app_utils.log_message(self, f"--- STARTING RECOVERY FROM: {Path(file_path).name} ---", "info")
+            for block in blocks:
+                rel_path = block['path']
+                file_content = block['content']
+                dest_path = (target_root / rel_path).resolve()
+                
+                try:
+                    dest_path.parent.mkdir(parents=True, exist_ok=True)
+                    # Normalize line endings to CRLF for restoration if it was likely Windows-originated
+                    final_restore_content = file_content.replace('\r\n', '\n').replace('\n', '\r\n')
+                    dest_path.write_bytes(final_restore_content.encode('utf-8'))
+                    app_utils.log_message(self, f"[RESTORED] {rel_path}", "success")
+                    restored_count += 1
+                except Exception as e:
+                    app_utils.log_message(self, f"[ERROR] Failed to restore {rel_path}: {e}", "error")
+                    error_count += 1
+
+            app_utils.log_message(self, f"--- RECOVERY FINISHED: {restored_count} success, {error_count} error ---", "info")
+            messagebox.showinfo(t("ui.recovery_title"), f"Restoration complete!\nSuccess: {restored_count}\nErrors: {error_count}")
+            
+            # Refresh 'Before' view to show restored files
+            self._populate_before_tree(target_root)
+
+        except Exception as e:
+            logger.error(f"Recovery failed: {e}")
+            messagebox.showerror(t("message.error_title"), f"An error occurred during recovery:\n{e}")
+
     def on_previous_folder(self):
         logger.debug("on_previous_folder called")
         if self.last_root_path and Path(self.last_root_path).is_dir():
@@ -702,8 +902,17 @@ class ScaffoldApp:
             if is_valid:
                 self.target_root_path.set(message)
                 self.recompute_button.config(state=tk.NORMAL)
+                
+                # THOROUGH CLEANUP on path change
+                self.before_cache = {}
+                self.after_cache = {}
+                self.current_plan = None
+                
                 self._populate_before_tree(Path(message))
                 self._clear_tree(self.after_tree)
+                self._clear_tree(self.after_list)
+                self._clear_tree(self.before_list)
+                
                 self.apply_button.config(state=tk.DISABLED)
                 action_handler.handle_folder_selected(self, message, method="prev")
             else:

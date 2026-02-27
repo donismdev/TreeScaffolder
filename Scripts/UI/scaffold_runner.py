@@ -296,6 +296,8 @@ def _write_recovery_v2_log(app, overwritten_backups: dict, original_log_method):
     root_path = plan.root_path
 
     log_entries = [
+        f"@ROOT {root_path}",
+        "",
         "@@@COMMENT_BEGIN",
         "SCAFFOLD EXECUTION RECOVERY LOG",
         f"Date: {datetime.datetime.now().isoformat()}",
@@ -309,16 +311,18 @@ def _write_recovery_v2_log(app, overwritten_backups: dict, original_log_method):
 
     for path, content in overwritten_backups.items():
         try:
-            rel_path = path.relative_to(root_path)
+            # Use as_posix() for consistent forward slashes in the log
+            rel_path = path.relative_to(root_path).as_posix()
+            display_path = f"{{{{Root}}}}/{rel_path}"
         except ValueError:
-            rel_path = path # Fallback to absolute if somehow not relative
+            display_path = str(path)
             
-        log_entries.append(f"@@@FILE_BEGIN {rel_path}")
+        log_entries.append(f"@@@FILE_BEGIN {display_path}")
         log_entries.append(content)
         # Ensure it ends with a newline before the tag if content doesn't have one
         if content and not content.endswith('\n'):
             log_entries.append("")
-        log_entries.append(f"@@@FILE_END {rel_path}")
+        log_entries.append(f"@@@FILE_END {display_path}")
         log_entries.append("")
 
     try:
