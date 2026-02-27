@@ -264,6 +264,10 @@ def create_right_panel(app):
     app.option_button = ttk.Button(summary_btns_frame, text=t("ui.option"), width=12, command=app.on_options)
     app.option_button.pack(side="left", padx=2)
     app.widget_map["on_options"] = app.option_button
+
+    # Recovery button (stub for now)
+    app.recovery_button = ttk.Button(summary_btns_frame, text=t("ui.recovery") if "ui.recovery" in t("ui") else "Recovery", width=12, command=lambda: app._log("Recovery feature coming soon!", "info"))
+    app.recovery_button.pack(side="left", padx=2)
     
     app.clear_button = ttk.Button(summary_btns_frame, text=t("ui.clear"), command=app.on_clear_data, width=8)
     app.clear_button.pack(side="left", padx=2)

@@ -1,4 +1,6 @@
 {
     "enable_runtime_logging": true,
-    "language": "en"
+    "language": "en",
+    "debug_level": 1,
+    "log_cleanup_limit": 5
 }

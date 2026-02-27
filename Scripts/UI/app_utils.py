@@ -13,6 +13,7 @@ import subprocess
 from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, messagebox
+from Scripts.Utils import logger
 
 def log_message(app, message: str, level: str = "info", buffer_list: list = None):
     """Appends a message to the log widget, a buffer list, and the runtime log file."""
@@ -94,19 +95,19 @@ def load_window_geometry(app):
                 if "diff_sash_pos" in config:
                     diff_sash_pos_loaded = config["diff_sash_pos"]
         except Exception as e:
-            print(f"Error loading window config: {e}")
+            logger.error(f"Error loading window config: {e}")
             # Ensure config is initialized to an empty dict if loading fails to prevent KeyErrors
             config = {}
     else:
         config = {} # Initialize config as empty if file doesn't exist
 
-    print(f"DEBUG: Loaded geometry from config: {loaded_geometry}, state: {window_state_loaded}")
+    logger.debug(f"Loaded geometry from config: {loaded_geometry}, state: {window_state_loaded}")
 
     app.open_folder_after_apply.set(open_folder_after_apply)
 
     # Determine the geometry to apply
     geometry_to_apply = app.DEFAULT_GEOMETRY
-    print(f"DEBUG: Applying geometry: {geometry_to_apply}")
+    logger.debug(f"Applying geometry: {geometry_to_apply}")
     if loaded_geometry:
         try:
             match = re.match(r"(\d+)x(\d+)\+(-?\d+)\+(-?\d+)", loaded_geometry)
@@ -120,27 +121,27 @@ def load_window_geometry(app):
                     geometry_to_apply = loaded_geometry
                 else:
                     # Invalid geometry, revert to default and mark for saving
-                    print(f"Loaded geometry '{loaded_geometry}' is invalid. Using default.")
+                    logger.warn(f"Loaded geometry '{loaded_geometry}' is invalid. Using default.")
             else:
                 # Malformed geometry string, revert to default and mark for saving
-                print(f"Loaded geometry string '{loaded_geometry}' is malformed. Using default.")
+                logger.warn(f"Loaded geometry string '{loaded_geometry}' is malformed. Using default.")
         except Exception as e:
             # Error during parsing, revert to default and mark for saving
-            print(f"Error parsing loaded geometry '{loaded_geometry}': {e}. Using default.")
+            logger.error(f"Error parsing loaded geometry '{loaded_geometry}': {e}. Using default.")
     
     app.root.geometry(geometry_to_apply)
-    print(f"DEBUG: After applying geometry, current: {app.root.geometry()}")
+    logger.debug(f"After applying geometry, current: {app.root.geometry()}")
 
     # Apply window state (e.g., 'zoomed')
     if window_state_loaded in ['normal', 'zoomed', 'iconic']: # Tkinter states
-        print(f"DEBUG: Applying window state: {window_state_loaded}")
+        logger.debug(f"Applying window state: {window_state_loaded}")
         try:
             app.root.state(window_state_loaded)
         except tk.TclError as e:
-            print(f"Warning: Could not apply window state '{window_state_loaded}': {e}. Setting to 'normal'.")
+            logger.warn(f"Could not apply window state '{window_state_loaded}': {e}. Setting to 'normal'.")
             app.root.state('normal')
             config["window_state"] = 'normal' # Update config if state fails
-        print(f"DEBUG: After applying state, current state: {app.root.state()}")
+        logger.debug(f"After applying state, current state: {app.root.state()}")
 
     # Ensure widgets are updated so their sizes are available for sash positioning
     app.root.update_idletasks()
@@ -184,7 +185,7 @@ def load_window_geometry(app):
             with open(config_path, "w", encoding="utf-8") as f:
                 json.dump(config, f, indent=4)
         except Exception as e:
-            print(f"Error saving updated config with default geometry/state/sash positions: {e}")
+            logger.error(f"Error saving updated config with default geometry/state/sash positions: {e}")
 
 def save_window_geometry(app):
     """Saves current window geometry and sash positions to config.json."""
@@ -208,37 +209,37 @@ def save_window_geometry(app):
         with open(config_path, "w", encoding="utf-8") as f:
             json.dump(config, f, indent=4)
     except Exception as e:
-        print(f"Error saving window config: {e}")
+        logger.error(f"Error saving window config: {e}")
 
 def load_last_root_path(app):
     """Loads the last selected root path from config.json and updates UI."""
-    print("DEBUG: app_utils.load_last_root_path called")
+    logger.debug("app_utils.load_last_root_path called")
     config_path = Path.cwd() / app.CONFIG_FILE
     app.last_root_path = None
 
     if config_path.exists():
-        print(f"DEBUG: Found config file: {config_path}")
+        logger.debug(f"Found config file: {config_path}")
         try:
             with open(config_path, "r", encoding="utf-8") as f:
                 config = json.load(f)
                 if "last_root_path" in config:
                     path_str = config["last_root_path"]
-                    print(f"DEBUG: Found last_root_path in config: '{path_str}'")
+                    logger.debug(f"Found last_root_path in config: '{path_str}'")
                     is_dir = Path(path_str).is_dir()
-                    print(f"DEBUG: Path('{path_str}').is_dir() = {is_dir}")
+                    logger.debug(f"Path('{path_str}').is_dir() = {is_dir}")
                     if is_dir:
                         app.last_root_path = path_str
         except Exception as e:
-            print(f"DEBUG: Error loading last root path from config: {e}")
+            logger.debug(f"Error loading last root path from config: {e}")
     else:
-        print(f"DEBUG: Config file not found at {config_path}")
+        logger.debug(f"Config file not found at {config_path}")
     
-    print(f"DEBUG: Final app.last_root_path = '{app.last_root_path}'")
+    logger.debug(f"Final app.last_root_path = '{app.last_root_path}'")
     if app.last_root_path:
-        print("DEBUG: Enabling 'Prev' button.")
+        logger.debug("Enabling 'Prev' button.")
         app.prev_dir_button.config(state=tk.NORMAL)
     else:
-        print("DEBUG: Disabling 'Prev' button.")
+        logger.debug("Disabling 'Prev' button.")
         app.prev_dir_button.config(state=tk.DISABLED)
 
 def save_last_root_path(app, path: str):
@@ -257,7 +258,7 @@ def save_last_root_path(app, path: str):
         app.last_root_path = path
         app.prev_dir_button.config(state=tk.NORMAL)
     except Exception as e:
-        print(f"Error saving last root path: {e}")
+        logger.error(f"Error saving last root path: {e}")
 
 def validate_path(path: str) -> tuple[bool, str]:
     """Calls the external validator script and returns (is_valid, message)."""

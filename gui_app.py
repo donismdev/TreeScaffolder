@@ -29,6 +29,7 @@ from Scripts.Utils import tree_generator # Import the new utility
 from Scripts.UI.tree_populator import _clear_tree as clear_tree_function # Import as different name
 from Scripts.Utils.i18n import t
 from Scripts.UI import action_handler
+from Scripts.Utils import logger
 
 # --- Constants ---
 APP_TITLE = "Tree Scaffolder v1.2"
@@ -84,7 +85,7 @@ class ScaffoldApp:
     """The main application class for the Tree Scaffolder GUI."""
 
     def __init__(self, root: tk.Tk):
-        print("DEBUG: ScaffoldApp.__init__ started") # Debug print
+        logger.debug("ScaffoldApp.__init__ started")
         self.root = root
         self.root.title(t("ui.title"))
         self.root.geometry(DEFAULT_GEOMETRY)
@@ -175,7 +176,7 @@ class ScaffoldApp:
         self.root.bind("<KeyRelease-Alt_R>", self.hint_manager.hide_hints)
         self.root.bind("<FocusOut>", self.hint_manager.hide_hints) # Hide hints when window loses focus
 
-        print("DEBUG: ScaffoldApp.__init__ completed") # Debug print
+        logger.debug("ScaffoldApp.__init__ completed")
 
     def refresh_ui(self):
         """Re-initializes the UI components to apply language changes."""
@@ -278,18 +279,18 @@ class ScaffoldApp:
         self.style.configure('TButton', font=self.app_button_font)
 
     def setup_left_panel(self):
-        print("DEBUG: Calling create_left_panel") # Debug print
+        logger.debug("Calling setup_left_panel")
         create_left_panel(self)
-        print("DEBUG: create_left_panel completed") # Debug print
+        logger.debug("setup_left_panel completed")
 
     def setup_right_panel(self):
-        print("DEBUG: Calling create_right_panel") # Debug print
+        logger.debug("Calling setup_right_panel")
         create_right_panel(self)
-        print("DEBUG: create_right_panel completed") # Debug print
+        logger.debug("setup_right_panel completed")
 
     # --- Event Handlers ---
     def on_browse_folder(self):
-        print("DEBUG: on_browse_folder called") # Debug print
+        logger.debug("on_browse_folder called")
         path = filedialog.askdirectory(mustexist=True, title="Select a Target Root Folder")
         if not path:
             return
@@ -311,10 +312,10 @@ class ScaffoldApp:
             self._clear_tree(self.after_list)
             self.apply_button.config(state=tk.DISABLED)
             action_handler.handle_folder_selected(self, message, method="browse")
-        print("DEBUG: on_browse_folder completed") # Debug print
+        logger.debug("on_browse_folder completed")
 
     def on_recompute(self, silent=False):
-        print(f"DEBUG: on_recompute called (silent={silent})") # Debug print
+        logger.debug(f"on_recompute called (silent={silent})")
         root_path_str = self.target_root_path.get()
         if not root_path_str or root_path_str == t("ui.no_folder_selected") or not Path(root_path_str).is_dir():
             messagebox.showerror(t("message.error_title"), t("message.select_root_first"))
@@ -405,7 +406,7 @@ class ScaffoldApp:
             return True
 
     def on_apply(self):
-        print("DEBUG: on_apply called") # Debug print
+        logger.debug("on_apply called")
         if not self.current_plan or self.current_plan.has_conflicts:
             messagebox.showerror("Cannot Apply", "No valid plan or plan has conflicts.")
             return
@@ -433,7 +434,7 @@ class ScaffoldApp:
             self.apply_button.config(state=tk.DISABLED)
             self.root.after(100, self._execute_scaffold)
         
-        print("DEBUG: on_apply completed") # Debug print
+        logger.debug("on_apply completed")
 
     def _on_after_tree_click(self, event):
         """Handles mouse clicks on After View trees to support toggle-on-reclick."""
@@ -599,7 +600,7 @@ class ScaffoldApp:
         print("DEBUG: on_tree_select completed") # Debug print
 
     def on_load_test_data(self):
-        print("DEBUG: on_load_test_data called") # Debug print
+        logger.debug("on_load_test_data called")
         try:
             # Clear log at the start of loading test data
             self.log_text.config(state=tk.NORMAL)
@@ -666,17 +667,17 @@ class ScaffoldApp:
             self._log(f"Error loading test data: {e}", "error")
             messagebox.showerror(t("message.error_title"), f"An error occurred: {e}")
             action_handler.handle_test_data_loaded(self, success=False)
-        print("DEBUG: on_load_test_data completed") # Debug print
+        logger.debug("on_load_test_data completed")
 
     def on_options(self):
         """Opens the options window."""
-        print("DEBUG: on_options called")
+        logger.debug("on_options called")
         from Scripts.UI import options_ui
         action_handler.handle_options_opened(self)
         options_ui.show_options(self.root, self)
 
     def on_clear_data(self):
-        print("DEBUG: on_clear_data called") # Debug print
+        logger.debug("on_clear_data called")
         app_utils.log_message(self, t("log.clearing_data"), "info")
         self.dry_run.set(True)
         self.enable_similarity_scan.set(True)
@@ -692,10 +693,10 @@ class ScaffoldApp:
         self.apply_button.config(state=tk.DISABLED)
         action_handler.handle_data_cleared(self)
         app_utils.log_message(self, t("log.data_cleared"), "info")
-        print("DEBUG: on_clear_data completed") # Debug print
+        logger.debug("on_clear_data completed")
 
     def on_previous_folder(self):
-        print("DEBUG: on_previous_folder called") # Debug print
+        logger.debug("on_previous_folder called")
         if self.last_root_path and Path(self.last_root_path).is_dir():
             is_valid, message = self._validate_path(self.last_root_path)
             if is_valid:
@@ -802,48 +803,59 @@ class ScaffoldApp:
 def setup_runtime_logging():
     global console_logger_instance, editor_logger_instance
     """Reads config and sets up a file logger if enabled."""
-    print("DEBUG: setup_runtime_logging started.")
     try:
         config_file_path = Path.cwd() / CONFIG_FILE
-        print(f"DEBUG: Attempting to open config file: {config_file_path}")
+        # Load level from config
+        logger.load_config_and_set_level(config_file_path)
+
         with open(config_file_path, "r", encoding="utf-8") as f:
             config = json.load(f)
-        print(f"DEBUG: Config loaded successfully. enable_runtime_logging: {config.get('enable_runtime_logging', False)}")
         
+        # Always initialize console_logger_instance so logger.py can find it
+        console_logger_instance = logging.getLogger('console_output')
+        console_logger_instance.setLevel(logging.DEBUG)
+        console_logger_instance.propagate = False
+
         if config.get("enable_runtime_logging", False):
             log_path_dir = Path.cwd() / LOG_DIR
             log_path_dir.mkdir(exist_ok=True)
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             runtime_log_filename = log_path_dir / f"runtime_{timestamp}.log"
 
-            # --- Setup Console Logger ---
-            console_logger_instance = logging.getLogger('console_output')
-            console_logger_instance.setLevel(logging.DEBUG)
             console_file_handler = logging.FileHandler(runtime_log_filename, mode='w', encoding='utf-8')
             console_file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
             console_logger_instance.addHandler(console_file_handler)
-            console_logger_instance.propagate = False # Prevent messages from going to root logger
 
             # --- Setup Editor Logger ---
             editor_logger_instance = logging.getLogger('editor_output')
             editor_logger_instance.setLevel(logging.DEBUG)
-            editor_file_handler = logging.FileHandler(runtime_log_filename, mode='a', encoding='utf-8') # Append to the same file
+            editor_file_handler = logging.FileHandler(runtime_log_filename, mode='a', encoding='utf-8')
             editor_file_handler.setFormatter(logging.Formatter('--- editor log ---\n%(asctime)s - %(levelname)s - %(message)s'))
             editor_logger_instance.addHandler(editor_file_handler)
-            editor_logger_instance.propagate = False # Prevent messages from going to root logger
+            editor_logger_instance.propagate = False
 
-            # Redirect stdout and stderr
+            # Redirect stdout and stderr to the logger
             sys.stdout = StreamToLogger(console_logger_instance, logging.INFO)
             sys.stderr = StreamToLogger(console_logger_instance, logging.ERROR)
 
-            console_logger_instance.info(f"--- console ---\nRuntime logging enabled, log file: {runtime_log_filename}")
+            logger.info(f"Runtime logging enabled, log file: {runtime_log_filename}")
         else:
-            print("DEBUG: Runtime logging disabled in config.")
-    except (FileNotFoundError, json.JSONDecodeError) as e:
-        print(f"DEBUG: Could not set up runtime logger: {e} (FileNotFoundError or JSONDecodeError)")
+            # If runtime logging to file is disabled, still add a StreamHandler to console
+            if not any(isinstance(h, logging.StreamHandler) for h in console_logger_instance.handlers):
+                ch = logging.StreamHandler(sys.stdout)
+                ch.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
+                console_logger_instance.addHandler(ch)
+            
+            # Still redirect sys.stdout/stderr so print() goes through our leveling
+            sys.stdout = StreamToLogger(console_logger_instance, logging.INFO)
+            sys.stderr = StreamToLogger(console_logger_instance, logging.ERROR)
+            logger.debug("Runtime logging to file disabled.")
+
+    except (FileNotFoundError, json.JSONDecodeError):
+        # Fallback if config is missing or broken
+        pass
     except Exception as e:
-        print(f"DEBUG: An unexpected error occurred during runtime logger setup: {e}")
-    print("DEBUG: setup_runtime_logging completed.")
+        print(f"CRITICAL: Failed to initialize logging: {e}")
 
 def main():
     setup_runtime_logging() # Set up the logger first

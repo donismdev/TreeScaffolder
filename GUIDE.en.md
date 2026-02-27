@@ -170,6 +170,12 @@ A configuration file that controls the operation of the application.
 -   `enable_runtime_logging` (boolean)
     -   **`true`**: When the application runs, it creates a `runtime.log` file that records all operations and errors. This log is more detailed than the GUI's log panel and is useful for troubleshooting.
     -   **`false`**: Does not create a `runtime.log` file.
+-   `debug_level` (integer, 0 to 3)
+    -   Controls the verbosity of the logs.
+    -   **`0` (Release)**: Only critical errors and warnings.
+    -   **`1` (Info)**: Default. Shows major execution steps and results.
+    -   **`2` (Debug)**: Detailed information for development and troubleshooting.
+    -   **`3` (Trace)**: Maximum verbosity, showing every minor operation.
 
 ---
 
@@ -212,7 +218,13 @@ The list of currently defined shortcuts is as follows:
 - **Feature**: Clicking an item in the After View automatically finds, expands, and selects the same path in the Before View. This allows users to quickly see where the planned changes sit within the current project structure.
 - **Restriction**: Double-clicking to expand/collapse the tree is disabled to ensure stable single-click/re-click interactions. Use the arrow icons on the left to expand or collapse nodes.
 
-### 7.1. Shortcut Binding Rules and Limitations
+### 8.3. Safety Features (Automatic Backup)
+- **Automatic Overwrite Backup**: As a last line of defense, whenever a file is about to be overwritten during the application phase (excluding Dry Run), the original file is automatically renamed to `{filename}.before_overwrite`.
+- **Purpose**: This ensures that even if you mistakenly apply a scaffold that overwrites important work, you can still recover the previous content manually.
+
+---
+
+## 9. Shortcut Binding Rules and Limitations
 
 Refer to the following rules and limitations when defining shortcuts in the `Resources/key_bindings_map.json` file.
 

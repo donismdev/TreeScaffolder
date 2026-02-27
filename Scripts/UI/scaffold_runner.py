@@ -58,6 +58,8 @@ def execute_scaffold(app):
 
     stats = {"dirs_created": 0, "dirs_skipped": 0, "dirs_error": 0, "files_created": 0, "files_overwritten": 0, "files_skipped": 0, "files_error": 0}
     successful_paths = []
+    # Collect original contents for recovery log
+    overwritten_backups = {} 
 
     for path in sorted(list(plan.planned_dirs), key=lambda p: len(p.parts)):
         state = plan.path_states.get(path)
@@ -93,6 +95,14 @@ def execute_scaffold(app):
 
         if state == "new" or state == "overwrite":
             is_overwrite = state == "overwrite"
+            
+            # --- PRE-READ FOR RECOVERY LOG ---
+            if is_overwrite and not is_dry_run and path.exists():
+                try:
+                    overwritten_backups[path] = path.read_text(encoding='utf-8', errors='replace')
+                except Exception:
+                    overwritten_backups[path] = "(Could not read original content)"
+
             # Pass correct level for logging based on state
             log_level = "overwrite" if is_overwrite else "success"
             ok, created, skipped = _ensure_file(app, path, is_dry_run, content, is_overwrite, successful_paths, log_level)
@@ -182,6 +192,9 @@ def execute_scaffold(app):
                 app._log(f"Failed to open folder: {e}", "error")
 
     _write_execution_log(app, stats, is_dry_run, captured_logs, original_log_method)
+    
+    if overwritten_backups and not is_dry_run:
+        _write_recovery_v2_log(app, overwritten_backups, original_log_method)
         
     # Restore original _log method
     app._log = original_log_method
@@ -271,6 +284,50 @@ def _write_execution_log(app, stats: dict, is_dry_run: bool, captured_logs: list
     except Exception as e:
         original_log_method(f"Error writing execution log: {e}", "error")
 
+def _write_recovery_v2_log(app, overwritten_backups: dict, original_log_method):
+    """Writes a V2-style recovery log containing original contents of overwritten files."""
+    log_path = Path.cwd() / app.LOG_DIR
+    log_path.mkdir(exist_ok=True)
+
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    recovery_filename = log_path / f"scaffold_recovery_{timestamp}.txt"
+
+    plan = app.current_plan
+    root_path = plan.root_path
+
+    log_entries = [
+        "@@@COMMENT_BEGIN",
+        "SCAFFOLD EXECUTION RECOVERY LOG",
+        f"Date: {datetime.datetime.now().isoformat()}",
+        f"Target Root Folder: {root_path}",
+        f"Number of Overwritten Files: {len(overwritten_backups)}",
+        "Instructions: This file contains the original content of files that were overwritten.",
+        "You can use these blocks to restore previous versions if needed.",
+        "@@@COMMENT_END",
+        ""
+    ]
+
+    for path, content in overwritten_backups.items():
+        try:
+            rel_path = path.relative_to(root_path)
+        except ValueError:
+            rel_path = path # Fallback to absolute if somehow not relative
+            
+        log_entries.append(f"@@@FILE_BEGIN {rel_path}")
+        log_entries.append(content)
+        # Ensure it ends with a newline before the tag if content doesn't have one
+        if content and not content.endswith('\n'):
+            log_entries.append("")
+        log_entries.append(f"@@@FILE_END {rel_path}")
+        log_entries.append("")
+
+    try:
+        with open(recovery_filename, "w", encoding="utf-8") as f:
+            f.write("\n".join(log_entries))
+        original_log_method(f"Recovery data (V2 format) saved to: {recovery_filename}", "success")
+    except Exception as e:
+        original_log_method(f"Error writing recovery log: {e}", "error")
+
 def _ensure_dir(app, path: Path, dry_run: bool, successful_paths: list) -> tuple[bool, bool, bool]:
     """(ok, created, skipped)"""
     if path.exists():
@@ -299,6 +356,18 @@ def _ensure_file(app, path: Path, dry_run: bool, content: str | None, is_overwri
     if not dry_run:
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
+            
+            # --- BACKUP LOGIC: Create a backup of the existing file before overwriting ---
+            if is_overwrite and path.exists():
+                backup_path = path.with_suffix(path.suffix + ".before_overwrite")
+                try:
+                    # If a backup already exists, delete it first to allow renaming
+                    if backup_path.exists():
+                        backup_path.unlink()
+                    path.rename(backup_path)
+                    app._log(f"[BACKUP]    Created: {backup_path.name}", "debug")
+                except Exception as b_err:
+                    app._log(f"[WARN]      Backup failed for {path.name}: {b_err}", "warn")
             
             # Normalize all line endings to CRLF for the output file
             final_content = (content or "").replace('\r\n', '\n').replace('\n', '\r\n')
