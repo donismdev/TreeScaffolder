@@ -5,19 +5,19 @@ import os
 from pathlib import Path
 from typing import Dict, List, Tuple
 
-def _get_pairings():
-    """Load extension pairings from resource file."""
+def _get_rules():
+    """Load similarity rules from resource file."""
     try:
         # Default path relative to this script
         base_dir = Path(__file__).parent.parent.parent
-        pairings_path = base_dir / "Resources" / "extension_pairings.json"
-        if pairings_path.exists():
-            with open(pairings_path, "r", encoding="utf-8") as f:
+        rules_path = base_dir / "Resources" / "similarity_rules.json"
+        if rules_path.exists():
+            with open(rules_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                return data.get("pairings", [])
+                return data
     except Exception:
         pass
-    return []
+    return {}
 
 def _is_allowed_pairing(name1: str, name2: str) -> bool:
     """Check if two filenames are allowed pairings (e.g., file.h and file.cpp)."""
@@ -35,7 +35,8 @@ def _is_allowed_pairing(name1: str, name2: str) -> bool:
     if ext1 == ext2:
         return False
         
-    pairings = _get_pairings()
+    rules = _get_rules()
+    pairings = rules.get("allowed_extension_pairs", [])
     for pair in pairings:
         if ext1 in pair and ext2 in pair:
             return True

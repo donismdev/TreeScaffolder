@@ -1,9 +1,0 @@
-{
-    "pairings": [
-        [".h", ".cpp"],
-        [".h", ".c"],
-        [".hpp", ".cpp"],
-        [".js", ".test.js"],
-        [".ts", ".test.ts"]
-    ]
-}
