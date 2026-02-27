@@ -215,12 +215,15 @@ The list of currently defined shortcuts is as follows:
 - **Summary Updates**: Changing a checkbox state immediately updates the counts (folders/files) in the bottom `Summary` panel.
 
 ### 8.2. Before/After View Synchronization
-- **Feature**: Clicking an item in the After View automatically finds, expands, and selects the same path in the Before View. This allows users to quickly see where the planned changes sit within the current project structure.
+- **Feature**: Clicking an item in the After View automatically finds, expands, and selects the same path in the Before View.
+- **Strict Content Source**:
+    - **Before View**: Always shows the **actual file content currently on your disk**.
+    - **After View**: Always shows the **planned content defined in the editors**. It does not read from the disk, allowing you to clearly see the difference between "what is" and "what will be".
 - **Restriction**: Double-clicking to expand/collapse the tree is disabled to ensure stable single-click/re-click interactions. Use the arrow icons on the left to expand or collapse nodes.
 
 ### 8.3. Safety Features (Automatic Backup)
-- **Automatic Overwrite Backup**: As a last line of defense, whenever a file is about to be overwritten during the application phase (excluding Dry Run), the original file is automatically renamed to `{filename}.before_overwrite`.
-- **Purpose**: This ensures that even if you mistakenly apply a scaffold that overwrites important work, you can still recover the previous content manually.
+- **Automatic Recovery Log**: As a last line of defense, whenever a file is about to be overwritten during the application phase (excluding Dry Run), the original contents of all such files are collected into a single V2-style log file in the `Log` folder.
+- **Purpose**: This ensures that even if you mistakenly apply a scaffold that overwrites important work, you can still recover the previous content manually using the Recovery tool.
 
 ---
 

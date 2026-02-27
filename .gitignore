@@ -210,4 +210,3 @@ __marimo__/
 Resources/config.json
 Test/
 Log/
-*.before_overwrite
