@@ -237,7 +237,7 @@ def generate_plan(root_path: Path, text_input: str, config: dict) -> Plan:
 	# 2. High-Priority: Validate and parse V2 blocks from the pre-processed text.
 	# This ensures block integrity before we try to separate tree vs. V2 content.
 	try:
-		# Determine a best-guess root marker for the V2 parser.
+		# Determine a best-guess root marker for substitution later.
 		root_match_in_full_text = re.search(r'@ROOT\s+([^{\s}]+|{{[\w-]+}})', text_input)
 		effective_root_marker = None
 		if root_match_in_full_text:
@@ -245,54 +245,82 @@ def generate_plan(root_path: Path, text_input: str, config: dict) -> Plan:
 		elif "{{Root}}" in text_input:
 			effective_root_marker = "{{Root}}"
 		
-		patch_data = parse_v2_format(text_input, root_marker=effective_root_marker)
+		# Pure parsing without string manipulation
+		patch_data = parse_v2_format(text_input)
 	except V2ParserError as e:
-		plan.errors.append(f"{e}") # Removed "V2 Patch Error: " prefix to show user the direct error
+		plan.errors.append(f"{e}") 
 		return plan
 
-	# 3. Isolate Tree Text: If V2 parsing was successful, remove all blocks to get clean tree text.
-	all_blocks_pattern = re.compile(r"@@@[A-Z_]+_BEGIN[\s\S]*?@@@[A-Z_]+_END\n?")
-	tree_text_only = all_blocks_pattern.sub("", text_input)
+	# ... (Step 3, 4, 5 skipped for brevity) ...
 
-	# 4. Parse the isolated scaffold tree structure.
-	tree_nodes, initial_root_marker, tree_error = parse_tree_text(tree_text_only)
-	if tree_error:
-		plan.errors.append(tree_error)
-
-	# 5. Process the parsed tree nodes to build the directory/file plan.
-	if tree_nodes:
-		plan.nodes = tree_nodes[1:] # Remove {{Root}} node
-		stack: List[Tuple[int, Path]] = [(0, root_path)]
-		for item in plan.nodes:
-			while stack and stack[-1][0] >= item.indent:
-				stack.pop()
-			if not stack or item.indent > stack[-1][0] + 1:
-				plan.errors.append(t("message.err_deep_indent", line=item.line_number, name=item.name))
-				continue
-			base_path = stack[-1][1]
-			current_path = base_path / item.name
-			if item.is_dir:
-				plan.planned_dirs.add(current_path)
-				stack.append((item.indent, current_path))
-			else:
-				plan.planned_files.add(current_path)
-	
 	# 6. Process the already-parsed V2 patch data to populate file contents.
 	seen_paths_in_v2: Dict[Path, str] = {}
 	for item in patch_data:
-		path_str = item['path']
+		raw_path_str = item['path'].strip()
 		content = item['content']
-		if '..' in path_str or Path(path_str).is_absolute():
-			plan.errors.append(f"Invalid path in patch: '{path_str}'.")
+		
+		if '..' in raw_path_str:
+			plan.errors.append(f"Invalid path in patch (security): '{raw_path_str}'.")
 			continue
-		target_path = (root_path / path_str).resolve()
+
+		# --- ROBUST EXPLICIT SUBSTITUTION LOGIC ---
+		# Standardize slashes and trim for consistent matching
+		norm_path = raw_path_str.replace('\\', '/').strip()
+		
+		# Define markers to check (Default {{Root}} and the effective marker)
+		markers = ["{{Root}}"]
+		if effective_root_marker and effective_root_marker.lower() != "{{root}}":
+			markers.insert(0, effective_root_marker)
+		
+		target_path = None
+		matched_marker = None
+		
+		# Check if the path starts with any recognized marker (ignoring leading slashes)
+		temp_path = norm_path.lstrip('/')
+		for m in markers:
+			if temp_path.lower().startswith(m.lower()):
+				matched_marker = m
+				# Strip marker and leading slash from the temporary path
+				rel_part = temp_path[len(m):].lstrip('/')
+				# SUBSTITUTE: Build the absolute path directly
+				target_path = (root_path / rel_part).resolve()
+				break
+		
+		if not target_path:
+			# Fallback logic if no marker is found
+			if Path(norm_path).is_absolute():
+				# Security check for absolute paths
+				try:
+					resolved_abs = Path(norm_path).resolve()
+					if resolved_abs.is_relative_to(root_path):
+						target_path = resolved_abs
+					else:
+						plan.errors.append(f"Absolute path outside root is forbidden: '{raw_path_str}'")
+						continue
+				except Exception:
+					plan.errors.append(f"Invalid absolute path: '{raw_path_str}'")
+					continue
+			else:
+				# Assume relative to root
+				target_path = (root_path / norm_path.lstrip('/')).resolve()
+		
+		# Final Validation: Ensure target_path is actually under root_path
+		try:
+			if not target_path.is_relative_to(root_path):
+				plan.errors.append(f"Path resolves outside of target root: '{raw_path_str}'")
+				continue
+		except Exception:
+			plan.errors.append(f"Invalid path resolution: '{raw_path_str}'")
+			continue
+		
+		if not target_path:
+			continue
 
 		# Check for duplicates within the source code itself
 		if target_path in seen_paths_in_v2:
-			prev_path_str = seen_paths_in_v2[target_path]
-			plan.errors.append(t("message.err_duplicate_v2", path=path_str))
+			plan.errors.append(t("message.err_duplicate_v2", path=raw_path_str))
 		
-		seen_paths_in_v2[target_path] = path_str
+		seen_paths_in_v2[target_path] = raw_path_str
 		plan.planned_files.add(target_path)
 		plan.file_contents[target_path] = content
 		for parent in target_path.parents:

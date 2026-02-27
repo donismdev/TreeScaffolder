@@ -97,6 +97,7 @@ def execute_scaffold(app):
             is_overwrite = state == "overwrite"
             
             # --- PRE-READ FOR RECOVERY LOG ---
+            # Capture original content if it's an overwrite and the file exists physically
             if is_overwrite and not is_dry_run and path.exists():
                 try:
                     overwritten_backups[path] = path.read_text(encoding='utf-8', errors='replace')
@@ -107,11 +108,11 @@ def execute_scaffold(app):
             log_level = "overwrite" if is_overwrite else "success"
             ok, created, skipped = _ensure_file(app, path, is_dry_run, content, is_overwrite, successful_paths, log_level)
             if ok:
-                if created and not is_overwrite:
-                    stats["files_created"] += 1
-                    successful_paths.append(path)
-                if created and is_overwrite:
-                    stats["files_overwritten"] += 1
+                if created:
+                    if is_overwrite:
+                        stats["files_overwritten"] += 1
+                    else:
+                        stats["files_created"] += 1
                     successful_paths.append(path)
                 if skipped: stats["files_skipped"] += 1
             else:
@@ -296,8 +297,6 @@ def _write_recovery_v2_log(app, overwritten_backups: dict, original_log_method):
     root_path = plan.root_path
 
     log_entries = [
-        f"@ROOT {root_path}",
-        "",
         "@@@COMMENT_BEGIN",
         "SCAFFOLD EXECUTION RECOVERY LOG",
         f"Date: {datetime.datetime.now().isoformat()}",
@@ -360,18 +359,6 @@ def _ensure_file(app, path: Path, dry_run: bool, content: str | None, is_overwri
     if not dry_run:
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
-            
-            # --- BACKUP LOGIC: Create a backup of the existing file before overwriting ---
-            if is_overwrite and path.exists():
-                backup_path = path.with_suffix(path.suffix + ".before_overwrite")
-                try:
-                    # If a backup already exists, delete it first to allow renaming
-                    if backup_path.exists():
-                        backup_path.unlink()
-                    path.rename(backup_path)
-                    app._log(f"[BACKUP]    Created: {backup_path.name}", "debug")
-                except Exception as b_err:
-                    app._log(f"[WARN]      Backup failed for {path.name}: {b_err}", "warn")
             
             # Normalize all line endings to CRLF for the output file
             final_content = (content or "").replace('\r\n', '\n').replace('\n', '\r\n')

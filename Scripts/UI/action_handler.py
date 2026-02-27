@@ -25,6 +25,10 @@ def handle_test_data_loaded(app, success=True):
     key = "test_data_loaded" if success else "test_data_error"
     update_summary(app, key)
 
+def handle_recovery_loaded(app, filename):
+    """Called after a recovery log is successfully loaded."""
+    update_summary(app, "recovery_loaded", file=filename)
+
 def handle_data_cleared(app):
     """Called after the clear button is pressed."""
     update_summary(app, "data_cleared")

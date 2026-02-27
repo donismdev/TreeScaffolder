@@ -812,88 +812,10 @@ class ScaffoldApp:
         logger.debug("on_clear_data completed")
 
     def on_recovery(self):
-        """Opens a recovery log file and restores the original contents."""
+        """Opens the Recovery window to select and apply recovery logs."""
         logger.debug("on_recovery called")
-        
-        log_dir = Path.cwd() / self.LOG_DIR
-        file_path = filedialog.askopenfilename(
-            initialdir=log_dir if log_dir.exists() else Path.cwd(),
-            title=t("ui.recovery_title"),
-            filetypes=[("Recovery Log", "scaffold_recovery_*.txt"), ("Text files", "*.txt"), ("All files", "*.*")]
-        )
-        
-        if not file_path:
-            return
-
-        try:
-            content = Path(file_path).read_text(encoding='utf-8')
-            
-            # --- 1. Extract Target Root from @ROOT directive ---
-            target_root = None
-            root_match = re.search(r'^@ROOT\s+(.*)$', content, re.MULTILINE)
-            if root_match:
-                target_root = Path(root_match.group(1).strip())
-
-            # --- 2. Confirm Target Folder with User ---
-            if not target_root:
-                # Fallback to current target if log doesn't have @ROOT (for older logs)
-                current_root_str = self.target_root_path.get()
-                if current_root_str and current_root_str != t("ui.no_folder_selected"):
-                    target_root = Path(current_root_str)
-
-            # If still no target, or to be safe, ask user to confirm/select
-            confirm_msg = f"Recovery Target Root: {target_root}\n\nDo you want to restore files to this folder?"
-            if not target_root or not messagebox.askyesno(t("ui.recovery_title"), confirm_msg):
-                selected_path = filedialog.askdirectory(title="Select Target Folder for Recovery")
-                if not selected_path:
-                    return
-                target_root = Path(selected_path)
-
-            if not target_root.exists() or not target_root.is_dir():
-                messagebox.showerror(t("message.error_title"), "Invalid recovery target folder.")
-                return
-
-            # --- 3. Parse Blocks ---
-            # Using v2_parser (which now handles {{Root}} robustly)
-            blocks = scaffold_core.parse_v2_format(content)
-            if not blocks:
-                messagebox.showinfo(t("ui.recovery_title"), "No restorable file blocks found in the log.")
-                return
-
-            # --- 4. Confirm Restoration ---
-            if not messagebox.askyesno(t("ui.recovery_title"), f"Found {len(blocks)} files to restore. Proceed?"):
-                return
-
-            # --- 5. Apply Restoration ---
-            restored_count = 0
-            error_count = 0
-            
-            app_utils.log_message(self, f"--- STARTING RECOVERY FROM: {Path(file_path).name} ---", "info")
-            for block in blocks:
-                rel_path = block['path']
-                file_content = block['content']
-                dest_path = (target_root / rel_path).resolve()
-                
-                try:
-                    dest_path.parent.mkdir(parents=True, exist_ok=True)
-                    # Normalize line endings to CRLF for restoration if it was likely Windows-originated
-                    final_restore_content = file_content.replace('\r\n', '\n').replace('\n', '\r\n')
-                    dest_path.write_bytes(final_restore_content.encode('utf-8'))
-                    app_utils.log_message(self, f"[RESTORED] {rel_path}", "success")
-                    restored_count += 1
-                except Exception as e:
-                    app_utils.log_message(self, f"[ERROR] Failed to restore {rel_path}: {e}", "error")
-                    error_count += 1
-
-            app_utils.log_message(self, f"--- RECOVERY FINISHED: {restored_count} success, {error_count} error ---", "info")
-            messagebox.showinfo(t("ui.recovery_title"), f"Restoration complete!\nSuccess: {restored_count}\nErrors: {error_count}")
-            
-            # Refresh 'Before' view to show restored files
-            self._populate_before_tree(target_root)
-
-        except Exception as e:
-            logger.error(f"Recovery failed: {e}")
-            messagebox.showerror(t("message.error_title"), f"An error occurred during recovery:\n{e}")
+        from Scripts.UI import recovery_ui
+        recovery_ui.show_recovery(self.root, self)
 
     def on_previous_folder(self):
         logger.debug("on_previous_folder called")

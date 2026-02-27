@@ -107,13 +107,8 @@ def parse_v2_format(text: str, root_marker: str | None = None, root_marker_name:
                 line_num = text.count('\n', 0, match.start()) + 1
                 raise V2ParserError(f"FILE_BEGIN block at line {line_num} has no path defined.")
 
-            # Apply root marker replacement
-            if root_marker and path.startswith(root_marker):
-                path = path.replace(root_marker, '', 1).lstrip('/\\')
-            # Hardcoded fallback for {{Root}} marker to ensure portability
-            elif path.startswith("{{Root}}"):
-                path = path.replace("{{Root}}", '', 1).lstrip('/\\')
-            
             file_blocks.append({'path': path, 'content': content})
+
+    return file_blocks
 
     return file_blocks

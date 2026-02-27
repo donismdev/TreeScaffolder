@@ -33,7 +33,18 @@ The application must treat the current state of the filesystem (Before) and the 
 - **Caching Strategy**: Each view maintains its own independent cache (`before_cache` and `after_cache`). These caches must be purged only during full recomputations (`on_recompute`) or data clears (`on_clear_data`).
 - **Path Matching**: Due to Windows-specific casing and resolution inconsistencies, all path comparisons must be performed using the lowercase string representation of the `resolve()`'d absolute path.
 
-## 4. Operational Directives (AI & Developers)
+## 4. V2 Multipatch Format (@@@ Blocks)
+
+All source code definitions and recovery logs must strictly follow the **V2 Multipatch Format**. This format ensures data integrity and prevents parsing ambiguities.
+
+- **Mandatory Paired Tags**: Every block MUST start with `@@@<KEYWORD>_BEGIN` and end with `@@@<KEYWORD>_END`. Unpaired tags or nested blocks are strictly forbidden.
+- **Recognized Keywords**:
+    - `FILE`: Used for defining file content. The path (including the `{{Root}}` marker) should follow the BEGIN tag.
+    - `COMMENT`: Used for metadata, logs, or instructions. This content is ignored during the scaffold application phase.
+- **Path Mapping**: Always use the `{{Root}}` marker at the start of paths within `FILE` blocks (e.g., `@@@FILE_BEGIN {{Root}}/path/to/file.txt`).
+- **No Naked Directives in Logs**: Recovery logs and patch files should NOT contain a top-level `@ROOT` directive outside of a `COMMENT` block, as this can confuse the tree parser. Essential metadata (like the target absolute path) must be placed inside `@@@COMMENT` blocks.
+
+## 5. Operational Directives (AI & Developers)
 
 To maintain project stability and integrity, all contributors must adhere to these rules:
 
