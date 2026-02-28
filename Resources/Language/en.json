@@ -102,6 +102,8 @@
         "select_root_first": "Please select a valid root folder first.",
         "root_not_found": "Root Folder Unavailable: The selected folder has been deleted or is inaccessible. All path settings will be reset.",
         "empty_editors": "Both editors are empty. Nothing to compute.",
+        "job_name_empty": "Job name is empty. Continue with a default name?",
+        "compute_first_job": "You must compute a valid plan first before naming the job.",
         "conflicts_found_title": "Conflicts Found",
         "conflicts_msg": "Structural conflicts found. (e.g., folder exists where a file is planned)\nApply is disabled.",
         "conflicts_msg_detail": "Path Conflict: Attempted to create '{path}' as a {type}, but a {existing} already exists on disk.",

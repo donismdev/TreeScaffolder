@@ -93,6 +93,7 @@ def create_left_panel(app):
     app.editor_entry_var = tk.StringVar()
     app.editor_entry = ttk.Entry(button_bar_frame, textvariable=app.editor_entry_var)
     app.editor_entry.pack(side="left", fill="x", expand=True, padx=2)
+    app.widget_map["focus_job_name"] = app.editor_entry
     
     placeholder_text = t("ui.job_name_placeholder")
     

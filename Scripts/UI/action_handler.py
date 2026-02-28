@@ -215,19 +215,12 @@ def on_recompute(app, silent=False):
             overwrites = len([p for p, s in plan.path_states.items() if s == 'overwrite'])
             total_lines = sum(len(c.splitlines()) for c in plan.file_contents.values())
             
-            summary_block = (
-                f"\n\n[INFO] - New directories: {new_dirs}\n"
-                f"[INFO] - New files: {new_files}\n"
-                f"[INFO] - Overwritten files: {overwrites}\n"
-                f"[INFO] - Total lines of content: {total_lines} lines"
-            )
-            
             comment_header = "@@@COMMENT_BEGIN Unified Scaffold Structure"
             comment_footer = "@@@COMMENT_END"
             
             # Find and replace existing structure comment if it exists
             pattern = re.compile(rf"{comment_header}[\s\S]*?{comment_footer}")
-            new_comment_block = f"\n\n{comment_header}\n{reconstructed_tree}{summary_block}\n{comment_footer}"
+            new_comment_block = f"\n\n{comment_header}\n{reconstructed_tree}\n{comment_footer}"
             
             if pattern.search(source_content):
                 new_source = pattern.sub(new_comment_block.strip(), source_content)
@@ -396,7 +389,7 @@ def on_apply(app):
         
         # New: Warning for empty job name (including if it's still the placeholder)
         if not job_name or job_name == placeholder:
-            if not messagebox.askyesno(t("message.error_title"), "Job name is empty. Continue with a default name?"):
+            if not messagebox.askyesno(t("message.error_title"), t("message.job_name_empty")):
                 # If user says no, abort apply so they can enter a name
                 app.recompute_button.config(state=tk.NORMAL)
                 app.apply_button.config(state=tk.NORMAL)
@@ -765,3 +758,17 @@ def on_editor_tab_changed(app, event):
     # We always show the entry widget in all tabs for consistent layout
     if hasattr(app, 'editor_entry'):
         app.editor_entry.pack(side="left", fill="x", expand=True, padx=2)
+
+def focus_job_name(app):
+    """Sets focus to the job name entry widget."""
+    if hasattr(app, 'editor_entry'):
+        if str(app.editor_entry.cget("state")) == "normal":
+            app.editor_entry.focus_set()
+            # Select all text for easy replacement if it's not the placeholder
+            placeholder = t("ui.job_name_placeholder")
+            if app.editor_entry_var.get() != placeholder:
+                app.editor_entry.selection_range(0, tk.END)
+                app.editor_entry.icursor(tk.END)
+        else:
+            # Entry is disabled, meaning no valid plan exists
+            messagebox.showwarning(t("message.error_title"), t("message.compute_first_job"))

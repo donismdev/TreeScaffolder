@@ -186,6 +186,7 @@ public class NewModule : ModuleRules
 | `1`            | `Cycle Before Notebook Tabs`    | 'Before' 패널의 노트북 탭을 순환합니다 (텍스트/입력 위젯에 포커스가 없을 때만). |
 | `2`            | `Cycle After Notebook Tabs`     | 'After' 패널의 노트북 탭을 순환합니다 (텍스트/입력 위젯에 포커스가 없을 때만). |
 | `3`            | `Cycle Editor Notebook Tabs`    | 'Editor' 패널의 노트북 탭을 순환합니다 (텍스트/입력 위젯에 포커스가 없을 때만). |
+| `4`            | `Focus Job Name`                | 작업 이름(Job Name) 입력창으로 즉시 포커스를 이동합니다.            |
 | `e`            | `Previous Folder`               | 이전에 선택했던 루트 폴더로 돌아갑니다.                               |
 | `w`            | `Browse Folder`                 | 새 루트 폴더를 탐색하여 선택합니다.                                  |
 | `r`            | `Clear Data`                    | 모든 편집기 내용과 계획된 데이터를 초기화합니다.                     |

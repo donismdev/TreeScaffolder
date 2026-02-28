@@ -156,6 +156,7 @@ You can quickly execute various functions within the application using keyboard 
 *   **r**: Clear data
 *   **`** (Grave): Cycle analysis panel tabs
 *   **1, 2, 3**: Cycle tabs in each area
+*   **4**: Focus Job Name entry
 *   **Alt**: Display shortcut hints (hold to show yellow overlays)
 
 ---

@@ -5,6 +5,7 @@
     "1": { "action": "cycle_notebook", "target_notebook": "before_notebook" },
     "2": { "action": "cycle_notebook", "target_notebook": "after_notebook" },
     "3": { "action": "cycle_notebook", "target_notebook": "editor_notebook" },
+    "4": { "action": "focus_job_name" },
     "e": { "action": "on_previous_folder" },
     "w": { "action": "on_browse_folder" },
     "r": { "action": "on_clear_data" },

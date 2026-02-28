@@ -195,6 +195,7 @@ The list of currently defined shortcuts is as follows:
 | `1`            | `Cycle Before Notebook Tabs`    | Cycles through 'Before' panel tabs.                          |
 | `2`            | `Cycle After Notebook Tabs`     | Cycles through 'After' panel tabs.                           |
 | `3`            | `Cycle Editor Notebook Tabs`    | Cycles through 'Editor' panel tabs.                          |
+| `4`            | `Focus Job Name`                | Sets focus to the Job Name entry field.                      |
 | `e`            | `Previous Folder`               | Returns to the previously selected root folder.               |
 | `w`            | `Browse Folder`                 | Opens folder browser for a new root folder.                  |
 | `r`            | `Clear Data`                    | Clears all editor content and planned data.                  |

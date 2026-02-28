@@ -243,7 +243,7 @@ def execute_scaffold(app):
     app.log_text.delete("1.0", "end")
     
     status_str = "EXECUTED (DRY RUN)" if is_dry_run else "EXECUTED (REAL)"
-    display_name = f" [{job_name}]" if job_name else ""
+    display_name = f" [job name : {job_name}]" if job_name else ""
     
     # UI Summary Header
     app_utils.log_message(app, "="*40, "info")
@@ -324,7 +324,7 @@ def _write_execution_log(app, plan, stats: dict, is_dry_run: bool, captured_logs
     )
 
     status_str = "EXECUTED (DRY RUN)" if is_dry_run else "EXECUTED (REAL)"
-    display_name = f" [{job_name}]" if job_name else ""
+    display_name = f" [job name : {job_name}]" if job_name else ""
     status_header = [
         "========================================",
         f"SCAFFOLD APPLY STATUS: {status_str}{display_name}",
@@ -369,10 +369,13 @@ def _write_execution_log(app, plan, stats: dict, is_dry_run: bool, captured_logs
         source_content,
         "=" * 80,
         "",
-        "========================================",
-        f"FINAL BRIEFING",
+        "@@@COMMENT_BEGIN FINAL BRIEFING",
         f"SCAFFOLD APPLY STATUS: {status_str}{display_name}",
-        "========================================",
+        f"- New Directories: {stats['dirs_created']}",
+        f"- New Files: {stats['files_created']}",
+        f"- Overwritten Files: {stats['files_overwritten']}",
+        f"- Total Errors: {stats['dirs_error'] + stats['files_error']}",
+        "@@@COMMENT_END",
     ])
 
     try:

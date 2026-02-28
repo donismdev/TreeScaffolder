@@ -90,7 +90,7 @@ def get_formatted_status() -> str:
     # Detail list of jobs
     job_details = []
     for run_type, name in _session_jobs:
-        job_details.append(f"[{run_type}] {name}" if name else f"[{run_type}] (Unnamed)")
+        job_details.append(f"[{run_type}] [job name : {name}]" if name else f"[{run_type}] (Unnamed)")
     
     return f"{base_status}\nJobs: " + ", ".join(job_details)
 

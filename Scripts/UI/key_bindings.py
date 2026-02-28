@@ -10,6 +10,7 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import ttk
 from Scripts.UI import app_utils
+from Scripts.UI import action_handler
 
 # --- Configuration ---
 KEYBINDINGS_CONFIG_FILE = "Resources/key_bindings_map.json"
@@ -87,6 +88,7 @@ def setup_key_bindings(app):
         "on_apply": lambda event: _call_method_without_event(app, app.on_apply, event),
         "on_options": lambda event: _call_method_without_event(app, app.on_options, event),
         "on_recovery": lambda event: _call_method_without_event(app, app.on_recovery, event),
+        "focus_job_name": lambda event: action_handler.focus_job_name(app),
     }
 
     for key_sequence, binding_config in bindings_map.items():
