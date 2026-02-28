@@ -162,36 +162,41 @@ def execute_scaffold(app):
             stats["files_skipped"] += 1
 
     # --- NEW: Create .gitkeep in empty planned folders ---
-    if not is_dry_run and app.create_gitkeep.get():
+    if app.create_gitkeep.get():
         for dir_path in plan.planned_dirs:
-            # Check if this dir path is effectively selected
             if not _is_effectively_selected(app, dir_path):
                 continue
                 
-            # Check if any planned file is inside this directory
-            has_child_file = False
+            has_planned_child = False
             for file_path in plan.planned_files:
                 if _is_effectively_selected(app, file_path) and file_path.is_relative_to(dir_path):
-                    has_child_file = True
+                    has_planned_child = True
                     break
             
-            # If no child files are planned/selected for this folder, create .gitkeep
-            if not has_child_file:
-                gitkeep_path = dir_path / ".gitkeep"
-                if not gitkeep_path.exists():
-                    try:
-                        gitkeep_path.write_bytes(b"")
-                        log_exec(f"[GITKEEP]   {gitkeep_path}", "success")
-                        stats["gitkeep_created"] += 1
-                        gitkeep_paths.append(gitkeep_path)
-                    except Exception as e:
-                        log_exec(f"[ERROR] failed to create .gitkeep in {dir_path}: {e}", "error")
+            if has_planned_child:
+                continue
 
-    # Determine which paths were effectively selected for the final log
-    applied_paths = set()
-    for p in plan.planned_dirs.union(plan.planned_files):
-        if _is_effectively_selected(app, p):
-            applied_paths.add(p)
+            has_phys_files = False
+            if dir_path.exists() and dir_path.is_dir():
+                try:
+                    if any(dir_path.iterdir()):
+                        has_phys_files = True
+                except:
+                    pass
+            
+            if has_phys_files:
+                continue
+
+            gitkeep_path = dir_path / ".gitkeep"
+            if not gitkeep_path.exists():
+                try:
+                    if not is_dry_run:
+                        gitkeep_path.write_bytes(b"")
+                    log_exec(f"[GITKEEP]   {gitkeep_path}", "success")
+                    stats["gitkeep_created"] += 1
+                    gitkeep_paths.append(gitkeep_path)
+                except Exception as e:
+                    log_exec(f"[ERROR] failed to create .gitkeep in {dir_path}: {e}", "error")
 
     log_exec("\n" + "="*25 + " SUMMARY " + "="*26)
     log_exec(f"- Dirs created: {stats['dirs_created']}, skipped: {stats['dirs_skipped']}, errors: {stats['dirs_error']}")
@@ -204,16 +209,17 @@ def execute_scaffold(app):
         log_exec(f"- Duplicate name warnings: {len(plan.duplicate_warnings)}", "warn")
         log_exec(f"- Similar name warnings: {len(plan.similarity_warnings)}", "warn")
 
-    # --- LOG GENERATION FIRST ---
-    # We write the log BEFORE updating plan.path_states to 'identical'/'exists'
-    # so that the 'Full Plan' section reflects what was INTENDED to be changed.
-    _write_execution_log(app, plan, stats, is_dry_run, captured_logs, applied_paths, successful_paths, gitkeep_paths, job_name)
-
+    log_exec("="*60)
     if stats["dirs_error"] > 0 or stats["files_error"] > 0:
         log_exec("Operation finished with errors.", "error")
     else:
         log_exec("Operation finished successfully.", "success")
-        
+
+    # --- LOG GENERATION ---
+    # We write the log AFTER success message but BEFORE updating path_states
+    _write_execution_log(app, plan, stats, is_dry_run, captured_logs, successful_paths, gitkeep_paths, job_name)
+
+    if not (stats["dirs_error"] > 0 or stats["files_error"] > 0):
         if not is_dry_run:
             for path in successful_paths:
                 if path.is_dir():
@@ -222,43 +228,25 @@ def execute_scaffold(app):
                     try:
                         actual_content = path.read_text(encoding='utf-8', errors='replace')
                         planned_content = plan.file_contents.get(path.resolve())
-                        
                         if scaffold_core.is_content_identical(actual_content, planned_content):
                             plan.path_states[path] = 'identical'
-                            log_exec(f"Successfully verified content for {path}. State set to 'identical'.", "debug")
-                        else:
-                            log_exec(f"Content verification failed for {path}. State not updated. Current state: {plan.path_states.get(path)}", "warn")
-                            
-                    except Exception as e:
-                        log_exec(f"Could not verify file content for {path}: {e}", "error")
+                    except:
+                        pass
 
         if app.open_folder_after_apply.get():
             try:
-                log_exec(t("sys.opening_folder", path=plan.root_path), "info")
                 path_str = str(plan.root_path)
-                if sys.platform == "win32":
-                    os.startfile(path_str)
-                elif sys.platform == "darwin": 
-                    subprocess.Popen(["open", path_str])
-                else: 
-                    subprocess.Popen(["xdg-open", path_str])
-            except Exception as e:
-                err_msg = t("sys.open_folder_error", e=e)
-                log_exec(err_msg, "error")
-                # Also show a popup since this is a user-requested action that failed
-                messagebox.showwarning(t("message.error_title"), err_msg)
+                if sys.platform == "win32": os.startfile(path_str)
+                elif sys.platform == "darwin": subprocess.Popen(["open", path_str])
+                else: subprocess.Popen(["xdg-open", path_str])
+            except:
+                pass
 
-    # CRITICAL: Always check if we have backups to write, and ensure it's NOT a dry run
     if not is_dry_run and len(overwritten_backups) > 0:
-        log_exec(f"Generating recovery log for {len(overwritten_backups)} files...", "info")
         recovery_file = _write_recovery_v2_log(app, overwritten_backups)
-        
-        # Show custom scrollable notification window
         if recovery_file:
             from Scripts.UI import recovery_ui
             recovery_ui.show_recovery_notification(app, list(overwritten_backups.keys()), recovery_file)
-    elif not is_dry_run:
-        log_exec("No files were overwritten; skipping recovery log generation.", "debug")
         
     app.log_text.config(state="normal")
     app.log_text.delete("1.0", "end")
@@ -266,7 +254,6 @@ def execute_scaffold(app):
     status_str = "EXECUTED (DRY RUN)" if is_dry_run else "EXECUTED (REAL)"
     display_name = f" [job name : {job_name}]" if job_name else ""
     
-    # UI Summary Header
     app_utils.log_message(app, "="*40, "info")
     app_utils.log_message(app, f"SCAFFOLD APPLY STATUS: {status_str}{display_name}", "info")
     app_utils.log_message(app, "="*40 + "\n", "info")
@@ -287,19 +274,15 @@ def execute_scaffold(app):
         app_utils.log_message(app, message, level)
     
     app.log_text.config(state="disabled")
-        
-    # Re-enable recompute always
     app.recompute_button.config(state="normal")
     
-    # After Dry Run: Allow user to click Apply again (for real this time)
-    # After Real Apply: Keep disabled to prevent accidental double-execution
     if is_dry_run and plan and not plan.has_conflicts:
         app.apply_button.config(state="normal")
     else:
         app.apply_button.config(state="disabled")
     
     populate_before_tree(app, plan.root_path)
-    populate_after_tree(app, plan) # Refresh After View to reflect 'exists' state
+    populate_after_tree(app, plan) 
     
     if stats["dirs_error"] > 0 or stats["files_error"] > 0:
         action_handler.handle_error(app, "apply")
@@ -308,7 +291,7 @@ def execute_scaffold(app):
         
     app.analysis_notebook.select(0)
 
-def _write_execution_log(app, plan, stats: dict, is_dry_run: bool, captured_logs: list, applied_paths: set, successful_paths: list, gitkeep_paths: list, job_name: str):
+def _write_execution_log(app, plan, stats: dict, is_dry_run: bool, captured_logs: list, successful_paths: list, gitkeep_paths: list, job_name: str):
     """Writes a comprehensive execution log to a timestamped file."""
     log_path = logger.get_session_dir()
     if not log_path:
@@ -325,25 +308,18 @@ def _write_execution_log(app, plan, stats: dict, is_dry_run: bool, captured_logs
     tree_content = app.tree_text.get("1.0", "end").strip()
     source_content = app.source_code_text.get("1.0", "end").strip()
 
-    # --- Identify Unchecked/Skipped paths for annotation ---
     full_planned_paths = plan.planned_dirs.union(plan.planned_files)
     unchecked_paths = set()
     for p in full_planned_paths:
         if not _is_effectively_selected(app, p):
             unchecked_paths.add(p)
 
-    # 1. Full Plan with Annotations (Identical/Exists/Skipped marks)
     unified_tree_text = scaffold_core.reconstruct_tree_string(
-        plan, 
-        show_annotations=True, 
-        unchecked_paths=unchecked_paths
+        plan, show_annotations=True, unchecked_paths=unchecked_paths
     )
     
-    # 2. Actually Applied (Newly created or overwritten only)
-    # We use successful_paths which contains what was actually touched (or would be touched in dry run)
     actual_written_paths = set()
     for p in successful_paths:
-        # Add the path and all its parents to preserve tree structure
         curr = p
         while curr != plan.root_path and curr.is_relative_to(plan.root_path):
             actual_written_paths.add(curr)
@@ -354,15 +330,11 @@ def _write_execution_log(app, plan, stats: dict, is_dry_run: bool, captured_logs
         applied_structure_text = "(No new or updated files were applied in this execution.)"
     else:
         applied_structure_text = scaffold_core.reconstruct_tree_string(
-            plan, 
-            filter_paths=actual_written_paths, 
-            show_annotations=False
+            plan, filter_paths=actual_written_paths, show_annotations=False
         )
 
-    # 3. .gitkeep Structure
     gitkeep_structure_text = ""
     if gitkeep_paths:
-        # Build a temporary set of paths for the .gitkeep tree
         gk_tree_paths = set()
         for p in gitkeep_paths:
             curr = p
@@ -370,22 +342,16 @@ def _write_execution_log(app, plan, stats: dict, is_dry_run: bool, captured_logs
                 gk_tree_paths.add(curr)
                 curr = curr.parent
         
-        # We need to temporarily add .gitkeep files to the plan so the reconstructor sees them
-        # but since we don't want to modify the actual plan object permanently, we'll be careful.
         original_planned_files = plan.planned_files.copy()
         try:
             plan.planned_files.update(gitkeep_paths)
             gitkeep_structure_text = scaffold_core.reconstruct_tree_string(
-                plan,
-                filter_paths=gk_tree_paths,
-                show_annotations=False
+                plan, filter_paths=gk_tree_paths, show_annotations=False
             )
         finally:
             plan.planned_files = original_planned_files
 
-    # 4. Actually Applied Detail Overview (List format)
     applied_details = []
-    # Mix of dirs and files from successful_paths
     for p in successful_paths:
         state = plan.path_states.get(p)
         action = "[DIR]" if p in plan.planned_dirs else ("[OVERWRITE]" if state == "overwrite" else "[FILE]")
@@ -528,10 +494,9 @@ def _write_recovery_v2_log(app, overwritten_backups: dict):
             display_path = str(path)
             
         log_entries.append(f"@@@FILE_BEGIN {display_path}")
-        # Append the raw content exactly. The "\n".join() will provide the necessary separator.
         log_entries.append(content if content is not None else "")
         log_entries.append(f"@@@FILE_END {display_path}")
-        log_entries.append("") # Spacer between file blocks
+        log_entries.append("")
 
     try:
         with open(recovery_filename, "w", encoding="utf-8") as f:
@@ -560,7 +525,6 @@ def _ensure_dir(app, path: Path, dry_run: bool, log_exec) -> tuple[bool, bool, b
 def _ensure_file(app, path: Path, dry_run: bool, content: str | None, is_overwrite: bool, log_exec, log_level: str = "success") -> tuple[bool, bool, bool]:
     """(ok, created, skipped)"""
     verb = "[OVERWRITE]" if is_overwrite else "[CREATE]"
-    
     if not is_overwrite and path.exists():
         log_exec(f"[SKIP FILE] {path} (already exists)", "skip")
         return True, False, True
@@ -571,12 +535,8 @@ def _ensure_file(app, path: Path, dry_run: bool, content: str | None, is_overwri
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
             raw_content = content or ""
-            # --- Robust Windows Line Ending Normalization ---
-            # 1. Convert everything to LF first to avoid \r\r\n issues
             temp_content = raw_content.replace('\r\n', '\n').replace('\r', '\n')
-            # 2. Convert all LF to CRLF for Windows standard
             final_content = temp_content.replace('\n', '\r\n')
-            
             path.write_bytes(final_content.encode('utf-8'))
         except Exception as e:
             log_exec(f"[ERROR] write file failed: {path} | {e}", "error")
