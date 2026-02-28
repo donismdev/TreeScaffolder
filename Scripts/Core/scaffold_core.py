@@ -275,8 +275,9 @@ def generate_plan(root_path: Path, text_input: str, config: dict) -> Plan:
 		raw_path_str = item['path'].strip()
 		content = item['content']
 		
+		# CRITICAL SECURITY: Strictly forbid '..' to ensure paths ONLY move downwards
 		if '..' in raw_path_str:
-			plan.errors.append(f"Invalid path in patch (security): '{raw_path_str}'.")
+			plan.errors.append(f"Security Violation: Path traversal '..' is strictly forbidden in '{raw_path_str}'. All paths must move downwards from the root.")
 			continue
 
 		norm_path = raw_path_str.replace('\\', '/').strip()
@@ -292,20 +293,10 @@ def generate_plan(root_path: Path, text_input: str, config: dict) -> Plan:
 				target_path = (root_path / rel_part).resolve()
 				break
 		
+		# CRITICAL: Strict Enforcement of Root Marker
 		if not target_path:
-			if Path(norm_path).is_absolute():
-				try:
-					resolved_abs = Path(norm_path).resolve()
-					if resolved_abs.is_relative_to(root_path):
-						target_path = resolved_abs
-					else:
-						plan.errors.append(f"Absolute path outside root is forbidden: '{raw_path_str}'")
-						continue
-				except Exception:
-					plan.errors.append(f"Invalid absolute path: '{raw_path_str}'")
-					continue
-			else:
-				target_path = (root_path / norm_path.lstrip('/')).resolve()
+			plan.errors.append(f"Invalid path format: '{raw_path_str}'. Every file path in Source Code MUST start with the '{{{{Root}}}}' marker.")
+			continue
 		
 		try:
 			if not target_path.is_relative_to(root_path):
