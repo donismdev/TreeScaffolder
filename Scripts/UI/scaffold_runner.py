@@ -16,6 +16,7 @@ from Scripts.UI import action_handler
 from Scripts.UI.tree_populator import populate_before_tree, populate_after_tree
 from Scripts.Utils import logger
 from Scripts.Utils.i18n import t
+from Scripts.Core import scaffold_core
 
 def _is_excluded_by_parent(app, path):
     """Checks if any parent directory of the path is unchecked in selected_paths."""
@@ -153,7 +154,13 @@ def execute_scaffold(app):
         elif state == "exists":
             log_exec(f"[SKIP FILE] {path}", "skip")
             stats["files_skipped"] += 1
-    
+
+    # Determine which paths were effectively selected for the final log
+    applied_paths = set()
+    for p in plan.planned_dirs.union(plan.planned_files):
+        if _is_effectively_selected(app, p):
+            applied_paths.add(p)
+
     log_exec("\n" + "="*25 + " SUMMARY " + "="*26)
     log_exec(f"- Dirs created: {stats['dirs_created']}, skipped: {stats['dirs_skipped']}, errors: {stats['dirs_error']}")
     log_exec(f"- Files created: {stats['files_created']}, overwritten: {stats['files_overwritten']}, skipped: {stats['files_skipped']}, errors: {stats['files_error']}")
@@ -217,7 +224,7 @@ def execute_scaffold(app):
                 # Also show a popup since this is a user-requested action that failed
                 messagebox.showwarning(t("message.error_title"), err_msg)
 
-    _write_execution_log(app, stats, is_dry_run, captured_logs)
+    _write_execution_log(app, plan, stats, is_dry_run, captured_logs, applied_paths)
     
     # CRITICAL: Always check if we have backups to write, and ensure it's NOT a dry run
     if not is_dry_run and len(overwritten_backups) > 0:
@@ -269,7 +276,7 @@ def execute_scaffold(app):
         
     app.analysis_notebook.select(0)
 
-def _write_execution_log(app, stats: dict, is_dry_run: bool, captured_logs: list):
+def _write_execution_log(app, plan, stats: dict, is_dry_run: bool, captured_logs: list, applied_paths: set):
     """Writes a comprehensive execution log to a timestamped file."""
     log_path = logger.get_session_dir()
     if not log_path:
@@ -286,13 +293,25 @@ def _write_execution_log(app, stats: dict, is_dry_run: bool, captured_logs: list
     tree_content = app.tree_text.get("1.0", "end").strip()
     source_content = app.source_code_text.get("1.0", "end").strip()
 
+    # --- Reconstructed Tree Sections ---
+    # 1. Full Plan with Annotations (Identical/Exists marks)
+    unified_tree_text = scaffold_core.reconstruct_tree_string(plan, show_annotations=True)
+    
+    # 2. Actually Applied (Only if filtering occurred)
+    full_planned_paths = plan.planned_dirs.union(plan.planned_files)
+    all_selected = (len(full_planned_paths) == len(applied_paths))
+    
+    applied_structure_text = ""
+    if not all_selected:
+        applied_structure_text = scaffold_core.reconstruct_tree_string(plan, filter_paths=applied_paths, show_annotations=False)
+
     summary_header = (
         f"{'DRY RUN' if is_dry_run else 'EXECUTION'} SUMMARY\n"
-        f"New Directories: {stats['dirs_created']}\n"
-        f"New Files: {stats['files_created']}\n"
-        f"Overwritten Files: {stats['files_overwritten']}\n"
-        f"Directory Errors: {stats['dirs_error']}\n"
-        f"File Errors: {stats['files_error']}\n"
+        f"- New Directories: {stats['dirs_created']}\n"
+        f"- New Files: {stats['files_created']}\n"
+        f"- Overwritten Files: {stats['files_overwritten']}\n"
+        f"- Directory Errors: {stats['dirs_error']}\n"
+        f"- File Errors: {stats['files_error']}\n"
     )
 
     status_str = "EXECUTED (DRY RUN)" if is_dry_run else "EXECUTED (REAL)"
@@ -306,11 +325,24 @@ def _write_execution_log(app, stats: dict, is_dry_run: bool, captured_logs: list
     log_entries = status_header + [
         f"Execution Log - {datetime.datetime.now().isoformat()}",
         "=" * 80,
+        "Unified Scaffold Structure (Full Plan):",
+        "=" * 80,
+        unified_tree_text,
+        "",
         summary_header,
         "=" * 80,
-        "\n--- detail ---\n",
     ]
 
+    if applied_structure_text:
+        log_entries.extend([
+            "\n" + "=" * 80,
+            "Actually Applied Structure (Filtered by Checkboxes):",
+            "=" * 80,
+            applied_structure_text,
+            ""
+        ])
+
+    log_entries.append("\n--- detail ---\n")
     for message, level in captured_logs:
         log_entries.append(f"[{level.upper()}] {message}")
         

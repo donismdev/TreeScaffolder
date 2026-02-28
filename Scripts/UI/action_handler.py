@@ -8,6 +8,7 @@ Updates the UI summary and executes logic for various user triggers.
 import tkinter as tk
 from tkinter import messagebox, filedialog
 from pathlib import Path
+import re
 from Scripts.Utils.i18n import t
 from Scripts.Core import scaffold_core
 from Scripts.UI import app_utils
@@ -121,6 +122,45 @@ def handle_error(app, action_key):
 TEST_DIR = Path("Test")
 RESOURCE_DIR = Path("Resources")
 
+def update_debug_ui(app):
+    """Shows or hides debug-only UI elements based on current debug_level."""
+    from Scripts.Utils import logger
+    level = logger.get_log_level()
+    
+    if level >= 2:
+        # Show Check Folder button
+        app.check_folder_button.grid(row=0, column=3)
+    else:
+        app.check_folder_button.grid_forget()
+
+def on_check_folder(app):
+    """Recursively counts files and directories in the target root."""
+    root_path_str = app.target_root_path.get()
+    if not root_path_str or root_path_str == t("ui.no_folder_selected"):
+        messagebox.showwarning(t("message.error_title"), t("message.select_root_first"))
+        return
+
+    try:
+        root_path = Path(root_path_str)
+        if not root_path.is_dir():
+            messagebox.showerror(t("message.error_title"), t("message.root_not_found"))
+            return
+
+        file_count = 0
+        dir_count = 0
+        
+        for item in root_path.rglob('*'):
+            if item.is_file():
+                file_count += 1
+            elif item.is_dir():
+                dir_count += 1
+        
+        info_msg = f"Target: {root_path.name}\n\n- Directories: {dir_count}\n- Files: {file_count}\n\n(Total items: {file_count + dir_count})"
+        messagebox.showinfo(t("ui.check_folder"), info_msg)
+        
+    except Exception as e:
+        messagebox.showerror(t("message.error_title"), f"Error scanning folder: {e}")
+
 def on_browse_folder(app):
     logger.debug("on_browse_folder called")
     path = filedialog.askdirectory(mustexist=True, title=t("ui.section_1"))
@@ -167,6 +207,45 @@ def on_recompute(app, silent=False):
 
     app.current_plan = scaffold_core.generate_plan(root_path, text_input, config)
     
+    # --- 0. Update Source Code with Unified Structure Comment ---
+    if app.current_plan:
+        reconstructed_tree = scaffold_core.reconstruct_tree_string(app.current_plan)
+        if reconstructed_tree:
+            source_content = app.source_code_text.get("1.0", tk.END).rstrip()
+            
+            # Calculate summary stats for the comment
+            plan = app.current_plan
+            new_dirs = len([p for p, s in plan.path_states.items() if s == 'new' and p in plan.planned_dirs])
+            new_files = len([p for p, s in plan.path_states.items() if s == 'new' and p in plan.planned_files])
+            overwrites = len([p for p, s in plan.path_states.items() if s == 'overwrite'])
+            total_lines = sum(len(c.splitlines()) for c in plan.file_contents.values())
+            
+            summary_block = (
+                f"\n\n[INFO] - New directories: {new_dirs}\n"
+                f"[INFO] - New files: {new_files}\n"
+                f"[INFO] - Overwritten files: {overwrites}\n"
+                f"[INFO] - Total lines of content: {total_lines} lines"
+            )
+            
+            comment_header = "@@@COMMENT_BEGIN Unified Scaffold Structure"
+            comment_footer = "@@@COMMENT_END"
+            
+            # Find and replace existing structure comment if it exists
+            pattern = re.compile(rf"{comment_header}[\s\S]*?{comment_footer}")
+            new_comment_block = f"\n\n{comment_header}\n{reconstructed_tree}{summary_block}\n{comment_footer}"
+            
+            if pattern.search(source_content):
+                new_source = pattern.sub(new_comment_block.strip(), source_content)
+            else:
+                new_source = source_content + new_comment_block
+            
+            # Use a flag to avoid triggering handle_content_updated recursively
+            app.source_code_text.edit_modified(False)
+            app.source_code_text.delete("1.0", tk.END)
+            app.source_code_text.insert("1.0", new_source.strip() + "\n")
+            app.source_code_text.edit_modified(False)
+            logger.debug("Source Code editor updated with unified structure.")
+
     # --- 0. Filter selected_paths to remove stale entries ---
     if app.current_plan:
         all_involved = app.current_plan.planned_dirs.union(app.current_plan.planned_files)

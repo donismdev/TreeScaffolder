@@ -394,3 +394,52 @@ def generate_plan(root_path: Path, text_input: str, config: dict) -> Plan:
 				plan.similarity_warnings[planned_file] = similar
 
 	return plan
+
+def reconstruct_tree_string(plan: Plan, filter_paths: Optional[Set[Path]] = None, show_annotations: bool = True) -> str:
+	"""Generates a text-based tree structure from the planned paths, optionally filtered and annotated."""
+	all_planned = plan.planned_dirs.union(plan.planned_files)
+	if filter_paths is not None:
+		all_paths_list = sorted(list(all_planned.intersection(filter_paths)), key=lambda p: (len(p.parts), str(p).lower()))
+	else:
+		all_paths_list = sorted(list(all_planned), key=lambda p: (len(p.parts), str(p).lower()))
+		
+	if not all_paths_list:
+		return ""
+
+	root_path = plan.root_path
+	# Find the root marker name from the plan nodes if possible
+	root_marker = "{{Root}}"
+	for node in plan.nodes:
+		if node.indent == 0:
+			root_marker = node.name
+			break
+
+	lines = [f"@ROOT {root_marker}", "", f"{root_marker}/"]
+	
+	def get_rel_depth(p):
+		try:
+			return len(p.relative_to(root_path).parts)
+		except:
+			return 0
+
+	for p in all_paths_list:
+		if p == root_path: continue
+		depth = get_rel_depth(p)
+		indent = "\t" * depth
+		
+		is_dir = p in plan.planned_dirs
+		name = p.name + ("/" if is_dir else "")
+		
+		# Add annotation if the file already matches the plan
+		annotation = ""
+		if show_annotations and not is_dir:
+			state = plan.path_states.get(p)
+			if state == "identical":
+				annotation = " // (Already matches)"
+			elif state == "exists":
+				annotation = " // (File exists)"
+		
+		lines.append(f"{indent}{name}{annotation}")
+		
+	return "\n".join(lines)
+	

@@ -145,6 +145,9 @@ class OptionsWindow:
         from Scripts.Utils import logger
         logger.set_log_level(new_level)
         self._save_config("debug_level", new_level)
+        # Update UI visibility in the main app
+        from Scripts.UI import action_handler
+        action_handler.update_debug_ui(self.app_instance)
 
     def _on_cleanup_logs(self):
         from pathlib import Path

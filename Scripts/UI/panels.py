@@ -73,8 +73,12 @@ def create_left_panel(app):
     app.widget_map["on_browse_folder"] = app.browse_button
 
     app.prev_dir_button = ttk.Button(path_buttons_frame, text=t("ui.prev"), command=app.on_previous_folder, width=8, state=tk.DISABLED)
-    app.prev_dir_button.grid(row=0, column=2)
+    app.prev_dir_button.grid(row=0, column=2, padx=(0, 5))
     app.widget_map["on_previous_folder"] = app.prev_dir_button
+
+    app.check_folder_button = ttk.Button(path_buttons_frame, text=t("ui.check_folder"), command=lambda: action_handler.on_check_folder(app), width=12)
+    # Don't grid it yet, it will be managed based on debug_level
+    app.widget_map["on_check_folder"] = app.check_folder_button
 
     # --- Editor Tabs ---
     editor_tabs_frame = ttk.LabelFrame(app.left_frame, text=t("ui.section_2"))

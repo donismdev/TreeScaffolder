@@ -133,6 +133,7 @@ class ScaffoldApp:
 
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
 
+        action_handler.update_debug_ui(self)
         logger.debug("ScaffoldApp.__init__ completed")
 
     def on_closing(self):
