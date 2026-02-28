@@ -277,7 +277,37 @@ def on_recompute(app, silent=False):
         return True
 
 def on_apply(app):
+    """Executes the plan if root path is valid and user confirms."""
     logger.debug("on_apply called")
+    
+    # 1. Strict Root Path Validation (Security Lockdown Routine)
+    root_path_str = app.target_root_path.get()
+    root_path = Path(root_path_str) if root_path_str else None
+    
+    if not root_path or not root_path.is_dir():
+        # Security Lockdown
+        messagebox.showerror(t("message.error_title"), t("message.root_not_found"))
+        
+        # Reset UI Settings
+        app.target_root_path.set(t("ui.no_folder_selected"))
+        app.prev_dir_button.config(state=tk.DISABLED)
+        app.recompute_button.config(state=tk.DISABLED)
+        app.apply_button.config(state=tk.DISABLED)
+        
+        # Clear Config Persistence
+        app.last_root_path = ""
+        app_utils.save_last_root_path(app, "")
+        
+        # Clear Analysis Views
+        clear_tree_function(app.before_tree)
+        clear_tree_function(app.before_list)
+        clear_tree_function(app.after_tree)
+        clear_tree_function(app.after_list)
+        
+        logger.warn(f"Apply aborted: Root path '{root_path_str}' is invalid. System locked down.")
+        return
+
+    # 2. Existing Validation and Confirmation
     if not app.current_plan or app.current_plan.has_conflicts:
         messagebox.showerror("Cannot Apply", "No valid plan or plan has conflicts.")
         return

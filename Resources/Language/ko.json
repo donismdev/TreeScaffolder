@@ -98,6 +98,7 @@
         "invalid_folder_title": "유효하지 않은 폴더",
         "error_title": "오류",
         "select_root_first": "먼저 유효한 루트 폴더를 선택하십시오.",
+        "root_not_found": "루트 폴더 확인 불가: 선택된 폴더가 삭제되었거나 접근할 수 없습니다. 모든 경로 세팅이 초기화됩니다.",
         "empty_editors": "두 에디터가 모두 비어 있습니다. 계산할 내용이 없습니다.",
         "conflicts_found_title": "충돌 발견",
         "conflicts_msg": "구조적 충돌이 발견되었습니다. (예: 파일이 계획된 위치에 폴더가 존재)\n적용이 비활성화됩니다.",

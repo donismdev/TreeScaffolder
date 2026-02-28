@@ -98,6 +98,7 @@
         "invalid_folder_title": "Invalid Folder",
         "error_title": "Error",
         "select_root_first": "Please select a valid root folder first.",
+        "root_not_found": "Root Folder Unavailable: The selected folder has been deleted or is inaccessible. All path settings will be reset.",
         "empty_editors": "Both editors are empty. Nothing to compute.",
         "conflicts_found_title": "Conflicts Found",
         "conflicts_msg": "Structural conflicts found. (e.g., folder exists where a file is planned)\nApply is disabled.",
