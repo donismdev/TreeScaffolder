@@ -161,7 +161,7 @@ You can quickly execute various functions within the application using keyboard 
 
 ---
 
-## 10. Support & Bug Reports
+## 9. Support & Bug Reports
 
 If you encounter any issues, have feature suggestions, or want to report a bug, please contact us via email.
 *   **Email**: donism.dev@gmail.com

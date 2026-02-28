@@ -167,11 +167,11 @@ At the top of the text editor in the "Define Scaffold Tree" panel, there is a to
 
 A configuration file that controls the operation of the application.
 
--   `debug_level` (integer, 1 to 3)
-    -   Controls the verbosity of the logs.
+-   `debug_level` (integer, 0 to 3)
+    -   Controls the logging verbosity and enables debug features.
     -   **`0` (Release)**: Only critical errors and warnings.
     -   **`1` (Info)**: Default. Shows major execution steps and results.
-    -   **`2` (Debug)**: Detailed information for development and troubleshooting.
+    -   **`2` (Debug)**: Detailed information for development. Enables the **[Check Folder]** button, which recursively counts items in the target root.
     -   **`3` (Trace)**: Maximum verbosity, showing every minor operation.
 -   **Runtime Logging (Automatic)**
     -   When the application runs, it always creates a runtime log that records all operations and errors.
