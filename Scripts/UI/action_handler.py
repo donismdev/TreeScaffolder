@@ -142,15 +142,27 @@ def on_check_folder(app):
             return
 
         file_count = 0
+        gitkeep_count = 0
         dir_count = 0
         
         for item in root_path.rglob('*'):
             if item.is_file():
-                file_count += 1
+                if item.name == ".gitkeep":
+                    gitkeep_count += 1
+                else:
+                    file_count += 1
             elif item.is_dir():
                 dir_count += 1
         
-        info_msg = f"Target: {root_path.name}\n\n- Directories: {dir_count}\n- Files: {file_count}\n\n(Total items: {file_count + dir_count})"
+        total_files = file_count + gitkeep_count
+        info_msg = t("ui.check_folder_result", 
+                     name=root_path.name, 
+                     dirs=dir_count, 
+                     files=total_files, 
+                     normal=file_count, 
+                     gitkeep=gitkeep_count, 
+                     total=total_files + dir_count)
+        
         messagebox.showinfo(t("ui.check_folder"), info_msg)
         
     except Exception as e:

@@ -382,6 +382,7 @@ def _write_execution_log(app, plan, stats: dict, is_dry_run: bool, captured_logs
 
     status_str = "EXECUTED (DRY RUN)" if is_dry_run else "EXECUTED (REAL)"
     display_name = f" [job name : {job_name}]" if job_name else ""
+    
     status_header = [
         "========================================",
         f"SCAFFOLD APPLY STATUS: {status_str}{display_name}",
@@ -389,6 +390,11 @@ def _write_execution_log(app, plan, stats: dict, is_dry_run: bool, captured_logs
         ""
     ]
 
+    # DEVELOPER NOTICE: The following sections (Status, Summary) are intentionally
+    # duplicated at both the top and bottom of the log file to ensure visibility
+    # regardless of where the user starts reading (top-down or bottom-up).
+    # This is a UX design choice, NOT a duplication bug.
+    
     log_entries = status_header + [
         f"Execution Log - {datetime.datetime.now().isoformat()}",
         "=" * 80,

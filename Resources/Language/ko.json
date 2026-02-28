@@ -52,7 +52,8 @@
         "keep_n_logs": "최근 남길 로그 개수:",
         "cleanup_now": "로그 정리 실행",
         "close": "닫기",
-        "esc_to_close": "(Esc를 눌러 닫기)"
+        "esc_to_close": "(Esc를 눌러 닫기)",
+        "check_folder_result": "대상: {name}\n\n- 폴더: {dirs}개\n- 파일: {files}개 (일반: {normal}, .gitkeep: {gitkeep})\n\n(전체 항목: {total}개)"
     },
     "log": {
         "loading_test_data": "테스트 데이터를 로드하는 중...",

@@ -52,7 +52,8 @@
         "keep_n_logs": "Keep last N logs:",
         "cleanup_now": "Clean up logs",
         "close": "Close",
-        "esc_to_close": "(Esc to close)"
+        "esc_to_close": "(Esc to close)",
+        "check_folder_result": "Target: {name}\n\n- Directories: {dirs}\n- Files: {files} (Normal: {normal}, .gitkeep: {gitkeep})\n\n(Total items: {total})"
     },
     "log": {
         "loading_test_data": "Attempting to load test data...",
