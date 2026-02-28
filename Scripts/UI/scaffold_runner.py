@@ -408,11 +408,10 @@ def _write_recovery_v2_log(app, overwritten_backups: dict):
             display_path = str(path)
             
         log_entries.append(f"@@@FILE_BEGIN {display_path}")
-        log_entries.append(content)
-        if content and not content.endswith('\n'):
-            log_entries.append("")
+        # Append the raw content exactly. The "\n".join() will provide the necessary separator.
+        log_entries.append(content if content is not None else "")
         log_entries.append(f"@@@FILE_END {display_path}")
-        log_entries.append("")
+        log_entries.append("") # Spacer between file blocks
 
     try:
         with open(recovery_filename, "w", encoding="utf-8") as f:
