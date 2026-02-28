@@ -772,6 +772,33 @@ def _update_node_visual_sync(app, path: Path, state: bool):
 
 # --- Editor Tab Logic ---
 
+def on_paste_with_limit(app, event):
+    """Intercepts paste events to check for excessive text size."""
+    widget = event.widget
+    try:
+        clipboard_content = app.root.clipboard_get()
+        # Limit set to 3 million characters (~3MB)
+        LIMIT = 3_000_000
+        
+        if len(clipboard_content) > LIMIT:
+            size_mb = len(clipboard_content) / (1024 * 1024)
+            messagebox.showwarning(
+                t("message.error_title"),
+                f"Clipboard content is too large ({size_mb:.1f}MB).\n"
+                f"Maximum allowed size is {LIMIT/1_000_000:.0f}MB to prevent freezing."
+            )
+            return "break" # Abort paste
+            
+        # Allow normal paste if within limit
+        # The default Text widget paste will happen after this if we don't return "break"
+        # However, to be safe and consistent, we can manually trigger the paste
+        # but returning nothing allows the default event handler to proceed.
+        return None
+        
+    except tk.TclError:
+        # Happens if clipboard is empty or contains non-text data
+        return None
+
 def on_editor_tab_changed(app, event):
     """Updates the editor control bar based on the active tab."""
     # We always show the entry widget in all tabs for consistent layout

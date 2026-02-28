@@ -137,6 +137,10 @@ def create_left_panel(app):
     source_yscroller.grid(row=0, column=1, sticky="ns")
     source_xscroller.grid(row=1, column=0, sticky="ew")
     
+    # Paste Limit
+    app.source_code_text.bind("<Control-v>", lambda e: action_handler.on_paste_with_limit(app, e))
+    app.source_code_text.bind("<Shift-Insert>", lambda e: action_handler.on_paste_with_limit(app, e))
+    
     app.source_code_text.bind("<<Modified>>", lambda e: action_handler.handle_content_updated(app, "source") if app.source_code_text.edit_modified() and app.source_code_text.edit_modified(False) else None)
 
     # --- Scaffold Tree Tab (Now Second) ---
@@ -156,6 +160,10 @@ def create_left_panel(app):
     tree_xscroller.grid(row=1, column=0, sticky="ew")
     
     app.tree_text.insert("1.0", app.DEFAULT_TREE_TEMPLATE)
+    
+    # Paste Limit
+    app.tree_text.bind("<Control-v>", lambda e: action_handler.on_paste_with_limit(app, e))
+    app.tree_text.bind("<Shift-Insert>", lambda e: action_handler.on_paste_with_limit(app, e))
     
     # Bind change events
     app.tree_text.bind("<<Modified>>", lambda e: action_handler.handle_content_updated(app, "tree") if app.tree_text.edit_modified() and app.tree_text.edit_modified(False) else None)

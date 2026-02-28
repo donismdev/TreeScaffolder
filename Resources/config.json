@@ -11,5 +11,6 @@
     "CREATE_GITKEEP": false,
     "ENABLE_SIMILARITY_SCAN": true,
     "SIMILARITY_RATIO_THRESHOLD": 0.86,
-    "recovery_window_geometry": "600x400+26+26"
+    "recovery_window_geometry": "600x400+26+26",
+    "recovery_notify_geometry": "500x400+190+239"
 }

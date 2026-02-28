@@ -4,6 +4,12 @@
 
 TreeScaffolder is a **Prompt Helper and File System Scaffolding tool** designed to optimize collaboration with LLMs (Large Language Models). Its core mission is to visualize complex file structures and source code, then safely reflect them onto the actual file system.
 
+## ⚠️ Important Warnings
+
+1.  **No Real-time File Detection**: This program does not monitor file system changes in real-time. Do not delete, move, or modify files in the target folder via external tools (like File Explorer) while the program is open. Doing so may cause unexpected errors or data loss. (Always re-run 'Check Folder' or 'Compute Diff' after manual changes.)
+2.  **Encoding Support**: All file read/write operations and recovery logs are designed based on **UTF-8** encoding. Overwriting files written in other encodings (e.g., EUC-KR, CP949) may result in corrupted characters during recovery.
+3.  **Operating System**: The current version is optimized specifically for **Windows**.
+
 ---
 
 ## 1. Core Objective
