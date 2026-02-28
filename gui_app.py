@@ -66,11 +66,19 @@ class ScaffoldApp:
         self.style.theme_use('vista')
 
         # --- Member Variables ---
+        config_data = {}
+        try:
+            if Path(self.CONFIG_FILE).exists():
+                with open(self.CONFIG_FILE, "r", encoding="utf-8") as f:
+                    config_data = json.load(f)
+        except: pass
+
         self.target_root_path = tk.StringVar(value=t("ui.no_folder_selected"))
         self.dry_run = tk.BooleanVar(value=True)
-        self.open_folder_after_apply = tk.BooleanVar(value=False)
-        self.enable_similarity_scan = tk.BooleanVar(value=True)
-        self.similarity_threshold = tk.DoubleVar(value=0.86)
+        self.open_folder_after_apply = tk.BooleanVar(value=config_data.get("OPEN_FOLDER_AFTER_APPLY", False))
+        self.create_gitkeep = tk.BooleanVar(value=config_data.get("CREATE_GITKEEP", False))
+        self.enable_similarity_scan = tk.BooleanVar(value=config_data.get("ENABLE_SIMILARITY_SCAN", True))
+        self.similarity_threshold = tk.DoubleVar(value=config_data.get("SIMILARITY_RATIO_THRESHOLD", 0.86))
         self.last_root_path = None
 
         self.current_plan: scaffold_core.Plan | None = None

@@ -4,10 +4,28 @@ options_ui.py
 
 A separate window for application options.
 """
+import json
+import re
+from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, messagebox
 from Scripts.Utils.i18n import t, set_language, get_current_language
 from Scripts.UI import action_handler
+
+def _validate_geometry(geom_str, min_w=400, min_h=500):
+    """Validates geometry string and ensures it's within reasonable bounds."""
+    try:
+        if not geom_str: return False
+        # Expected format: WxH+X+Y
+        match = re.match(r"(\d+)x(\d+)\+?(-?\d+)\+?(-?\d+)", geom_str)
+        if not match: return False
+        
+        w, h, x, y = map(int, match.groups())
+        if w < min_w or h < min_h: return False
+        # Loose screen bound check to allow multi-monitor setups
+        if x < -5000 or x > 5000 or y < -5000 or y > 5000: return False
+        return True
+    except: return False
 
 class OptionsWindow:
     _instance = None
@@ -22,14 +40,19 @@ class OptionsWindow:
         self.app = app_instance
         self.window = tk.Toplevel(parent)
         self.window.title(t("ui.options_title"))
-        self.window.geometry("400x450")
-        self.window.minsize(350, 400)
+        
+        # Increased default and min size to ensure buttons are not hidden
+        self.window.geometry("450x550")
+        self.window.minsize(400, 500)
+        self._load_geometry()
+
         self.window.grab_set()  # Make it modal
         self.window.focus_set() # Set focus to the new window
 
-        # Bind Escape key to close the window
+        # Bind events
         self.window.bind("<Escape>", lambda e: self._on_close())
         self.window.protocol("WM_DELETE_WINDOW", self._on_close)
+        self.window.bind("<Destroy>", lambda e: self._save_geometry() if e.widget == self.window else None)
 
         self.setup_ui()
 
@@ -39,9 +62,7 @@ class OptionsWindow:
         self.window.destroy()
 
     def _load_config(self):
-        import json
-        from pathlib import Path
-        config_path = Path("Resources/config.json")
+        config_path = Path(self.app.CONFIG_FILE)
         if config_path.exists():
             try:
                 with open(config_path, "r", encoding="utf-8") as f:
@@ -51,9 +72,7 @@ class OptionsWindow:
         return {}
 
     def _save_config(self, key, value):
-        import json
-        from pathlib import Path
-        config_path = Path("Resources/config.json")
+        config_path = Path(self.app.CONFIG_FILE)
         config = self._load_config()
         config[key] = value
         try:
@@ -61,6 +80,23 @@ class OptionsWindow:
                 json.dump(config, f, indent=4)
         except Exception:
             pass
+
+    def _load_geometry(self):
+        try:
+            config = self._load_config()
+            geom = config.get("options_window_geometry")
+            if _validate_geometry(geom):
+                self.window.geometry(geom)
+        except: pass
+
+    def _save_geometry(self):
+        try:
+            config_path = Path(self.app.CONFIG_FILE)
+            config = self._load_config()
+            config["options_window_geometry"] = self.window.geometry()
+            with open(config_path, "w", encoding="utf-8") as f:
+                json.dump(config, f, indent=4)
+        except: pass
 
     def setup_ui(self):
         # Clear current UI if re-running
@@ -94,6 +130,61 @@ class OptionsWindow:
         debug_combo = ttk.Combobox(debug_frame, textvariable=self.debug_var, values=[0, 1, 2, 3], state="readonly", width=5)
         debug_combo.pack(side=tk.LEFT)
         debug_combo.bind("<<ComboboxSelected>>", self._on_debug_change)
+
+        # Application Settings Section
+        settings_group = ttk.LabelFrame(main_frame, text=t("ui.section_3"), padding=10)
+        settings_group.pack(fill=tk.X, pady=10)
+
+        # Open Folder after Apply
+        self.open_folder_var = tk.BooleanVar(value=self.app.open_folder_after_apply.get())
+        def toggle_open_folder():
+            val = self.open_folder_var.get()
+            self.app.open_folder_after_apply.set(val)
+            self._save_config("OPEN_FOLDER_AFTER_APPLY", val)
+            action_handler.handle_toggle_open_after(self.app, val)
+
+        ttk.Checkbutton(settings_group, text=t("ui.open_after"), variable=self.open_folder_var, command=toggle_open_folder).pack(anchor="w", pady=2)
+
+        # Create .gitkeep
+        self.create_gitkeep_var = tk.BooleanVar(value=self.app.create_gitkeep.get())
+        def toggle_gitkeep():
+            val = self.create_gitkeep_var.get()
+            self.app.create_gitkeep.set(val)
+            self._save_config("CREATE_GITKEEP", val)
+            action_handler.update_summary(self.app, "gitkeep_on" if val else "gitkeep_off")
+
+        ttk.Checkbutton(settings_group, text=t("ui.create_gitkeep"), variable=self.create_gitkeep_var, command=toggle_gitkeep).pack(anchor="w", pady=2)
+
+        # Similarity Scan Settings
+        similarity_frame = ttk.Frame(settings_group)
+        similarity_frame.pack(fill=tk.X, pady=5)
+
+        self.sim_scan_var = tk.BooleanVar(value=self.app.enable_similarity_scan.get())
+        def toggle_sim_scan():
+            val = self.sim_scan_var.get()
+            self.app.enable_similarity_scan.set(val)
+            self._save_config("ENABLE_SIMILARITY_SCAN", val)
+            action_handler.handle_toggle_similarity(self.app, val)
+
+        ttk.Checkbutton(similarity_frame, text=t("ui.similarity_scan"), variable=self.sim_scan_var, command=toggle_sim_scan).pack(anchor="w")
+
+        # Similarity Ratio Slider
+        ratio_frame = ttk.Frame(settings_group)
+        ratio_frame.pack(fill=tk.X, padx=20, pady=(0, 5))
+        
+        current_ratio = self.app.similarity_threshold.get()
+        self.ratio_label = ttk.Label(ratio_frame, text=f"{t('ui.similarity_ratio')}: {current_ratio:.2f}")
+        self.ratio_label.pack(side=tk.LEFT)
+
+        self.ratio_var = tk.DoubleVar(value=current_ratio)
+        def on_ratio_move(val):
+            val = float(val)
+            self.ratio_label.config(text=f"{t('ui.similarity_ratio')}: {val:.2f}")
+            self.app.similarity_threshold.set(val)
+            self._save_config("SIMILARITY_RATIO_THRESHOLD", val)
+
+        ratio_slider = ttk.Scale(ratio_frame, from_=0.5, to=1.0, variable=self.ratio_var, orient=tk.HORIZONTAL, command=on_ratio_move)
+        ratio_slider.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=10)
 
         # Log Cleanup Section
         config = self._load_config()
@@ -146,8 +237,7 @@ class OptionsWindow:
         logger.set_log_level(new_level)
         self._save_config("debug_level", new_level)
         # Update UI visibility in the main app
-        from Scripts.UI import action_handler
-        action_handler.update_debug_ui(self.app_instance)
+        action_handler.update_debug_ui(self.app)
 
     def _on_cleanup_logs(self):
         from pathlib import Path

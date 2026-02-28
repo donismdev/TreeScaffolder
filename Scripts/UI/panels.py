@@ -186,18 +186,13 @@ def create_left_panel(app):
     # Settings
     ttk.Checkbutton(settings_frame, text=t("ui.dry_run"), variable=app.dry_run, 
                     command=lambda: action_handler.handle_toggle_dry_run(app, app.dry_run.get())).grid(row=0, column=0, columnspan=2, sticky="w", padx=5)
-    ttk.Checkbutton(settings_frame, text=t("ui.similarity_scan"), variable=app.enable_similarity_scan,
-                    command=lambda: action_handler.handle_toggle_similarity(app, app.enable_similarity_scan.get())).grid(row=1, column=0, columnspan=2, sticky="w", padx=5)
-
-    ttk.Label(settings_frame, text=t("ui.similarity_ratio")).grid(row=2, column=0, sticky="w", padx=5, pady=2)
-    ttk.Scale(settings_frame, from_=0.5, to=1.0, variable=app.similarity_threshold, orient=tk.HORIZONTAL).grid(row=2, column=1, sticky="ew", padx=5)
-
+    
     ttk.Checkbutton(settings_frame, text=t("ui.open_after"), variable=app.open_folder_after_apply,
-                    command=lambda: action_handler.handle_toggle_open_after(app, app.open_folder_after_apply.get())).grid(row=3, column=0, columnspan=2, sticky="w", padx=5)
+                    command=lambda: action_handler.handle_toggle_open_after(app, app.open_folder_after_apply.get())).grid(row=1, column=0, columnspan=2, sticky="w", padx=5)
     
     # Action Buttons
     actions_subframe = ttk.Frame(settings_frame)
-    actions_subframe.grid(row=4, column=0, columnspan=2, sticky="ew", pady=5)
+    actions_subframe.grid(row=2, column=0, columnspan=2, sticky="ew", pady=5)
     actions_subframe.columnconfigure((0, 1), weight=1)
 
     app.recompute_button = ttk.Button(actions_subframe, text=t("ui.compute_diff"), command=app.on_recompute, state=tk.DISABLED)

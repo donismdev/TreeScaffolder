@@ -415,6 +415,7 @@ def on_clear_data(app):
     logger.debug("on_clear_data called")
     app_utils.log_message(app, t("log.clearing_data"), "info")
     app.dry_run.set(True)
+    app.create_gitkeep.set(False)
     app.enable_similarity_scan.set(True)
     app.similarity_threshold.set(0.86)
     app.tree_text.delete("1.0", tk.END)

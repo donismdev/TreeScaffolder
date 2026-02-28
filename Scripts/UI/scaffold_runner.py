@@ -86,8 +86,13 @@ def execute_scaffold(app):
     log_exec(f"- Total lines of content to be written: {total_content_lines} lines")
     log_exec("="*60)
 
-    stats = {"dirs_created": 0, "dirs_skipped": 0, "dirs_error": 0, "files_created": 0, "files_overwritten": 0, "files_skipped": 0, "files_error": 0}
+    stats = {
+        "dirs_created": 0, "dirs_skipped": 0, "dirs_error": 0, 
+        "files_created": 0, "files_overwritten": 0, "files_skipped": 0, "files_error": 0,
+        "gitkeep_created": 0
+    }
     successful_paths = []
+    gitkeep_paths = []
     # Collect original contents for recovery log
     overwritten_backups = {} 
 
@@ -156,6 +161,32 @@ def execute_scaffold(app):
             log_exec(f"[SKIP FILE] {path}", "skip")
             stats["files_skipped"] += 1
 
+    # --- NEW: Create .gitkeep in empty planned folders ---
+    if not is_dry_run and app.create_gitkeep.get():
+        for dir_path in plan.planned_dirs:
+            # Check if this dir path is effectively selected
+            if not _is_effectively_selected(app, dir_path):
+                continue
+                
+            # Check if any planned file is inside this directory
+            has_child_file = False
+            for file_path in plan.planned_files:
+                if _is_effectively_selected(app, file_path) and file_path.is_relative_to(dir_path):
+                    has_child_file = True
+                    break
+            
+            # If no child files are planned/selected for this folder, create .gitkeep
+            if not has_child_file:
+                gitkeep_path = dir_path / ".gitkeep"
+                if not gitkeep_path.exists():
+                    try:
+                        gitkeep_path.write_bytes(b"")
+                        log_exec(f"[GITKEEP]   {gitkeep_path}", "success")
+                        stats["gitkeep_created"] += 1
+                        gitkeep_paths.append(gitkeep_path)
+                    except Exception as e:
+                        log_exec(f"[ERROR] failed to create .gitkeep in {dir_path}: {e}", "error")
+
     # Determine which paths were effectively selected for the final log
     applied_paths = set()
     for p in plan.planned_dirs.union(plan.planned_files):
@@ -165,6 +196,8 @@ def execute_scaffold(app):
     log_exec("\n" + "="*25 + " SUMMARY " + "="*26)
     log_exec(f"- Dirs created: {stats['dirs_created']}, skipped: {stats['dirs_skipped']}, errors: {stats['dirs_error']}")
     log_exec(f"- Files created: {stats['files_created']}, overwritten: {stats['files_overwritten']}, skipped: {stats['files_skipped']}, errors: {stats['files_error']}")
+    if stats["gitkeep_created"] > 0:
+        log_exec(f"- .gitkeep created: {stats['gitkeep_created']}")
     
     if plan.duplicate_warnings or plan.similarity_warnings:
         log_exec("\n--- Warnings ---", "warn")
@@ -211,7 +244,7 @@ def execute_scaffold(app):
                 # Also show a popup since this is a user-requested action that failed
                 messagebox.showwarning(t("message.error_title"), err_msg)
 
-    _write_execution_log(app, plan, stats, is_dry_run, captured_logs, applied_paths, job_name)
+    _write_execution_log(app, plan, stats, is_dry_run, captured_logs, applied_paths, successful_paths, gitkeep_paths, job_name)
     
     # CRITICAL: Always check if we have backups to write, and ensure it's NOT a dry run
     if not is_dry_run and len(overwritten_backups) > 0:
@@ -242,6 +275,8 @@ def execute_scaffold(app):
         f"New Files: {stats['files_created']}\n"
         f"Overwritten Files: {stats['files_overwritten']}\n"
     )
+    if stats.get("gitkeep_created", 0) > 0:
+        summary_header += f".gitkeep Created: {stats['gitkeep_created']}\n"
     
     app_utils.log_message(app, summary_header, "info")
     app_utils.log_message(app, "\n--- detail ---\n", "info")
@@ -271,7 +306,7 @@ def execute_scaffold(app):
         
     app.analysis_notebook.select(0)
 
-def _write_execution_log(app, plan, stats: dict, is_dry_run: bool, captured_logs: list, applied_paths: set, job_name: str):
+def _write_execution_log(app, plan, stats: dict, is_dry_run: bool, captured_logs: list, applied_paths: set, successful_paths: list, gitkeep_paths: list, job_name: str):
     """Writes a comprehensive execution log to a timestamped file."""
     log_path = logger.get_session_dir()
     if not log_path:
@@ -288,23 +323,70 @@ def _write_execution_log(app, plan, stats: dict, is_dry_run: bool, captured_logs
     tree_content = app.tree_text.get("1.0", "end").strip()
     source_content = app.source_code_text.get("1.0", "end").strip()
 
-    # --- Reconstructed Tree Sections ---
-    # 1. Full Plan with Annotations (Identical/Exists marks)
-    unified_tree_text = scaffold_core.reconstruct_tree_string(plan, show_annotations=True)
-    
-    # 2. Actually Applied (Only if filtering occurred)
+    # --- Identify Unchecked/Skipped paths for annotation ---
     full_planned_paths = plan.planned_dirs.union(plan.planned_files)
-    all_selected = (len(full_planned_paths) == len(applied_paths))
+    unchecked_paths = set()
+    for p in full_planned_paths:
+        if not _is_effectively_selected(app, p):
+            unchecked_paths.add(p)
+
+    # 1. Full Plan with Annotations (Identical/Exists/Skipped marks)
+    unified_tree_text = scaffold_core.reconstruct_tree_string(
+        plan, 
+        show_annotations=True, 
+        unchecked_paths=unchecked_paths
+    )
     
+    # 2. Actually Applied (Newly created or overwritten only)
+    # We use successful_paths which contains what was actually touched (or would be touched in dry run)
+    actual_written_paths = set()
+    for p in successful_paths:
+        # Add the path and all its parents to preserve tree structure
+        curr = p
+        while curr != plan.root_path and curr.is_relative_to(plan.root_path):
+            actual_written_paths.add(curr)
+            curr = curr.parent
+            
     applied_structure_text = ""
-    if not all_selected:
-        applied_structure_text = scaffold_core.reconstruct_tree_string(plan, filter_paths=applied_paths, show_annotations=False)
+    if not actual_written_paths:
+        applied_structure_text = "(No new or updated files were applied in this execution.)"
+    else:
+        applied_structure_text = scaffold_core.reconstruct_tree_string(
+            plan, 
+            filter_paths=actual_written_paths, 
+            show_annotations=False
+        )
+
+    # 3. .gitkeep Structure
+    gitkeep_structure_text = ""
+    if gitkeep_paths:
+        # Build a temporary set of paths for the .gitkeep tree
+        gk_tree_paths = set()
+        for p in gitkeep_paths:
+            curr = p
+            while curr != plan.root_path and curr.is_relative_to(plan.root_path):
+                gk_tree_paths.add(curr)
+                curr = curr.parent
+        
+        # We need to temporarily add .gitkeep files to the plan so the reconstructor sees them
+        # but since we don't want to modify the actual plan object permanently, we'll be careful.
+        original_planned_files = plan.planned_files.copy()
+        try:
+            plan.planned_files.update(gitkeep_paths)
+            gitkeep_structure_text = scaffold_core.reconstruct_tree_string(
+                plan,
+                filter_paths=gk_tree_paths,
+                show_annotations=False
+            )
+        finally:
+            plan.planned_files = original_planned_files
 
     summary_header = (
         f"{'DRY RUN' if is_dry_run else 'EXECUTION'} SUMMARY\n"
         f"- New Directories: {stats['dirs_created']}\n"
         f"- New Files: {stats['files_created']}\n"
         f"- Overwritten Files: {stats['files_overwritten']}\n"
+        f"- .gitkeep Created: {stats.get('gitkeep_created', 0)}\n"
         f"- Directory Errors: {stats['dirs_error']}\n"
         f"- File Errors: {stats['files_error']}\n"
     )
@@ -321,23 +403,9 @@ def _write_execution_log(app, plan, stats: dict, is_dry_run: bool, captured_logs
     log_entries = status_header + [
         f"Execution Log - {datetime.datetime.now().isoformat()}",
         "=" * 80,
-        "Unified Scaffold Structure (Full Plan):",
-        "=" * 80,
-        unified_tree_text,
-        "",
         summary_header,
         "=" * 80,
     ]
-
-    if applied_structure_text:
-        log_entries.extend([
-            "\n" + "=" * 80,
-            f"Actually Applied Structure (Filtered by Checkboxes):",
-            f"SCAFFOLD APPLY STATUS: {status_str}{display_name}",
-            "=" * 80,
-            applied_structure_text,
-            ""
-        ])
 
     log_entries.append("\n--- detail ---\n")
     for message, level in captured_logs:
@@ -355,14 +423,35 @@ def _write_execution_log(app, plan, stats: dict, is_dry_run: bool, captured_logs
         source_content,
         "=" * 80,
         "",
+        "Unified Scaffold Structure (Full Plan):",
+        "=" * 80,
+        unified_tree_text,
+        "",
         "@@@COMMENT_BEGIN FINAL BRIEFING",
         f"SCAFFOLD APPLY STATUS: {status_str}{display_name}",
         f"- New Directories: {stats['dirs_created']}",
         f"- New Files: {stats['files_created']}",
         f"- Overwritten Files: {stats['files_overwritten']}",
+        f"- .gitkeep Created: {stats.get('gitkeep_created', 0)}",
         f"- Total Errors: {stats['dirs_error'] + stats['files_error']}",
-        "@@@COMMENT_END",
+        "@@@COMMENT_END"
     ])
+
+    if applied_structure_text:
+        log_entries.extend([
+            "",
+            "@@@COMMENT_BEGIN Actually Applied Structure (Newly Created/Updated Only)",
+            applied_structure_text,
+            "@@@COMMENT_END"
+        ])
+
+    if gitkeep_structure_text:
+        log_entries.extend([
+            "",
+            "@@@COMMENT_BEGIN Actually Applied .gitkeep Structure",
+            gitkeep_structure_text,
+            "@@@COMMENT_END"
+        ])
 
     try:
         with open(log_filename, "w", encoding="utf-8") as f:

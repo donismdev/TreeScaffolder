@@ -395,25 +395,33 @@ def reconstruct_source_only_tree(plan: Plan) -> str:
 	all_source_paths = source_files.union(source_dirs)
 	return reconstruct_tree_string(plan, filter_paths=all_source_paths, show_annotations=False)
 
-def reconstruct_tree_string(plan: Plan, filter_paths: Optional[Set[Path]] = None, show_annotations: bool = True) -> str:
-	"""Generates a text-based tree structure from the planned paths, optionally filtered and annotated."""
+def reconstruct_tree_string(plan: Plan, filter_paths: Optional[Set[Path]] = None, show_annotations: bool = True, unchecked_paths: Optional[Set[Path]] = None) -> str:
+	"""Generates a text-based tree structure with correct hierarchical nesting."""
 	all_planned = plan.planned_dirs.union(plan.planned_files)
+	
+	# Determine base set of paths
 	if filter_paths is not None:
-		all_paths_list = sorted(list(all_planned.intersection(filter_paths)), key=lambda p: (len(p.parts), str(p).lower()))
+		# Use provided filter (for Actually Applied tree)
+		target_paths = all_planned.intersection(filter_paths)
 	else:
-		all_paths_list = sorted(list(all_planned), key=lambda p: (len(p.parts), str(p).lower()))
-		
-	if not all_paths_list:
+		# Use all planned paths
+		target_paths = all_planned
+
+	if not target_paths:
 		return ""
 
 	root_path = plan.root_path
-	# Find the root marker name from the plan nodes if possible
+	# Find the root marker name
 	root_marker = "{{Root}}"
 	for node in plan.nodes:
 		if node.indent == 0:
 			root_marker = node.name
 			break
 
+	# CRITICAL FIX: Sort by path parts (case-insensitive) to ensure correct hierarchical nesting.
+	# String sorting of absolute paths fails on Windows because '\' (92) sorts after 'S' (83) etc.
+	path_list = sorted(list(target_paths), key=lambda p: [part.lower() for part in p.parts])
+	
 	lines = [f"@ROOT {root_marker}", "", f"{root_marker}/"]
 	
 	def get_rel_depth(p):
@@ -422,7 +430,7 @@ def reconstruct_tree_string(plan: Plan, filter_paths: Optional[Set[Path]] = None
 		except:
 			return 0
 
-	for p in all_paths_list:
+	for p in path_list:
 		if p == root_path: continue
 		depth = get_rel_depth(p)
 		indent = "\t" * depth
@@ -430,14 +438,17 @@ def reconstruct_tree_string(plan: Plan, filter_paths: Optional[Set[Path]] = None
 		is_dir = p in plan.planned_dirs
 		name = p.name + ("/" if is_dir else "")
 		
-		# Add annotation if the file already matches the plan
+		# Annotation logic
 		annotation = ""
-		if show_annotations and not is_dir:
-			state = plan.path_states.get(p)
-			if state == "identical":
-				annotation = " // (Already matches)"
-			elif state == "exists":
-				annotation = " // (File exists)"
+		if show_annotations:
+			if unchecked_paths and p in unchecked_paths:
+				annotation = " // (Unchecked - Not applied)"
+			elif not is_dir:
+				state = plan.path_states.get(p)
+				if state == "identical":
+					annotation = " // (Already matches)"
+				elif state == "exists":
+					annotation = " // (File exists)"
 		
 		lines.append(f"{indent}{name}{annotation}")
 		
