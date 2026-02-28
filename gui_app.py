@@ -24,7 +24,7 @@ from Scripts.Utils import logger
 from Scripts.UI.action_handler import TEST_DIR, RESOURCE_DIR
 
 # --- Constants ---
-APP_TITLE = "Tree Scaffolder v1.2"
+APP_TITLE = "Tree Scaffolder v0.8.0"
 LOG_DIR = "Log"
 
 if (TEST_DIR / "config.json").exists():

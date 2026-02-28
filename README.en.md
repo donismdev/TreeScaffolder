@@ -1,6 +1,7 @@
 > ⚠️ **CRITICAL WARNING**: This tool directly modifies the file system. To prevent accidental data loss, it is strongly recommended to use it in environments with **Version Control Systems (Git, SVN, etc.)** or to perform a **backup** before any operation.
 >
 # TreeScaffolder: Prompt Helper & File System Scaffolder
+**Version 0.8.0**
 
 TreeScaffolder is a tool designed to **maximize LLM prompting efficiency** and safely reflect text-based blueprints onto the **actual file system**.
 

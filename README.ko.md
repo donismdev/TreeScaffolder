@@ -1,6 +1,7 @@
 > ⚠️ **중요 (CRITICAL)**: 이 도구는 파일 시스템을 직접 수정합니다. 데이터 유실 방지를 위해 반드시 **Git, SVN 등 형상 관리 도구**가 적용된 환경에서 사용하거나, 작업 전 **백업**을 수행할 것을 강력히 권장합니다.
 >
 # TreeScaffolder: Prompt Helper & File System Scaffolder
+**Version 0.8.0**
 
 TreeScaffolder는 **LLM 프롬프팅 효율을 극대화**하고, 텍스트 기반의 설계도를 **실제 파일 시스템에 안전하게 반영**하기 위한 도구입니다.
 
