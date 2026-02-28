@@ -38,6 +38,20 @@ def _is_effectively_selected(app, path):
         return False
     return not _is_excluded_by_parent(app, path)
 
+def _is_excluded_by_parent(app, path):
+    """Checks if any parent directory of the path is unchecked in selected_paths."""
+    plan = app.current_plan
+    if not plan: return False
+    
+    parent = path.parent
+    root_path = plan.root_path
+    
+    while parent != root_path and parent.is_relative_to(root_path):
+        if parent in app.selected_paths and not app.selected_paths[parent]:
+            return True
+        parent = parent.parent
+    return False
+
 def execute_scaffold(app):
     """Performs the actual file and directory creation."""
     plan = app.current_plan
