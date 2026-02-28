@@ -204,7 +204,11 @@ def execute_scaffold(app):
         log_exec(f"- Duplicate name warnings: {len(plan.duplicate_warnings)}", "warn")
         log_exec(f"- Similar name warnings: {len(plan.similarity_warnings)}", "warn")
 
-    log_exec("="*60)
+    # --- LOG GENERATION FIRST ---
+    # We write the log BEFORE updating plan.path_states to 'identical'/'exists'
+    # so that the 'Full Plan' section reflects what was INTENDED to be changed.
+    _write_execution_log(app, plan, stats, is_dry_run, captured_logs, applied_paths, successful_paths, gitkeep_paths, job_name)
+
     if stats["dirs_error"] > 0 or stats["files_error"] > 0:
         log_exec("Operation finished with errors.", "error")
     else:
@@ -244,8 +248,6 @@ def execute_scaffold(app):
                 # Also show a popup since this is a user-requested action that failed
                 messagebox.showwarning(t("message.error_title"), err_msg)
 
-    _write_execution_log(app, plan, stats, is_dry_run, captured_logs, applied_paths, successful_paths, gitkeep_paths, job_name)
-    
     # CRITICAL: Always check if we have backups to write, and ensure it's NOT a dry run
     if not is_dry_run and len(overwritten_backups) > 0:
         log_exec(f"Generating recovery log for {len(overwritten_backups)} files...", "info")
@@ -381,6 +383,27 @@ def _write_execution_log(app, plan, stats: dict, is_dry_run: bool, captured_logs
         finally:
             plan.planned_files = original_planned_files
 
+    # 4. Actually Applied Detail Overview (List format)
+    applied_details = []
+    # Mix of dirs and files from successful_paths
+    for p in successful_paths:
+        state = plan.path_states.get(p)
+        action = "[DIR]" if p in plan.planned_dirs else ("[OVERWRITE]" if state == "overwrite" else "[FILE]")
+        try:
+            rel = p.relative_to(plan.root_path)
+            applied_details.append(f"{action:<12} {{Root}}/{rel.as_posix()}")
+        except:
+            applied_details.append(f"{action:<12} {p}")
+    
+    for p in gitkeep_paths:
+        try:
+            rel = p.relative_to(plan.root_path)
+            applied_details.append(f"{'[GITKEEP]':<12} {{Root}}/{rel.as_posix()}")
+        except:
+            applied_details.append(f"{'[GITKEEP]':<12} {p}")
+            
+    applied_details_text = "\n".join(applied_details) if applied_details else "(No changes were applied.)"
+
     summary_header = (
         f"{'DRY RUN' if is_dry_run else 'EXECUTION'} SUMMARY\n"
         f"- New Directories: {stats['dirs_created']}\n"
@@ -423,7 +446,13 @@ def _write_execution_log(app, plan, stats: dict, is_dry_run: bool, captured_logs
         source_content,
         "=" * 80,
         "",
+        "@@@COMMENT_BEGIN Actually Applied Detail Overview",
+        t("log_sections.applied_detail_desc"),
+        applied_details_text,
+        "@@@COMMENT_END",
+        "",
         "Unified Scaffold Structure (Full Plan):",
+        t("log_sections.unified_tree_desc"),
         "=" * 80,
         unified_tree_text,
         "",
@@ -441,6 +470,7 @@ def _write_execution_log(app, plan, stats: dict, is_dry_run: bool, captured_logs
         log_entries.extend([
             "",
             "@@@COMMENT_BEGIN Actually Applied Structure (Newly Created/Updated Only)",
+            t("log_sections.applied_structure_desc"),
             applied_structure_text,
             "@@@COMMENT_END"
         ])
@@ -449,6 +479,7 @@ def _write_execution_log(app, plan, stats: dict, is_dry_run: bool, captured_logs
         log_entries.extend([
             "",
             "@@@COMMENT_BEGIN Actually Applied .gitkeep Structure",
+            t("log_sections.gitkeep_structure_desc"),
             gitkeep_structure_text,
             "@@@COMMENT_END"
         ])

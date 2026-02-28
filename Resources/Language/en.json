@@ -144,5 +144,11 @@
         "recovery_notify_msg": "Target files have been updated, and original contents were backed up for safety.\nYou can restore them anytime using the generated recovery log.",
         "recovery_error_title": "Recovery Error",
         "recovery_error_msg": "Failed to load recovery data:\n{e}"
+    },
+    "log_sections": {
+        "applied_detail_desc": "Description: Detailed list of all files and folders that were actually created or modified.",
+        "unified_tree_desc": "Description: The complete design structure combining the input scaffold tree and source code definitions.",
+        "applied_structure_desc": "Description: Tree structure of items where physical changes (creation/overwrite) actually occurred.",
+        "gitkeep_structure_desc": "Description: Tree structure of .gitkeep files automatically created to maintain empty folders."
     }
 }
