@@ -132,41 +132,29 @@ def on_check_folder(app):
     """Recursively counts files and directories in the target root."""
     root_path_str = app.target_root_path.get()
     if not root_path_str or root_path_str == t("ui.no_folder_selected"):
-        messagebox.showwarning(t("message.error_title"), t("message.select_root_first"))
+        app_utils.show_notification(app, 'warning', t("message.error_title"), t("message.select_root_first"))
         return
 
     try:
         root_path = Path(root_path_str)
         if not root_path.is_dir():
-            messagebox.showerror(t("message.error_title"), t("message.root_not_found"))
+            app_utils.show_notification(app, 'error', t("message.error_title"), t("message.root_not_found"))
             return
 
-        file_count = 0
-        gitkeep_count = 0
-        dir_count = 0
+        stats = app_utils.get_folder_stats(root_path)
         
-        for item in root_path.rglob('*'):
-            if item.is_file():
-                if item.name == ".gitkeep":
-                    gitkeep_count += 1
-                else:
-                    file_count += 1
-            elif item.is_dir():
-                dir_count += 1
-        
-        total_files = file_count + gitkeep_count
         info_msg = t("ui.check_folder_result", 
                      name=root_path.name, 
-                     dirs=dir_count, 
-                     files=total_files, 
-                     normal=file_count, 
-                     gitkeep=gitkeep_count, 
-                     total=total_files + dir_count)
+                     dirs=stats["dirs"], 
+                     files=stats["files"], 
+                     normal=stats["normal"], 
+                     gitkeep=stats["gitkeep"], 
+                     total=stats["total"])
         
-        messagebox.showinfo(t("ui.check_folder"), info_msg)
+        app_utils.show_notification(app, 'info', t("ui.check_folder"), info_msg)
         
     except Exception as e:
-        messagebox.showerror(t("message.error_title"), f"Error scanning folder: {e}")
+        app_utils.show_notification(app, 'error', t("message.error_title"), f"Error scanning folder: {e}")
 
 def on_browse_folder(app):
     logger.debug("on_browse_folder called")

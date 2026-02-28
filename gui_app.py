@@ -22,14 +22,14 @@ from Scripts.Utils.i18n import t
 from Scripts.UI import action_handler
 from Scripts.Utils import logger
 
-from Scripts.UI.action_handler import TEST_DIR, RESOURCE_DIR
+from Scripts.UI.action_handler import DEV_DIR, RESOURCE_DIR
 
 # --- Constants ---
 APP_TITLE = "Tree Scaffolder v0.8.0"
 LOG_DIR = "Log"
 
-if (TEST_DIR / "config.json").exists():
-    CONFIG_FILE = str(TEST_DIR / "config.json")
+if (DEV_DIR / "config.json").exists():
+    CONFIG_FILE = str(DEV_DIR / "config.json")
 else:
     CONFIG_FILE = str(RESOURCE_DIR / "config.json")
 
