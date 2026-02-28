@@ -13,6 +13,7 @@ from pathlib import Path
 _log_level = 1  # Default
 _dry_run_count = 0
 _real_run_count = 0
+_session_jobs = [] # List of (type, name) tuples
 _runtime_log_path = None
 _error_log_path = None
 _session_dir = None
@@ -36,6 +37,15 @@ class StreamToLogger(object):
     def flush(self):
         pass
 
+class LazyFileHandler(logging.FileHandler):
+    """FileHandler that only opens/creates the file when the first record is emitted."""
+    def __init__(self, filename, mode='a', encoding=None, delay=True):
+        # Setting delay=True prevents file creation at init
+        super().__init__(filename, mode, encoding, delay)
+
+    def emit(self, record):
+        super().emit(record)
+
 def set_log_level(level: int):
     global _log_level
     # Clamp level between 0 and 3, default to 1 if invalid
@@ -50,25 +60,39 @@ def get_log_level() -> int:
 def get_session_dir() -> Path | None:
     return _session_dir
 
-def notify_scaffold_executed(is_dry_run: bool):
-    global _dry_run_count, _real_run_count
+def notify_scaffold_executed(is_dry_run: bool, job_name: str = ""):
+    global _dry_run_count, _real_run_count, _session_jobs
+    run_type = "DRY RUN" if is_dry_run else "REAL"
     if is_dry_run:
         _dry_run_count += 1
     else:
         _real_run_count += 1
+    _session_jobs.append((run_type, job_name))
+
+def is_job_name_used(name: str) -> bool:
+    """Checks if a job name has already been used in this session."""
+    return any(job[1] == name for job in _session_jobs)
 
 def get_formatted_status() -> str:
-    """Returns a summary string of executions in the current session."""
-    if _dry_run_count == 0 and _real_run_count == 0:
+    """Returns a summary string of executions in the current session with job names."""
+    if not _session_jobs:
         return "NOT EXECUTED"
     
+    # Core stats
     parts = []
     if _dry_run_count > 0:
         parts.append(f"DRY RUN x{_dry_run_count}")
     if _real_run_count > 0:
         parts.append(f"REAL x{_real_run_count}")
     
-    return "EXECUTED (" + ", ".join(parts) + ")"
+    base_status = "EXECUTED (" + ", ".join(parts) + ")"
+    
+    # Detail list of jobs
+    job_details = []
+    for run_type, name in _session_jobs:
+        job_details.append(f"[{run_type}] {name}" if name else f"[{run_type}] (Unnamed)")
+    
+    return f"{base_status}\nJobs: " + ", ".join(job_details)
 
 def finalize_session_log():
     """Prepends the scaffold execution status to the beginning of the runtime log file and cleans up empty error logs."""
@@ -182,7 +206,8 @@ def setup_runtime_logging(config_file, log_dir):
         console_logger_instance.addHandler(console_file_handler)
 
         # --- Dedicated Error Log (ERROR level and above only) ---
-        error_file_handler = logging.FileHandler(error_log_filename, mode='w', encoding='utf-8')
+        # Using LazyFileHandler with delay=True to avoid creating empty files
+        error_file_handler = LazyFileHandler(error_log_filename, mode='w', encoding='utf-8', delay=True)
         error_file_handler.setLevel(logging.ERROR)
         error_file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
         console_logger_instance.addHandler(error_file_handler)
@@ -196,8 +221,8 @@ def setup_runtime_logging(config_file, log_dir):
         editor_file_handler.setFormatter(logging.Formatter('--- editor log ---\n%(asctime)s - %(levelname)s - %(message)s'))
         editor_logger_instance.addHandler(editor_file_handler)
         
-        # Editor messages to error log (filtered)
-        editor_error_handler = logging.FileHandler(error_log_filename, mode='a', encoding='utf-8')
+        # Editor messages to error log (filtered, also lazy)
+        editor_error_handler = LazyFileHandler(error_log_filename, mode='a', encoding='utf-8', delay=True)
         editor_error_handler.setLevel(logging.ERROR)
         editor_error_handler.setFormatter(logging.Formatter('--- editor error ---\n%(asctime)s - %(levelname)s - %(message)s'))
         editor_logger_instance.addHandler(editor_error_handler)

@@ -13,7 +13,7 @@ from Scripts.Utils.i18n import t
 from Scripts.Core import scaffold_core
 from Scripts.UI import app_utils
 from Scripts.UI import scaffold_runner
-from Scripts.Utils import tree_generator, logger
+from Scripts.Utils import logger
 from Scripts.UI.tree_populator import populate_before_tree, populate_after_tree, _clear_tree as clear_tree_function
 
 def update_summary(app, key, **kwargs):
@@ -103,11 +103,6 @@ def handle_content_updated(app, editor_type):
         update_summary(app, "tree_updated")
     else:
         update_summary(app, "source_updated")
-
-def handle_make_tree_result(app, success=True):
-    """Called after make tree from source code action."""
-    key = "make_tree_success" if success else "make_tree_error"
-    update_summary(app, key)
 
 def handle_language_changed(app):
     """Called after UI language is changed."""
@@ -313,6 +308,9 @@ def on_recompute(app, silent=False):
     populate_before_tree(app, root_path)
     populate_after_tree(app, app.current_plan)
     
+    # Enable job name entry after successful recompute
+    app.editor_entry.config(state=tk.NORMAL)
+    
     if app.current_plan.has_conflicts:
         messagebox.showwarning(t("message.conflicts_found_title"), t("message.conflicts_msg"))
         app.apply_button.config(state=tk.DISABLED)
@@ -392,9 +390,37 @@ def on_apply(app):
         confirmed = messagebox.askyesno(title, msg, icon='warning')
 
     if confirmed:
+        # --- Handle Job Name ---
+        job_name = app.editor_entry_var.get().strip()
+        placeholder = t("ui.job_name_placeholder")
+        
+        # New: Warning for empty job name (including if it's still the placeholder)
+        if not job_name or job_name == placeholder:
+            if not messagebox.askyesno(t("message.error_title"), "Job name is empty. Continue with a default name?"):
+                # If user says no, abort apply so they can enter a name
+                app.recompute_button.config(state=tk.NORMAL)
+                app.apply_button.config(state=tk.NORMAL)
+                return
+            job_name = "Unnamed_Job"
+
+        if logger.is_job_name_used(job_name):
+            # If name exists, append counter automatically
+            base_name = job_name if job_name else "unnamed"
+            counter = 2
+            new_name = f"{base_name}_{counter}"
+            while logger.is_job_name_used(new_name):
+                counter += 1
+                new_name = f"{base_name}_{counter}"
+            
+            messagebox.showwarning(t("message.error_title"), f"Job name '{job_name}' already used in this session.\nRenaming to '{new_name}' for this execution.")
+            job_name = new_name
+            app.editor_entry_var.set(job_name)
+
         app.analysis_notebook.select(1)
         app.recompute_button.config(state=tk.DISABLED)
         app.apply_button.config(state=tk.DISABLED)
+        # Store current job name on app for the runner to pick up
+        app._current_job_name = job_name
         app.root.after(100, lambda: scaffold_runner.execute_scaffold(app))
     logger.debug("on_apply completed")
 
@@ -422,6 +448,13 @@ def on_clear_data(app):
     
     app.recompute_button.config(state=tk.DISABLED)
     app.apply_button.config(state=tk.DISABLED)
+    # Reset job name entry with placeholder
+    app.editor_entry.config(state=tk.NORMAL)
+    placeholder = t("ui.job_name_placeholder")
+    app.editor_entry_var.set(placeholder)
+    app.editor_entry.config(foreground='grey')
+    app.editor_entry.config(state=tk.DISABLED)
+    
     handle_data_cleared(app)
 
 def on_load_test_data(app):
@@ -728,32 +761,7 @@ def _update_node_visual_sync(app, path: Path, state: bool):
 # --- Editor Tab Logic ---
 
 def on_editor_tab_changed(app, event):
-    current_tab = app.editor_notebook.index(app.editor_notebook.select())
-    for btn in app.editor_buttons:
-        btn.pack_forget()
-        btn.config(command=None, state=tk.NORMAL)
-    
-    if current_tab == 0: # Source Code (Now First)
-        app.editor_buttons[0].config(text=t("ui.btn_make_tree"), command=lambda: handle_make_tree(app), state=tk.NORMAL)
-        app.editor_buttons[0].pack(side="left", padx=2)
-    elif current_tab == 1: # Scaffold Tree (Now Second)
-        app.editor_buttons[0].config(text=t("ui.btn_empty"), state=tk.DISABLED)
-        app.editor_buttons[0].pack(side="left", padx=2)
-    elif current_tab == 2: # Content
-        app.editor_buttons[0].config(text=t("ui.btn_empty"), state=tk.DISABLED)
-        app.editor_buttons[0].pack(side="left", padx=2)
-    
-def handle_make_tree(app):
-    source_text = app.source_code_text.get("1.0", "end-1c")
-    if not source_text.strip():
-        messagebox.showwarning(t("message.error_title"), t("message.empty_editors"))
-        return
-    try:
-        new_tree_text = tree_generator.generate_tree_from_v2(source_text)
-        app.tree_text.delete("1.0", tk.END)
-        app.tree_text.insert("1.0", new_tree_text)
-        app.editor_notebook.select(0)
-        handle_make_tree_result(app, success=True)
-    except Exception as e:
-        messagebox.showerror(t("message.error_title"), f"Error generating tree: {e}")
-        handle_make_tree_result(app, success=False)
+    """Updates the editor control bar based on the active tab."""
+    # We always show the entry widget in all tabs for consistent layout
+    if hasattr(app, 'editor_entry'):
+        app.editor_entry.pack(side="left", fill="x", expand=True, padx=2)

@@ -96,7 +96,6 @@ class ScaffoldApp:
         
         self.widget_map = {} # Map action names to UI widgets for shortcut hints
         self.key_bindings_map = key_bindings._load_key_bindings_config()
-        self.editor_buttons = []
 
         # --- Main Layout ---
         self.main_paned_window = tk.PanedWindow(self.root, orient=tk.HORIZONTAL, sashrelief=tk.RAISED, sashwidth=4)
@@ -168,7 +167,6 @@ class ScaffoldApp:
 
         self.root.title(t("ui.title"))
         self.widget_map = {} 
-        self.editor_buttons = []
 
         self.main_paned_window = tk.PanedWindow(self.root, orient=tk.HORIZONTAL, sashrelief=tk.RAISED, sashwidth=4)
         self.main_paned_window.pack(fill=tk.BOTH, expand=True)

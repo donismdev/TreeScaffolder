@@ -42,6 +42,7 @@ def execute_scaffold(app):
     """Performs the actual file and directory creation."""
     plan = app.current_plan
     is_dry_run = app.dry_run.get()
+    job_name = getattr(app, '_current_job_name', "")
     
     captured_logs = []
     
@@ -51,11 +52,11 @@ def execute_scaffold(app):
         # Also log to UI directly
         app_utils.log_message(app, msg, level)
 
-    logger.notify_scaffold_executed(is_dry_run)
+    logger.notify_scaffold_executed(is_dry_run, job_name=job_name)
     log_exec("="*60)
     
     if is_dry_run:
-        log_exec("Starting scaffold simulation (DRY RUN)...", "warn")
+        log_exec(f"Starting scaffold simulation (DRY RUN) [Job: {job_name if job_name else '(Unnamed)'}]...", "warn")
     else:
         # --- FINAL PHYSICAL SAFETY CHECK ---
         try:
@@ -224,7 +225,7 @@ def execute_scaffold(app):
                 # Also show a popup since this is a user-requested action that failed
                 messagebox.showwarning(t("message.error_title"), err_msg)
 
-    _write_execution_log(app, plan, stats, is_dry_run, captured_logs, applied_paths)
+    _write_execution_log(app, plan, stats, is_dry_run, captured_logs, applied_paths, job_name)
     
     # CRITICAL: Always check if we have backups to write, and ensure it's NOT a dry run
     if not is_dry_run and len(overwritten_backups) > 0:
@@ -241,6 +242,14 @@ def execute_scaffold(app):
     app.log_text.config(state="normal")
     app.log_text.delete("1.0", "end")
     
+    status_str = "EXECUTED (DRY RUN)" if is_dry_run else "EXECUTED (REAL)"
+    display_name = f" [{job_name}]" if job_name else ""
+    
+    # UI Summary Header
+    app_utils.log_message(app, "="*40, "info")
+    app_utils.log_message(app, f"SCAFFOLD APPLY STATUS: {status_str}{display_name}", "info")
+    app_utils.log_message(app, "="*40 + "\n", "info")
+
     summary_header = (
         f"{'DRY RUN' if is_dry_run else 'EXECUTION'} SUMMARY\n"
         f"New Directories: {stats['dirs_created']}\n"
@@ -276,7 +285,7 @@ def execute_scaffold(app):
         
     app.analysis_notebook.select(0)
 
-def _write_execution_log(app, plan, stats: dict, is_dry_run: bool, captured_logs: list, applied_paths: set):
+def _write_execution_log(app, plan, stats: dict, is_dry_run: bool, captured_logs: list, applied_paths: set, job_name: str):
     """Writes a comprehensive execution log to a timestamped file."""
     log_path = logger.get_session_dir()
     if not log_path:
@@ -315,9 +324,10 @@ def _write_execution_log(app, plan, stats: dict, is_dry_run: bool, captured_logs
     )
 
     status_str = "EXECUTED (DRY RUN)" if is_dry_run else "EXECUTED (REAL)"
+    display_name = f" [{job_name}]" if job_name else ""
     status_header = [
         "========================================",
-        f"SCAFFOLD APPLY STATUS: {status_str}",
+        f"SCAFFOLD APPLY STATUS: {status_str}{display_name}",
         "========================================",
         ""
     ]
@@ -336,7 +346,8 @@ def _write_execution_log(app, plan, stats: dict, is_dry_run: bool, captured_logs
     if applied_structure_text:
         log_entries.extend([
             "\n" + "=" * 80,
-            "Actually Applied Structure (Filtered by Checkboxes):",
+            f"Actually Applied Structure (Filtered by Checkboxes):",
+            f"SCAFFOLD APPLY STATUS: {status_str}{display_name}",
             "=" * 80,
             applied_structure_text,
             ""
@@ -357,6 +368,11 @@ def _write_execution_log(app, plan, stats: dict, is_dry_run: bool, captured_logs
         "=" * 80,
         source_content,
         "=" * 80,
+        "",
+        "========================================",
+        f"FINAL BRIEFING",
+        f"SCAFFOLD APPLY STATUS: {status_str}{display_name}",
+        "========================================",
     ])
 
     try:

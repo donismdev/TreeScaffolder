@@ -85,17 +85,35 @@ def create_left_panel(app):
     editor_tabs_frame.grid(row=1, column=0, sticky="nsew")
     editor_tabs_frame.columnconfigure(0, weight=1) # Make sure the column expands
 
-    # --- New Button Bar ---
+    # --- Editor Button Bar / Input Area ---
     button_bar_frame = ttk.Frame(editor_tabs_frame)
     button_bar_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=(0, 5))
 
-    # Add 4 placeholder buttons and store them on the app instance
-    app.editor_buttons = []
-    for i in range(4):
-        button = ttk.Button(button_bar_frame, text="")
-        button.pack(side="left", padx=2)
-        app.editor_buttons.append(button)
+    # Single-line entry for job name with placeholder logic
+    app.editor_entry_var = tk.StringVar()
+    app.editor_entry = ttk.Entry(button_bar_frame, textvariable=app.editor_entry_var)
+    app.editor_entry.pack(side="left", fill="x", expand=True, padx=2)
+    
+    placeholder_text = t("ui.job_name_placeholder")
+    
+    def on_focus_in(event):
+        if app.editor_entry_var.get() == placeholder_text:
+            app.editor_entry_var.set("")
+            app.editor_entry.config(foreground='black')
 
+    def on_focus_out(event):
+        if not app.editor_entry_var.get():
+            app.editor_entry_var.set(placeholder_text)
+            app.editor_entry.config(foreground='grey')
+
+    app.editor_entry.bind("<FocusIn>", on_focus_in)
+    app.editor_entry.bind("<FocusOut>", on_focus_out)
+    
+    # Initialize with placeholder
+    app.editor_entry_var.set(placeholder_text)
+    app.editor_entry.config(foreground='grey')
+    app.editor_entry.config(state=tk.DISABLED) # Start disabled until Compute Diff
+    
     # --- Notebook ---
     app.editor_notebook = ttk.Notebook(editor_tabs_frame)
     app.editor_notebook.grid(row=1, column=0, sticky="nsew") # Notebook is now in row 1
