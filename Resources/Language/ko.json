@@ -146,9 +146,9 @@
         "recovery_error_msg": "복구 데이터를 로드하지 못했습니다:\n{e}"
     },
     "log_sections": {
-        "applied_detail_desc": "설명: 실제로 생성되거나 수정된 모든 파일 및 폴더의 상세 리스트입니다.",
-        "unified_tree_desc": "설명: 입력된 스캐폴드 트리와 소스코드 정의가 합쳐진 전체 설계 구조입니다.",
-        "applied_structure_desc": "설명: 실제로 물리적인 변경(생성/덮어쓰기)이 발생한 항목들의 트리 구조입니다.",
-        "gitkeep_structure_desc": "설명: 빈 폴더 유지를 위해 자동으로 생성된 .gitkeep 파일들의 트리 구조입니다."
+        "applied_detail_desc": "설명: 디스크에 실제로 생성되거나 수정된 모든 파일 및 폴더의 상세 리스트입니다.",
+        "unified_tree_desc": "설명: '스캐폴드 트리'와 '소스 코드' 에디터의 내용이 합쳐진 전체 설계 구조입니다.",
+        "applied_structure_desc": "설명: 물리적인 변경(생성/덮어쓰기)이 발생한 항목만 포함된 순수 적용 트리입니다. (건너뛴 파일 제외)",
+        "gitkeep_structure_desc": "설명: 빈 폴더 유지를 위해 생성된 '.gitkeep' 파일들의 트리 구조입니다."
     }
 }

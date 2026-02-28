@@ -146,9 +146,9 @@
         "recovery_error_msg": "Failed to load recovery data:\n{e}"
     },
     "log_sections": {
-        "applied_detail_desc": "Description: Detailed list of all files and folders that were actually created or modified.",
-        "unified_tree_desc": "Description: The complete design structure combining the input scaffold tree and source code definitions.",
-        "applied_structure_desc": "Description: Tree structure of items where physical changes (creation/overwrite) actually occurred.",
-        "gitkeep_structure_desc": "Description: Tree structure of .gitkeep files automatically created to maintain empty folders."
+        "applied_detail_desc": "Description: Detailed list of all files and folders actually created or modified on disk.",
+        "unified_tree_desc": "Description: The complete design structure combining 'Scaffold Tree' and 'Source Code' editor contents.",
+        "applied_structure_desc": "Description: Pure applied tree containing only items where physical changes occurred (excluding skipped files).",
+        "gitkeep_structure_desc": "Description: Tree structure of '.gitkeep' files created to maintain empty folders."
     }
 }
