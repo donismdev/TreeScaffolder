@@ -19,15 +19,49 @@ def _check_is_relative_to(child: Path, parent: Path) -> bool:
     except ValueError:
         return False
 
+# ==============================================================================
+# ⚠️ CRITICAL SAFETY DATA - DO NOT REMOVE (이 데이터와 로직을 절대 삭제하지 마십시오)
+# 이 섹션의 하드코딩된 경로는 외부 설정 파일(folder_safety_rules.json)이 유실되거나 
+# 훼손되었을 때 프로젝트 전체를 보호하기 위한 '최후의 방어선'입니다. 
+# 설정 파일이 존재할 경우 이 데이터와 '병합'되어 2중으로 검사됩니다.
+# ==============================================================================
+DEFAULT_FORBIDDEN_ENV = [
+    "SystemRoot", "windir", "ProgramFiles", "ProgramFiles(x86)",
+    "ProgramData", "Public", "APPDATA", "LOCALAPPDATA"
+]
+DEFAULT_ALLOWED_BASES = [
+    "Desktop", "바탕 화면", "바탕화면", "Documents", "문서",
+    "Projects", "프로젝트", "MyProjects", "Code", "개발", "Dev", 
+    "workspace", "작업폴더", "AI-Projects", "개발프로젝트"
+]
+DEFAULT_DANGEROUS_ZONES = [
+    "Downloads", "다운로드", "Pictures", "사진", "Videos", "비디오", "동영상",
+    "Music", "음악", "Dropbox", "iCloudDrive"
+]
+# ==============================================================================
+
+def _load_rules() -> dict:
+    """설정 파일에서 폴더 안전 규칙을 로드합니다."""
+    try:
+        base_dir = Path(__file__).parent.parent.parent
+        rules_path = base_dir / "Resources" / "folder_safety_rules.json"
+        if rules_path.exists():
+            with open(rules_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+    except:
+        pass
+    return {}
+
 def get_forbidden_system_paths() -> Set[Path]:
-    """시스템 보호 경로 목록 (물리적 존재 확인 후 수집)."""
+    """시스템 보호 경로 목록을 반환합니다 (코드 기본값 + 설정 파일 병합)."""
+    rules = _load_rules()
+    
+    # Merge hardcoded defaults with external rules
+    env_vars = set(DEFAULT_FORBIDDEN_ENV)
+    if "forbidden_env_vars" in rules:
+        env_vars.update(rules["forbidden_env_vars"])
+    
     forbidden: Set[Path] = set()
-    env_vars = [
-        "SystemRoot", "windir",
-        "ProgramFiles", "ProgramFiles(x86)",
-        "ProgramData", "Public",
-        "APPDATA", "LOCALAPPDATA",
-    ]
     for env_var in env_vars:
         if path_str := os.environ.get(env_var):
             p = Path(path_str)
@@ -44,31 +78,37 @@ def get_forbidden_system_paths() -> Set[Path]:
     return forbidden
 
 def get_allowed_project_bases() -> Set[Path]:
-    """허용되는 프로젝트 상위 폴더 목록 (후보지 자동 생성)."""
+    """허용되는 프로젝트 상위 폴더 목록 (코드 기본값 + 설정 파일 병합)."""
+    rules = _load_rules()
+    
+    # Merge hardcoded defaults with external rules
+    base_names = set(DEFAULT_ALLOWED_BASES)
+    if "allowed_base_names" in rules:
+        for cat in rules["allowed_base_names"].values():
+            base_names.update(cat)
+
     home = Path.home().resolve()
-    base_names = [
-        "Desktop", "바탕 화면", "바탕화면",
-        "Documents", "문서",
-        "Projects", "프로젝트", "MyProjects",
-        "Code", "개발", "Dev", "workspace", "작업폴더",
-        "AI-Projects", "개발프로젝트"
-    ]
     allowed: Set[Path] = set()
     for name in base_names:
-        # home이 이미 resolve된 상태이므로 단순히 합쳐서 후보 등록
         allowed.add(home / name)
     return allowed
 
 def get_dangerous_zones() -> Set[Path]:
-    """개인 자료 및 클라우드 동기화 구역 자동 감지."""
-    home = Path.home().resolve()
-    fixed_zones = ["Downloads", "Pictures", "Videos", "Music", "Dropbox", "iCloudDrive"]
-    dangerous: Set[Path] = set()
+    """위험 구역 목록 (코드 기본값 + 설정 파일 병합 + OneDrive 자동 감지)."""
+    rules = _load_rules()
     
-    for name in fixed_zones:
+    # Merge hardcoded defaults with external rules
+    zone_names = set(DEFAULT_DANGEROUS_ZONES)
+    if "dangerous_zones" in rules:
+        for cat in rules["dangerous_zones"].values():
+            zone_names.update(cat)
+
+    home = Path.home().resolve()
+    dangerous: Set[Path] = set()
+    for name in zone_names:
         dangerous.add(home / name)
 
-    # OneDrive 변종 (OneDrive - Company 등) 샅샅이 뒤져서 차단
+    # OneDrive 변종 검색 유지
     try:
         if home.exists():
             for item in home.iterdir():
@@ -222,7 +262,10 @@ def main():
     else:
         result = validate_folder(sys.argv[1])
 
-    print(json.dumps(result, separators=(',', ':'), ensure_ascii=False))
+    # Output JSON using UTF-8 explicitly to avoid CP949 issues on Windows
+    json_output = json.dumps(result, separators=(',', ':'), ensure_ascii=False)
+    sys.stdout.buffer.write(json_output.encode('utf-8'))
+    sys.stdout.buffer.flush()
 
 if __name__ == "__main__":
     main()

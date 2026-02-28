@@ -186,21 +186,7 @@ def execute_scaffold(app):
                         actual_content = path.read_text(encoding='utf-8', errors='replace')
                         planned_content = plan.file_contents.get(path.resolve())
                         
-                        norm_actual = (actual_content or "").replace('\r\n', '\n')
-                        norm_planned = (planned_content or "").replace('\r\n', '\n')
-
-                        norm_actual_lines = [line.rstrip() for line in norm_actual.splitlines()]
-                        norm_planned_lines = [line.rstrip() for line in norm_planned.splitlines()]
-
-                        while norm_actual_lines and not norm_actual_lines[-1]:
-                            norm_actual_lines.pop()
-                        while norm_planned_lines and not norm_planned_lines[-1]:
-                            norm_planned_lines.pop()
-                        
-                        final_norm_actual = "\n".join(norm_actual_lines)
-                        final_norm_planned = "\n".join(norm_planned_lines)
-
-                        if final_norm_actual == final_norm_planned:
+                        if scaffold_core.is_content_identical(actual_content, planned_content):
                             plan.path_states[path] = 'identical'
                             log_exec(f"Successfully verified content for {path}. State set to 'identical'.", "debug")
                         else:
@@ -465,7 +451,13 @@ def _ensure_file(app, path: Path, dry_run: bool, content: str | None, is_overwri
     if not dry_run:
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
-            final_content = (content or "").replace('\r\n', '\n').replace('\n', '\r\n')
+            raw_content = content or ""
+            # --- Robust Windows Line Ending Normalization ---
+            # 1. Convert everything to LF first to avoid \r\r\n issues
+            temp_content = raw_content.replace('\r\n', '\n').replace('\r', '\n')
+            # 2. Convert all LF to CRLF for Windows standard
+            final_content = temp_content.replace('\n', '\r\n')
+            
             path.write_bytes(final_content.encode('utf-8'))
         except Exception as e:
             log_exec(f"[ERROR] write file failed: {path} | {e}", "error")

@@ -137,6 +137,8 @@
         "recovery_saved": "Recovery data (V2 format) saved to: {path}",
         "recovery_save_error": "Error writing recovery log: {e}",
         "recovery_file_missing": "Selected log file no longer exists.",
+        "recovery_notify_title": "File Overwrite Completed & Backup Created",
+        "recovery_notify_msg": "Target files have been updated, and original contents were backed up for safety.\nYou can restore them anytime using the generated recovery log.",
         "recovery_error_title": "Recovery Error",
         "recovery_error_msg": "Failed to load recovery data:\n{e}"
     }

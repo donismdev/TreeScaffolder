@@ -14,6 +14,7 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, messagebox
 from Scripts.Utils import logger
+from Scripts.Utils.i18n import t
 
 def log_message(app, message: str, level: str = "info", buffer_list: list = None):
     """Appends a message to the log widget, a buffer list, and the runtime log file."""
@@ -322,12 +323,15 @@ def validate_path(path: str) -> tuple[bool, str]:
         if not validator_script.exists():
             return False, "folder_selection_validator.py not found in the script directory."
 
-        run_kwargs = {'capture_output': True, 'text': True, 'check': True}
+        run_kwargs = {'capture_output': True, 'check': True}
         if sys.platform == 'win32':
             run_kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
 
         process = subprocess.run([python_exe, str(validator_script), path], **run_kwargs)
-        result = json.loads(process.stdout)
+        
+        # Explicitly decode as utf-8 to handle Korean characters correctly
+        stdout_str = process.stdout.decode('utf-8', errors='replace')
+        result = json.loads(stdout_str)
         
         if result["ok"]:
             return True, result["resolved_path"]

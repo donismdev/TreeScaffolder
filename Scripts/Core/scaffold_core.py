@@ -187,19 +187,15 @@ def scan_existing_files(root: Path, config: dict) -> Dict[str, List[Path]]:
     return result
 
 def is_content_identical(actual: str, planned: str) -> bool:
-    """Compares actual and planned content with normalization."""
-    def normalize(text):
+    """Strictly compares two contents including the exact number of newlines. 
+    Only normalizes line endings to a common '\n' format for comparison.
+    """
+    def to_lf(text):
         if text is None: return ""
-        # Normalize line endings
-        text = text.replace('\r\n', '\n')
-        # Strip trailing whitespace from each line
-        lines = [line.rstrip() for line in text.splitlines()]
-        # Remove trailing empty lines from the end of the file
-        while lines and not lines[-1]:
-            lines.pop()
-        return "\n".join(lines)
-    
-    return normalize(actual) == normalize(planned)
+        # Convert all to LF so we can compare the raw content and newline counts fairly
+        return text.replace('\r\n', '\n').replace('\r', '\n')
+
+    return to_lf(actual) == to_lf(planned)
 
 def generate_plan(root_path: Path, text_input: str, config: dict) -> Plan:
 	"""

@@ -209,7 +209,7 @@ class RecoveryNotificationWindow:
     """A window that shows a list of files that were backed up after an overwrite."""
     def __init__(self, app, backed_up_paths, log_path):
         self.window = tk.Toplevel(app.root)
-        self.window.title(t("sys.recovery_error_title"))
+        self.window.title(t("sys.recovery_notify_title"))
         self.window.geometry("500x400")
         self.window.minsize(400, 300)
         self._load_geometry()
@@ -222,9 +222,10 @@ class RecoveryNotificationWindow:
         main_frame.pack(fill=tk.BOTH, expand=True)
 
         # Header
-        ttk.Label(main_frame, text=t("sys.recovery_saved", path=""), font=("Segoe UI", 11, "bold")).pack(anchor="w", pady=(0, 5))
-        ttk.Label(main_frame, text=f"Location: {log_path.name}", font=("Consolas", 9), foreground="blue").pack(anchor="w", pady=(0, 10))
+        ttk.Label(main_frame, text="✅ " + t("sys.recovery_notify_title"), font=("Segoe UI", 11, "bold")).pack(anchor="w", pady=(0, 5))
+        ttk.Label(main_frame, text=t("sys.recovery_notify_msg"), font=("Segoe UI", 9), wraplength=450, justify=tk.LEFT).pack(anchor="w", pady=(0, 10))
         
+        ttk.Label(main_frame, text=f"Location: {log_path.name}", font=("Consolas", 9), foreground="blue").pack(anchor="w", pady=(0, 5))
         ttk.Label(main_frame, text=f"Total {len(backed_up_paths)} files have been backed up:", font=("Segoe UI", 9)).pack(anchor="w")
 
         # List Area with Scrollbar (Using Text for a "dry" look and copyability)

@@ -39,6 +39,12 @@ If you need specific empty folder structures or files without content yet, use t
 2.  **Filter with Checkboxes**: Deselect any items you wish to exclude from the operation.
 3.  **Apply Scaffold (`f`)**: Reflect the plan onto the actual file system.
 
+### 2.5. File-Based Template Loading
+For frequently used structures or code, you can prepare them in text files and load them instantly.
+-   **Method**: Write your content in `Resources/sample_blueprint.txt` (for Source Code) and `Resources/sample_structure.txt` (for Tree Structure).
+-   **Execution**: Click the **Load Test Data** button at the bottom to immediately populate the editors with the file contents.
+-   **Benefit**: This is a very convenient way to manage predefined templates without the need for manual copy-pasting every time.
+
 ---
 
 ## 3. V2 Multipatch Format (@@@ Blocks)
