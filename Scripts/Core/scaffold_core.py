@@ -170,7 +170,7 @@ def parse_tree_text(text: str) -> tuple[List[NodeItem], Optional[str], Optional[
 
     return items, root_marker_name, None
 
-# ---------- Planning and Analysis Logic (unchanged) ----------
+# ---------- Planning and Analysis Logic ----------
 def _is_interesting_file(path: Path, config: dict) -> bool:
     extensions = config.get("SCAN_INCLUDE_EXTENSIONS", {".h", ".cpp", ".cs"})
     name = path.name
@@ -219,7 +219,7 @@ def generate_plan(root_path: Path, text_input: str, config: dict) -> Plan:
 	
 	plan.nodes = tree_nodes
 
-	# 2. Map Tree Nodes to Paths
+	# 3. Map Tree Nodes to Paths
 	node_paths: Dict[int, Path] = {} # line_number -> absolute path
 	if tree_nodes:
 		# stack stores (indent_level, path_object)
@@ -256,14 +256,14 @@ def generate_plan(root_path: Path, text_input: str, config: dict) -> Plan:
 				# Default content for files in tree is empty string
 				plan.file_contents[current_path] = ""
 
-	# 3. Parse V2 blocks to identify file contents.
+	# 4. Parse V2 blocks to identify file contents.
 	try:
 		patch_data = parse_v2_format(text_input)
 	except V2ParserError as e:
 		plan.errors.append(f"{e}") 
 		return plan
 
-	# 4. Process V2 patch data (Overrides/Updates tree definitions)
+	# 5. Process V2 patch data (Overrides/Updates tree definitions)
 	# Determine a best-guess root marker for substitution.
 	effective_root_marker = root_marker if root_marker else "{{Root}}"
 	
@@ -381,6 +381,19 @@ def generate_plan(root_path: Path, text_input: str, config: dict) -> Plan:
 				plan.similarity_warnings[planned_file] = similar
 
 	return plan
+
+def reconstruct_source_only_tree(plan: Plan) -> str:
+	"""Generates a tree structure using only files defined in the Source Code blocks."""
+	# Filter to only include files from Source Code and their parents
+	source_files = set(plan.file_contents.keys())
+	source_dirs = set()
+	for f in source_files:
+		for parent in f.parents:
+			if parent != plan.root_path and parent.is_relative_to(plan.root_path):
+				source_dirs.add(parent)
+	
+	all_source_paths = source_files.union(source_dirs)
+	return reconstruct_tree_string(plan, filter_paths=all_source_paths, show_annotations=False)
 
 def reconstruct_tree_string(plan: Plan, filter_paths: Optional[Set[Path]] = None, show_annotations: bool = True) -> str:
 	"""Generates a text-based tree structure from the planned paths, optionally filtered and annotated."""

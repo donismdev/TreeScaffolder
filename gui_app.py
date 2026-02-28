@@ -2,9 +2,10 @@
 """
 gui_app.py
 
-A Windows GUI application for scaffolding projects from a tree text description.
-Provides a tree editor, safe folder selection, a before/after diff view,
-and logging. Built with tkinter and ttk.
+A Windows GUI application designed as a Prompt Helper for LLM workflows.
+Optimizes project scaffolding by prioritizing Source Code analysis, 
+providing visual diffs, and ensuring safe file system operations.
+Built with tkinter and ttk.
 """
 from pathlib import Path
 import tkinter as tk

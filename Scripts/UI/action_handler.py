@@ -202,24 +202,18 @@ def on_recompute(app, silent=False):
 
     app.current_plan = scaffold_core.generate_plan(root_path, text_input, config)
     
-    # --- 0. Update Source Code with Unified Structure Comment ---
+    # --- 0. Update Source Code with Source Structure Comment ---
     if app.current_plan:
-        reconstructed_tree = scaffold_core.reconstruct_tree_string(app.current_plan)
+        # Use source-only reconstruction instead of unified
+        reconstructed_tree = scaffold_core.reconstruct_source_only_tree(app.current_plan)
         if reconstructed_tree:
             source_content = app.source_code_text.get("1.0", tk.END).rstrip()
             
-            # Calculate summary stats for the comment
-            plan = app.current_plan
-            new_dirs = len([p for p, s in plan.path_states.items() if s == 'new' and p in plan.planned_dirs])
-            new_files = len([p for p, s in plan.path_states.items() if s == 'new' and p in plan.planned_files])
-            overwrites = len([p for p, s in plan.path_states.items() if s == 'overwrite'])
-            total_lines = sum(len(c.splitlines()) for c in plan.file_contents.values())
-            
-            comment_header = "@@@COMMENT_BEGIN Unified Scaffold Structure"
+            comment_header = "@@@COMMENT_BEGIN Source Code Structure"
             comment_footer = "@@@COMMENT_END"
             
-            # Find and replace existing structure comment if it exists
-            pattern = re.compile(rf"{comment_header}[\s\S]*?{comment_footer}")
+            # Find and replace either old 'Unified' or new 'Source Code' comment if it exists
+            pattern = re.compile(rf"@@@COMMENT_BEGIN (Unified Scaffold|Source Code) Structure[\s\S]*?{comment_footer}")
             new_comment_block = f"\n\n{comment_header}\n{reconstructed_tree}\n{comment_footer}"
             
             if pattern.search(source_content):
@@ -232,7 +226,7 @@ def on_recompute(app, silent=False):
             app.source_code_text.delete("1.0", tk.END)
             app.source_code_text.insert("1.0", new_source.strip() + "\n")
             app.source_code_text.edit_modified(False)
-            logger.debug("Source Code editor updated with unified structure.")
+            logger.debug("Source Code editor updated with source structure.")
 
     # --- 0. Filter selected_paths to remove stale entries ---
     if app.current_plan:
@@ -497,14 +491,19 @@ def on_load_test_data(app):
         clear_tree_function(app.after_list)
         app.apply_button.config(state=tk.DISABLED)
 
-        # Tab Switching Logic
+        # Tab Switching Logic (Prioritize Source Code at Index 0)
         tree_content = app.tree_text.get("1.0", "end-1c").strip()
         source_content = app.source_code_text.get("1.0", "end-1c").strip()
-        is_tree_empty = not tree_content or all(line.strip().startswith("#") or not line.strip() for line in tree_content.splitlines())
         
-        if is_tree_empty and source_content:
+        # Check if contents are effectively empty (ignoring comments/whitespace)
+        is_tree_effectively_empty = not tree_content or all(line.strip().startswith("#") or not line.strip() for line in tree_content.splitlines())
+        is_source_effectively_empty = not source_content
+        
+        if is_source_effectively_empty and not is_tree_effectively_empty:
+            # Only switch to Scaffold Tree (Index 1) if Source is empty and Tree has data
             app.editor_notebook.select(1)
         else:
+            # Default to Source Code (Index 0) if it has data or if both are empty
             app.editor_notebook.select(0)
 
         app_utils.log_message(app, t("log.load_test_data_success"), "success")
