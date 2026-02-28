@@ -114,7 +114,7 @@ def handle_error(app, action_key):
 
 # --- Core Action Logic (Moved from gui_app.py) ---
 
-TEST_DIR = Path("Test")
+DEV_DIR = Path("Dev")
 RESOURCE_DIR = Path("Resources")
 
 def update_debug_ui(app):
@@ -466,11 +466,13 @@ def on_load_test_data(app):
         app.log_text.delete('1.0', tk.END)
         app.log_text.config(state=tk.DISABLED)
 
-        structure_file = TEST_DIR / "sample_structure.txt"
+        # Priority: Check Dev first (Development/Local), then Resources (Production/Git)
+        # This allows local testing without polluting the production resources.
+        structure_file = DEV_DIR / "sample_structure.txt"
         if not structure_file.exists():
             structure_file = RESOURCE_DIR / "sample_structure.txt"
             
-        blueprint_file = TEST_DIR / "sample_blueprint.txt"
+        blueprint_file = DEV_DIR / "sample_blueprint.txt"
         if not blueprint_file.exists():
             blueprint_file = RESOURCE_DIR / "sample_blueprint.txt"
 

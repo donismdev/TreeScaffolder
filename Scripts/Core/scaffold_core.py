@@ -147,11 +147,17 @@ def parse_tree_text(text: str) -> tuple[List[NodeItem], Optional[str], Optional[
         
     min_level = temp_info[0][2] if temp_info else 0
 
+    last_effective_indent = -1
     for line_index, raw_line, level in temp_info:
         content = raw_line.strip()
         effective_indent = level - min_level
         if effective_indent < 0:
             effective_indent = 0
+
+        # CRITICAL FIX: Check for indentation jumps (CASE-TREE-01)
+        # A node cannot be more than 1 level deeper than the previous node.
+        if effective_indent > last_effective_indent + 1:
+            return [], None, t("message.err_deep_indent", line=line_index + 1, name=content)
 
         is_dir = content.endswith("/") or content.endswith("\\")
         name = content[:-1] if is_dir else content
@@ -161,6 +167,7 @@ def parse_tree_text(text: str) -> tuple[List[NodeItem], Optional[str], Optional[
             return [], None, t("message.err_invalid_char", line=line_index + 1, name=name)
 
         items.append(NodeItem(indent=effective_indent, name=name, is_dir=is_dir, line_number=line_index + 1))
+        last_effective_indent = effective_indent
 
     if not root_marker_name and items:
         return [], None, t("message.err_no_root")
