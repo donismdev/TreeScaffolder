@@ -655,11 +655,11 @@ def on_editor_tab_changed(app, event):
         btn.pack_forget()
         btn.config(command=None, state=tk.NORMAL)
     
-    if current_tab == 0: # Scaffold Tree
-        app.editor_buttons[0].config(text=t("ui.btn_empty"), state=tk.DISABLED)
-        app.editor_buttons[0].pack(side="left", padx=2)
-    elif current_tab == 1: # Source Code
+    if current_tab == 0: # Source Code (Now First)
         app.editor_buttons[0].config(text=t("ui.btn_make_tree"), command=lambda: handle_make_tree(app), state=tk.NORMAL)
+        app.editor_buttons[0].pack(side="left", padx=2)
+    elif current_tab == 1: # Scaffold Tree (Now Second)
+        app.editor_buttons[0].config(text=t("ui.btn_empty"), state=tk.DISABLED)
         app.editor_buttons[0].pack(side="left", padx=2)
     elif current_tab == 2: # Content
         app.editor_buttons[0].config(text=t("ui.btn_empty"), state=tk.DISABLED)

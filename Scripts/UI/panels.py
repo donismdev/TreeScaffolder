@@ -98,7 +98,25 @@ def create_left_panel(app):
     editor_tabs_frame.rowconfigure(1, weight=1) # Configure row 1 to expand
     app.widget_map["cycle_notebook_editor_notebook"] = app.editor_notebook
 
-    # --- Scaffold Tree Tab ---
+    # --- Source Code Tab (Now First) ---
+    source_code_frame = ttk.Frame(app.editor_notebook)
+    app.editor_notebook.add(source_code_frame, text=t("ui.tab_source_code"))
+    source_code_frame.rowconfigure(0, weight=1)
+    source_code_frame.columnconfigure(0, weight=1)
+    
+    app.source_code_text = tk.Text(source_code_frame, wrap=tk.NONE, undo=True, font=app.editor_font, tabs=(app.editor_font.measure('    '),))
+    
+    source_yscroller = ttk.Scrollbar(source_code_frame, orient=tk.VERTICAL, command=app.source_code_text.yview)
+    source_xscroller = ttk.Scrollbar(source_code_frame, orient=tk.HORIZONTAL, command=app.source_code_text.xview)
+    app.source_code_text.config(yscrollcommand=source_yscroller.set, xscrollcommand=source_xscroller.set)
+    
+    app.source_code_text.grid(row=0, column=0, sticky="nsew")
+    source_yscroller.grid(row=0, column=1, sticky="ns")
+    source_xscroller.grid(row=1, column=0, sticky="ew")
+    
+    app.source_code_text.bind("<<Modified>>", lambda e: action_handler.handle_content_updated(app, "source") if app.source_code_text.edit_modified() and app.source_code_text.edit_modified(False) else None)
+
+    # --- Scaffold Tree Tab (Now Second) ---
     scaffold_tree_frame = ttk.Frame(app.editor_notebook)
     app.editor_notebook.add(scaffold_tree_frame, text=t("ui.tab_scaffold_tree"))
     scaffold_tree_frame.rowconfigure(0, weight=1)
@@ -118,24 +136,6 @@ def create_left_panel(app):
     
     # Bind change events
     app.tree_text.bind("<<Modified>>", lambda e: action_handler.handle_content_updated(app, "tree") if app.tree_text.edit_modified() and app.tree_text.edit_modified(False) else None)
-
-    # --- Source Code Tab ---
-    source_code_frame = ttk.Frame(app.editor_notebook)
-    app.editor_notebook.add(source_code_frame, text=t("ui.tab_source_code"))
-    source_code_frame.rowconfigure(0, weight=1)
-    source_code_frame.columnconfigure(0, weight=1)
-
-    app.source_code_text = tk.Text(source_code_frame, wrap=tk.NONE, undo=True, font=app.editor_font, tabs=(app.editor_font.measure('    '),))
-    
-    source_yscroller = ttk.Scrollbar(source_code_frame, orient=tk.VERTICAL, command=app.source_code_text.yview)
-    source_xscroller = ttk.Scrollbar(source_code_frame, orient=tk.HORIZONTAL, command=app.source_code_text.xview)
-    app.source_code_text.config(yscrollcommand=source_yscroller.set, xscrollcommand=source_xscroller.set)
-    
-    app.source_code_text.grid(row=0, column=0, sticky="nsew")
-    source_yscroller.grid(row=0, column=1, sticky="ns")
-    source_xscroller.grid(row=1, column=0, sticky="ew")
-
-    app.source_code_text.bind("<<Modified>>", lambda e: action_handler.handle_content_updated(app, "source") if app.source_code_text.edit_modified() and app.source_code_text.edit_modified(False) else None)
 
     # --- Content Tab ---
     content_frame = ttk.Frame(app.editor_notebook)
