@@ -168,6 +168,7 @@ def create_left_panel(app):
 
     app.content_text = tk.Text(content_frame, wrap=tk.NONE, undo=True, font=app.editor_font, tabs=(app.editor_font.measure('    '),))
     app.content_text.tag_configure("warning", foreground="red", font=("Segoe UI", 10, "bold"))
+    app.content_text.tag_configure("newline_mark", foreground="#CCCCCC") # Light grey for symbols
     
     content_yscroller = ttk.Scrollbar(content_frame, orient=tk.VERTICAL, command=app.content_text.yview)
     content_xscroller = ttk.Scrollbar(content_frame, orient=tk.HORIZONTAL, command=app.content_text.xview)

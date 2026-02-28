@@ -536,6 +536,44 @@ def on_after_tree_focus_out(app, event):
     """Resets the last clicked item tracking when focus leaves the tree."""
     app._after_tree_last_clicked = None
 
+def _update_content_panel(app, source_info_lines: list, content: str, is_warning: bool = False):
+    """
+    Helper to update the content panel with a fixed-height header 
+    and visual newline markers.
+    """
+    app.content_text.config(state=tk.NORMAL)
+    app.content_text.delete("1.0", tk.END)
+    
+    # 1. Insert Header (Ensure exactly 4 lines including separator)
+    header_lines = source_info_lines[:3]
+    while len(header_lines) < 3:
+        header_lines.append("")
+    
+    for line in header_lines:
+        app.content_text.insert(tk.END, line + "\n")
+    app.content_text.insert(tk.END, "="*40 + "\n") # Line 4: Separator
+    
+    # 2. Insert Body with Newline Markers
+    if is_warning:
+        app.content_text.insert(tk.END, content, "warning")
+    else:
+        # Split content but keep newline information
+        lines = content.splitlines(keepends=True)
+        for line in lines:
+            if line.endswith('\n'):
+                # Insert text without the actual newline first
+                app.content_text.insert(tk.END, line[:-1])
+                # Insert the visual mark
+                app.content_text.insert(tk.END, "↵", "newline_mark")
+                # Finally insert the real newline
+                app.content_text.insert(tk.END, "\n")
+            else:
+                # Last line might not have a newline
+                app.content_text.insert(tk.END, line)
+                
+    app.content_text.config(state=tk.DISABLED) # Keep it read-only
+    app.editor_notebook.select(2)
+
 def on_before_select(app, event: tk.Event):
     # CRITICAL: If this selection was triggered programmatically by After View, 
     # ignore it to prevent overwriting the Content Panel with 'Before' info.
@@ -551,27 +589,17 @@ def on_before_select(app, event: tk.Event):
     if not values: return
     path = Path(values[0])
     
-    content_to_show, source_info = "", ""
     try:
         if path.is_dir():
-            content_to_show = f"--- DIRECTORY ---\nPath: {path}"
+            _update_content_panel(app, ["--- DIRECTORY ---", "", f"Path: {path}"], "")
         else:
             if path not in app.before_cache:
                 app.before_cache[path] = path.read_text(encoding='utf-8', errors='replace')
-            content_to_show = app.before_cache[path]
-            source_info = f"--- PHYSICAL CONTENT (Before View) ---\nFile: {path}\n"
+            content = app.before_cache[path]
+            header = ["--- PHYSICAL CONTENT (Before View) ---", "", f"File: {path}"]
+            _update_content_panel(app, header, content)
     except Exception as e:
-        content_to_show = f"Error loading content: {e}"
-
-    app.content_text.delete("1.0", tk.END)
-    app.content_text.insert("1.0", source_info + "="*40 + "\n")
-    
-    if "⚠️" in content_to_show:
-        app.content_text.insert(tk.END, content_to_show, "warning")
-    else:
-        app.content_text.insert(tk.END, content_to_show)
-        
-    app.editor_notebook.select(2)
+        _update_content_panel(app, ["--- ERROR ---"], f"Error loading content: {e}")
 
 def on_after_select(app, event: tk.Event):
     widget = event.widget
@@ -583,18 +611,15 @@ def on_after_select(app, event: tk.Event):
     if not values: return
     path = Path(values[0])
     
-    content_to_show, source_info = "", ""
     try:
         if not app.current_plan: return
         
         # --- Visual Navigation (One-way: After -> Before) ---
-        # We use a flag to tell on_before_select NOT to update the UI
         app._in_selection_sync = True
         try:
             path_str = str(path)
             if path_str in app.before_tree_map:
                 node = app.before_tree_map[path_str]
-                # Open all parent nodes to ensure visibility
                 parent = app.before_tree.parent(node)
                 while parent:
                     app.before_tree.item(parent, open=True)
@@ -606,7 +631,6 @@ def on_after_select(app, event: tk.Event):
                 app.before_list.selection_set(node)
                 app.before_list.see(node)
         finally:
-            # Short delay to ensure any triggered events are caught and ignored
             app.root.after(50, lambda: setattr(app, '_in_selection_sync', False))
 
         # --- Data Loading ---
@@ -615,48 +639,31 @@ def on_after_select(app, event: tk.Event):
         is_dir = is_actually_planned_dir or (path.exists() and path.is_dir())
         
         if is_dir:
-            app.content_text.delete("1.0", tk.END)
-            app.content_text.insert("1.0", f"--- PLANNED DIRECTORY ---\nPath: {path}")
-            app.editor_notebook.select(2)
+            _update_content_panel(app, ["--- PLANNED DIRECTORY ---", f"State: {state}", f"Path: {path}"], "")
             return
 
         if state in ('new', 'overwrite', 'conflict_file', 'conflict_dir', 'identical', 'exists'):
             planned_content = _get_planned_content(app, path)
             if planned_content is not None:
                 # Check if this is an empty overwrite
-                if state == 'overwrite' and not planned_content.strip():
-                    content_to_show = t("summary.empty_overwrite_warn")
-                else:
-                    content_to_show = planned_content
-                source_info = f"--- PLANNED CONTENT (Memory) ---\nState: {state}\nFile: {path}\n"
+                is_empty_warn = (state == 'overwrite' and not planned_content.strip())
+                content = t("summary.empty_overwrite_warn") if is_empty_warn else planned_content
+                header = ["--- PLANNED CONTENT (Memory) ---", f"State: {state}", f"File: {path}"]
+                _update_content_panel(app, header, content, is_warning=is_empty_warn)
             elif (state in ('identical', 'exists')) and path.exists() and path.is_file():
-                # 2. No changes planned, but file exists. Read from disk using AFTER_CACHE.
                 if path not in app.after_cache:
                     app.after_cache[path] = path.read_text(encoding='utf-8', errors='replace')
-                content_to_show = app.after_cache[path]
-                source_info = f"--- EXISTING CONTENT (After View) ---\nState: {state}\nFile: {path}\n"
+                header = ["--- EXISTING CONTENT (After View) ---", f"State: {state}", f"File: {path}"]
+                _update_content_panel(app, header, app.after_cache[path])
             elif state in ('identical', 'exists'):
-                # 3. Planned item but no content and no physical file
-                content_to_show = "(No content defined in plan)"
-                source_info = f"--- NO CONTENT ---\nState: {state}\nFile: {path}\n"
+                _update_content_panel(app, ["--- NO CONTENT ---", f"State: {state}", f"File: {path}"], "(No content defined in plan)")
             else:
-                # 4. New file defined in Tree but no content in Source Code
-                source_info = f"--- NEW FILE (Empty) ---\nFile: {path}\n"
+                _update_content_panel(app, ["--- NEW FILE (Empty) ---", f"State: {state}", f"File: {path}"], "")
         else:
-            source_info = f"--- FILE NOT PLANNED ---\nFile: {path}\n"
+            _update_content_panel(app, ["--- FILE NOT PLANNED ---", "", f"File: {path}"], "")
 
     except Exception as e:
-        content_to_show = f"Error loading content: {e}"
-
-    app.content_text.delete("1.0", tk.END)
-    app.content_text.insert("1.0", source_info + "="*40 + "\n")
-    
-    if "⚠️" in content_to_show:
-        app.content_text.insert(tk.END, content_to_show, "warning")
-    else:
-        app.content_text.insert(tk.END, content_to_show)
-        
-    app.editor_notebook.select(2)
+        _update_content_panel(app, ["--- ERROR ---"], f"Error loading content: {e}")
 
 def _get_planned_content(app, path: Path) -> str | None:
     if not app.current_plan: return None
