@@ -126,44 +126,12 @@ def on_browse_folder(app):
     path = filedialog.askdirectory(mustexist=True, title=t("ui.section_1"))
     if not path:
         return
-    is_valid, message = app_utils.validate_path(path)
-    if not is_valid:
-        messagebox.showerror(t("message.invalid_folder_title"), message)
-        app.target_root_path.set(t("ui.no_folder_selected"))
-        app.recompute_button.config(state=tk.DISABLED)
-        clear_tree_function(app.before_tree)
-        clear_tree_function(app.after_tree)
-        clear_tree_function(app.before_list)
-        clear_tree_function(app.after_list)
-    else:
-        app.target_root_path.set(message)
-        app_utils.save_last_root_path(app, message)
-        app.recompute_button.config(state=tk.NORMAL)
-        
-        # THOROUGH CLEANUP on path change
-        app.before_cache = {}
-        app.after_cache = {}
-        app.current_plan = None
-        
-        populate_before_tree(app, Path(message))
-        clear_tree_function(app.after_tree)
-        clear_tree_function(app.after_list)
-        clear_tree_function(app.before_list)
-        
-        app.apply_button.config(state=tk.DISABLED)
-        handle_folder_selected(app, message, method="browse")
+    app_utils.verify_and_set_root(app, path, method="browse")
     logger.debug("on_browse_folder completed")
 
 def on_previous_folder(app):
-    if app.last_root_path and Path(app.last_root_path).is_dir():
-        app.target_root_path.set(app.last_root_path)
-        app.recompute_button.config(state=tk.NORMAL)
-        populate_before_tree(app, Path(app.last_root_path))
-        clear_tree_function(app.after_tree)
-        clear_tree_function(app.after_list)
-        clear_tree_function(app.before_list)
-        app.apply_button.config(state=tk.DISABLED)
-        handle_folder_selected(app, app.last_root_path, method="prev")
+    if app.last_root_path:
+        app_utils.verify_and_set_root(app, app.last_root_path, method="prev")
 
 def on_recompute(app, silent=False):
     logger.debug(f"on_recompute called (silent={silent})")
@@ -280,32 +248,33 @@ def on_apply(app):
     """Executes the plan if root path is valid and user confirms."""
     logger.debug("on_apply called")
     
-    # 1. Strict Root Path Validation (Security Lockdown Routine)
+    # --- [STRICT SECURITY LOCKDOWN ROUTINE] ---
+    # Perform physical check IMMEDIATELY before showing any confirmation popups
     root_path_str = app.target_root_path.get()
-    root_path = Path(root_path_str) if root_path_str else None
+    import os
     
-    if not root_path or not root_path.is_dir():
+    # We use os.path.exists + os.path.isdir for the most 'raw' check possible
+    if not root_path_str or not os.path.exists(root_path_str) or not os.path.isdir(root_path_str):
         # Security Lockdown
         messagebox.showerror(t("message.error_title"), t("message.root_not_found"))
         
-        # Reset UI Settings
+        # Reset UI & Reset Config (Lockdown)
         app.target_root_path.set(t("ui.no_folder_selected"))
         app.prev_dir_button.config(state=tk.DISABLED)
         app.recompute_button.config(state=tk.DISABLED)
         app.apply_button.config(state=tk.DISABLED)
-        
-        # Clear Config Persistence
         app.last_root_path = ""
         app_utils.save_last_root_path(app, "")
         
-        # Clear Analysis Views
+        # Clear Views
         clear_tree_function(app.before_tree)
         clear_tree_function(app.before_list)
         clear_tree_function(app.after_tree)
         clear_tree_function(app.after_list)
         
-        logger.warn(f"Apply aborted: Root path '{root_path_str}' is invalid. System locked down.")
+        logger.warn(f"Security Lockdown: Root path '{root_path_str}' no longer exists physically. Aborting.")
         return
+    # ------------------------------------------
 
     # 2. Existing Validation and Confirmation
     if not app.current_plan or app.current_plan.has_conflicts:

@@ -260,6 +260,55 @@ def save_last_root_path(app, path: str):
     except Exception as e:
         logger.error(f"Error saving last root path: {e}")
 
+def is_path_accessible(path_str: str) -> tuple[bool, str]:
+    """Quick check for path existence, directory type, and basic accessibility."""
+    if not path_str:
+        return False, "No path provided."
+    try:
+        p = Path(path_str).resolve(strict=True)
+        if not p.is_dir():
+            return False, f"Path exists but is not a directory: {path_str}"
+        # Basic write test (optional, but good for robust check)
+        return True, str(p)
+    except (FileNotFoundError, PermissionError) as e:
+        return False, f"Path inaccessible or not found: {e}"
+    except Exception as e:
+        return False, f"Unexpected error checking path: {e}"
+
+def verify_and_set_root(app, path_str: str, method: str = "browse") -> bool:
+    """Centralized logic to validate a path and update the app's root folder state."""
+    from Scripts.UI.action_handler import handle_folder_selected
+    from Scripts.UI.tree_populator import populate_before_tree, _clear_tree as clear_tree_function
+    
+    is_valid, result = validate_path(path_str)
+    if not is_valid:
+        messagebox.showerror(t("message.invalid_folder_title"), result)
+        # If the failure happened during 'prev' or 'recovery', it means the stored path is stale
+        if method in ("prev", "recovery"):
+            app.target_root_path.set(t("ui.no_folder_selected"))
+            app.last_root_path = ""
+            save_last_root_path(app, "")
+            app.prev_dir_button.config(state=tk.DISABLED)
+            app.recompute_button.config(state=tk.DISABLED)
+            app.apply_button.config(state=tk.DISABLED)
+            clear_tree_function(app.before_tree)
+            clear_tree_function(app.before_list)
+        return False
+
+    # Path is valid, update app state
+    app.target_root_path.set(result)
+    save_last_root_path(app, result)
+    app.recompute_button.config(state=tk.NORMAL)
+    populate_before_tree(app, Path(result))
+    
+    # Reset subsequent analysis views
+    clear_tree_function(app.after_tree)
+    clear_tree_function(app.after_list)
+    app.apply_button.config(state=tk.DISABLED)
+    
+    handle_folder_selected(app, result, method=method)
+    return True
+
 def validate_path(path: str) -> tuple[bool, str]:
     """Calls the external validator script and returns (is_valid, message)."""
     process = None

@@ -183,11 +183,7 @@ class RecoveryWindow:
 
             # --- 2. Set Target Root Path in Main App ---
             if target_root_str:
-                self.app.target_root_path.set(target_root_str)
-                app_utils.save_last_root_path(self.app, target_root_str)
-                # Refresh 'Before' view
-                from Scripts.UI.tree_populator import populate_before_tree
-                populate_before_tree(self.app, Path(target_root_str))
+                app_utils.verify_and_set_root(self.app, target_root_str, method="recovery")
 
             # --- 3. Paste to Source Code Editor ---
             self.app.source_code_text.delete("1.0", tk.END)
@@ -195,11 +191,12 @@ class RecoveryWindow:
             self.app.source_code_text.edit_modified(True) # Trigger modified event
             
             # Switch to Source Code Tab
-            self.app.editor_notebook.select(1)
+            self.app.editor_notebook.select(0) # Changed from 1 to 0 because Source Code is now first
 
             # --- 4. Trigger Recompute (Compute Diff) ---
             # We close the window first so user can see the progress in log
             self._on_close()
+            from Scripts.UI import action_handler
             action_handler.handle_recovery_loaded(self.app, file_path.name)
             self.app.root.after(100, lambda: action_handler.on_recompute(self.app, silent=False))
 

@@ -56,6 +56,14 @@ def execute_scaffold(app):
     if is_dry_run:
         log_exec("Starting scaffold simulation (DRY RUN)...", "warn")
     else:
+        # --- FINAL PHYSICAL SAFETY CHECK ---
+        try:
+            if not plan.root_path.resolve(strict=True).is_dir():
+                raise FileNotFoundError()
+        except:
+            log_exec(f"[CRITICAL ERROR] Target root folder disappeared: {plan.root_path}", "error")
+            messagebox.showerror(t("message.error_title"), t("message.root_not_found"))
+            return
         log_exec("Starting scaffold operation...", "info")
     
     # Only count lines from files that are effectively selected
