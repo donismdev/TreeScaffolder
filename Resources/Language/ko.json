@@ -10,6 +10,8 @@
         "tab_source_code": "소스 코드",
         "tab_content": "내용",
         "btn_make_tree": "트리 생성",
+        "btn_empty": "Empty",
+        "btn_source_action": "Source Action",
         "section_3": "3. 설정 및 작업 (Settings & Actions)",
         "dry_run": "드라이 런 (실제 파일 쓰지 않음)",
         "similarity_scan": "유사한 이름 검색",

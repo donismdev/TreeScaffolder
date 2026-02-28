@@ -197,6 +197,12 @@ def _populate_treeview_from_plan(app, tree_widget: ttk.Treeview, plan_obj, root_
                     tags.append('overwrite')
             elif state == 'identical': tags.append('warning')
             elif state in ('conflict_file', 'conflict_dir'): tags.append('conflict')
+            
+            # ALSO: Check for similarity warnings even for new files
+            if path in plan_obj.similarity_warnings:
+                if 'warning' not in tags:
+                    tags.append('warning')
+
             if path in modified_parent_dirs: tags.append('modified_parent')
             
             # Robust directory check (case-insensitive)

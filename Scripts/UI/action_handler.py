@@ -171,6 +171,17 @@ def on_recompute(app, silent=False):
     if not root_path_str or root_path_str == t("ui.no_folder_selected") or not Path(root_path_str).is_dir():
         messagebox.showerror(t("message.error_title"), t("message.select_root_first"))
         return False
+
+    # --- CRITICAL: Clear stale data before new analysis ---
+    app.log_text.config(state=tk.NORMAL)
+    app.log_text.delete("1.0", tk.END)
+    app.log_text.config(state=tk.DISABLED)
+    
+    app.content_text.delete("1.0", tk.END)
+    clear_tree_function(app.after_tree)
+    clear_tree_function(app.after_list)
+    # ------------------------------------------------------
+
     root_path = Path(root_path_str)
     text_input = app.tree_text.get("1.0", "end-1c") + "\n" + app.source_code_text.get("1.0", "end-1c")
     if not text_input.strip():
@@ -642,10 +653,16 @@ def on_editor_tab_changed(app, event):
     current_tab = app.editor_notebook.index(app.editor_notebook.select())
     for btn in app.editor_buttons:
         btn.pack_forget()
-        btn.config(command=None)
+        btn.config(command=None, state=tk.NORMAL)
     
-    if current_tab == 1: # Source Code
-        app.editor_buttons[0].config(text=t("ui.btn_make_tree"), command=lambda: handle_make_tree(app))
+    if current_tab == 0: # Scaffold Tree
+        app.editor_buttons[0].config(text=t("ui.btn_empty"), state=tk.DISABLED)
+        app.editor_buttons[0].pack(side="left", padx=2)
+    elif current_tab == 1: # Source Code
+        app.editor_buttons[0].config(text=t("ui.btn_make_tree"), command=lambda: handle_make_tree(app), state=tk.NORMAL)
+        app.editor_buttons[0].pack(side="left", padx=2)
+    elif current_tab == 2: # Content
+        app.editor_buttons[0].config(text=t("ui.btn_empty"), state=tk.DISABLED)
         app.editor_buttons[0].pack(side="left", padx=2)
     
 def handle_make_tree(app):

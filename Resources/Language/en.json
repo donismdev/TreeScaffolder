@@ -10,6 +10,8 @@
         "tab_source_code": "Source Code",
         "tab_content": "Content",
         "btn_make_tree": "Make Tree",
+        "btn_empty": "Empty",
+        "btn_source_action": "Source Action",
         "section_3": "3. Settings & Actions",
         "dry_run": "Dry Run (don't write files)",
         "similarity_scan": "Scan for similar names",

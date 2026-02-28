@@ -21,25 +21,31 @@ def _get_rules():
 
 def _is_allowed_pairing(name1: str, name2: str) -> bool:
     """Check if two filenames are allowed pairings (e.g., file.h and file.cpp)."""
-    p1 = Path(name1)
-    p2 = Path(name2)
-    
-    # If base names are different, it's not a pairing of the same file
-    if p1.stem != p2.stem:
-        return False
-        
-    ext1 = p1.suffix.lower()
-    ext2 = p2.suffix.lower()
-    
-    # If extensions are the same and stem is the same, they are the same file (already handled elsewhere)
-    if ext1 == ext2:
-        return False
-        
     rules = _get_rules()
     pairings = rules.get("allowed_extension_pairs", [])
-    for pair in pairings:
-        if ext1 in pair and ext2 in pair:
-            return True
+    
+    def get_matching_pair_and_stem(filename):
+        # Sort pairs by length of extensions descending to match longest first (e.g. .test.ts before .ts)
+        for pair in pairings:
+            for ext in pair:
+                if filename.lower().endswith(ext.lower()):
+                    stem = filename[:-len(ext)]
+                    return stem.lower(), ext.lower(), pair
+        # Fallback to standard Path suffix if no multi-dot matches
+        p = Path(filename)
+        return p.stem.lower(), p.suffix.lower(), None
+
+    stem1, ext1, pair1 = get_matching_pair_and_stem(name1)
+    stem2, ext2, pair2 = get_matching_pair_and_stem(name2)
+    
+    # Must have the same base name
+    if stem1 != stem2 or not stem1:
+        return False
+        
+    # If they matched the same allowed pair, it's a valid pairing
+    if pair1 and pair2 and pair1 == pair2:
+        # Just ensure they aren't the exact same extension
+        return ext1 != ext2
             
     return False
 
