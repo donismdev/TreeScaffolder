@@ -12,22 +12,10 @@ import json
 from Scripts.Utils.i18n import t
 from Scripts.Core import scaffold_core
 from Scripts.UI import app_utils
-
-def _validate_geometry(geom_str, min_w=400, min_h=300):
-    """Validates geometry string and ensures it's within screen bounds."""
-    try:
-        if not geom_str: return False
-        # Expected format: WxH+X+Y
-        match = re.match(r"(\d+)x(\d+)\+?(-?\d+)\+?(-?\d+)", geom_str)
-        if not match: return False
-        
-        w, h, x, y = map(int, match.groups())
-        if w < min_w or h < min_h: return False
-        if x < -5000 or x > 5000 or y < -5000 or y > 5000: return False
-        return True
-    except: return False
+from Scripts.Utils.i18n import t
 
 class RecoveryWindow:
+
     _instance = None
 
     def __init__(self, parent, app_instance):
@@ -63,7 +51,7 @@ class RecoveryWindow:
                 with open(config_path, "r", encoding="utf-8") as f:
                     config = json.load(f)
                     geom = config.get("recovery_window_geometry")
-                    if _validate_geometry(geom, 500, 300):
+                    if app_utils.validate_geometry(geom, 500, 300):
                         self.window.geometry(geom)
         except: pass
 
@@ -275,7 +263,7 @@ class RecoveryNotificationWindow:
                 with open(config_path, "r", encoding="utf-8") as f:
                     config = json.load(f)
                     geom = config.get("recovery_notify_geometry")
-                    if _validate_geometry(geom, 400, 300):
+                    if app_utils.validate_geometry(geom, 400, 300):
                         self.window.geometry(geom)
         except: pass
 

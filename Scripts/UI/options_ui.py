@@ -10,24 +10,11 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, messagebox
 from Scripts.Utils.i18n import t, set_language, get_current_language
-from Scripts.UI import action_handler
-
-def _validate_geometry(geom_str, min_w=400, min_h=500):
-    """Validates geometry string and ensures it's within reasonable bounds."""
-    try:
-        if not geom_str: return False
-        # Expected format: WxH+X+Y
-        match = re.match(r"(\d+)x(\d+)\+?(-?\d+)\+?(-?\d+)", geom_str)
-        if not match: return False
-        
-        w, h, x, y = map(int, match.groups())
-        if w < min_w or h < min_h: return False
-        # Loose screen bound check to allow multi-monitor setups
-        if x < -5000 or x > 5000 or y < -5000 or y > 5000: return False
-        return True
-    except: return False
+from Scripts.Utils.i18n import t
+from Scripts.UI import app_utils
 
 class OptionsWindow:
+
     _instance = None
 
     def __init__(self, parent, app_instance):
@@ -85,7 +72,7 @@ class OptionsWindow:
         try:
             config = self._load_config()
             geom = config.get("options_window_geometry")
-            if _validate_geometry(geom):
+            if app_utils.validate_geometry(geom):
                 self.window.geometry(geom)
         except: pass
 

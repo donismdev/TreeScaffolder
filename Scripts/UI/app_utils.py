@@ -268,3 +268,38 @@ def validate_path(path: str) -> tuple[bool, str]:
         else: return False, "\n".join(result["errors"])
     except Exception as e:
         return False, str(e)
+
+def is_excluded_by_parent(app, path: Path) -> bool:
+    """Checks if any parent directory of the path is unchecked in selected_paths."""
+    plan = app.current_plan
+    if not plan: return False
+    
+    parent = path.parent
+    root_path = plan.root_path
+    
+    while parent != root_path and parent.is_relative_to(root_path):
+        if parent in app.selected_paths and not app.selected_paths[parent]:
+            return True
+        parent = parent.parent
+    return False
+
+def is_effectively_selected(app, path: Path) -> bool:
+    """Checks if a path is directly or indirectly (via parent) unchecked."""
+    if not app.selected_paths.get(path, True):
+        return False
+    return not is_excluded_by_parent(app, path)
+
+def validate_geometry(geom_str, min_w=400, min_h=300) -> bool:
+    """Validates geometry string and ensures it's within reasonable screen bounds."""
+    try:
+        if not geom_str: return False
+        # Expected format: WxH+X+Y
+        match = re.match(r"(\d+)x(\d+)\+?(-?\d+)\+?(-?\d+)", geom_str)
+        if not match: return False
+        
+        w, h, x, y = map(int, match.groups())
+        if w < min_w or h < min_h: return False
+        # Loose screen bound check to allow multi-monitor setups
+        if x < -5000 or x > 5000 or y < -5000 or y > 5000: return False
+        return True
+    except: return False
