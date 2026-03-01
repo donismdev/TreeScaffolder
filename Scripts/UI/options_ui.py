@@ -49,41 +49,18 @@ class OptionsWindow:
         self.window.destroy()
 
     def _load_config(self):
-        config_path = Path(self.app.CONFIG_FILE)
-        if config_path.exists():
-            try:
-                with open(config_path, "r", encoding="utf-8") as f:
-                    return json.load(f)
-            except Exception:
-                pass
-        return {}
+        return app_utils.load_config(self.app.CONFIG_FILE)
 
     def _save_config(self, key, value):
-        config_path = Path(self.app.CONFIG_FILE)
         config = self._load_config()
         config[key] = value
-        try:
-            with open(config_path, "w", encoding="utf-8") as f:
-                json.dump(config, f, indent=4)
-        except Exception:
-            pass
+        app_utils.save_config(self.app.CONFIG_FILE, config)
 
     def _load_geometry(self):
-        try:
-            config = self._load_config()
-            geom = config.get("options_window_geometry")
-            if app_utils.validate_geometry(geom):
-                self.window.geometry(geom)
-        except: pass
+        app_utils.load_window_geometry(self.window, self.app.CONFIG_FILE, "options_window_geometry", 400, 500)
 
     def _save_geometry(self):
-        try:
-            config_path = Path(self.app.CONFIG_FILE)
-            config = self._load_config()
-            config["options_window_geometry"] = self.window.geometry()
-            with open(config_path, "w", encoding="utf-8") as f:
-                json.dump(config, f, indent=4)
-        except: pass
+        app_utils.save_window_geometry(self.window, self.app.CONFIG_FILE, "options_window_geometry")
 
     def setup_ui(self):
         # Clear current UI if re-running

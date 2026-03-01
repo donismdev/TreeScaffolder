@@ -303,3 +303,36 @@ def validate_geometry(geom_str, min_w=400, min_h=300) -> bool:
         if x < -5000 or x > 5000 or y < -5000 or y > 5000: return False
         return True
     except: return False
+
+def load_config(config_file: str) -> dict:
+    """Loads configuration data from the specified JSON file."""
+    config_path = Path(config_file)
+    if config_path.exists():
+        try:
+            with open(config_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
+
+def save_config(config_file: str, data: dict):
+    """Saves the given configuration data to the specified JSON file."""
+    config_path = Path(config_file)
+    try:
+        with open(config_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4)
+    except Exception:
+        pass
+
+def load_window_geometry(window: tk.Toplevel, config_file: str, key: str, min_w: int = 400, min_h: int = 300):
+    """Loads and applies window geometry from configuration."""
+    config = load_config(config_file)
+    geom = config.get(key)
+    if validate_geometry(geom, min_w, min_h):
+        window.geometry(geom)
+
+def save_window_geometry(window: tk.Toplevel, config_file: str, key: str):
+    """Saves the current window geometry to configuration."""
+    config = load_config(config_file)
+    config[key] = window.geometry()
+    save_config(config_file, config)

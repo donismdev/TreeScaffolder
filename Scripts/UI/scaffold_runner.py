@@ -226,7 +226,7 @@ def execute_scaffold(app):
         recovery_file = _write_recovery_v2_log(app, overwritten_backups)
         if recovery_file:
             from Scripts.UI import recovery_ui
-            recovery_ui.show_recovery_notification(app, list(overwritten_backups.keys()), recovery_file)
+            recovery_ui.show_recovery_notification(app.root, app, list(overwritten_backups.keys()), recovery_file)
         
     app.log_text.config(state="normal")
     app.log_text.delete("1.0", "end")
