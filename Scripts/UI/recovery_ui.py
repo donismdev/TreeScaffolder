@@ -9,6 +9,7 @@ from tkinter import ttk, messagebox
 from pathlib import Path
 import re
 import json
+import datetime
 from Scripts.Utils.i18n import t
 from Scripts.Core import scaffold_core
 from Scripts.UI import app_utils
@@ -44,10 +45,10 @@ class RecoveryWindow:
         self.refresh_log_list()
 
     def _load_geometry(self):
-        app_utils.load_window_geometry(self.window, self.app.CONFIG_FILE, "recovery_window_geometry", 500, 300)
+        app_utils.load_popup_window_geometry(self.window, self.app.CONFIG_FILE, "recovery_window_geometry", 500, 300)
 
     def _save_geometry(self):
-        app_utils.save_window_geometry(self.window, self.app.CONFIG_FILE, "recovery_window_geometry")
+        app_utils.save_popup_window_geometry(self.window, self.app.CONFIG_FILE, "recovery_window_geometry")
 
     def _on_close(self):
         RecoveryWindow._instance = None
@@ -92,32 +93,44 @@ class RecoveryWindow:
         for item in self.log_tree.get_children():
             self.log_tree.delete(item)
         
-        # Scan Log directory for Session folders
         log_dir = Path(self.app.LOG_DIR)
         if not log_dir.exists():
             return
             
         logs = []
+        # Search for both legacy (recovery_v2_*) and current (scaffold_recovery_*) patterns
+        patterns = ["recovery_v2_*.txt", "scaffold_recovery_*.txt"]
+        
+        # 1. Search in root Log directory
+        for pattern in patterns:
+            for recovery_file in log_dir.glob(pattern):
+                self._add_log_to_list(recovery_file, logs, "Log")
+
+        # 2. Search in Session folders
         for session_folder in log_dir.glob("Session_*"):
             if not session_folder.is_dir(): continue
-            
-            # Find V2 recovery logs within session
-            for recovery_file in session_folder.glob("recovery_v2_*.txt"):
-                mtime = recovery_file.stat().st_mtime
-                import datetime
-                date_str = datetime.datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M:%S')
-                logs.append({
-                    "path": recovery_file,
-                    "filename": f"{session_folder.name}/{recovery_file.name}",
-                    "date": date_str,
-                    "mtime": mtime
-                })
+            for pattern in patterns:
+                for recovery_file in session_folder.glob(pattern):
+                    self._add_log_to_list(recovery_file, logs, session_folder.name)
                 
         # Sort by mtime descending
         logs.sort(key=lambda x: x["mtime"], reverse=True)
         
         for log in logs:
             self.log_tree.insert("", tk.END, values=(log["filename"], log["date"]), tags=(str(log["path"]),))
+
+    def _add_log_to_list(self, file_path: Path, log_list: list, display_parent: str):
+        """Helper to add a log file to the list with formatted metadata."""
+        if not file_path.is_file(): return
+        
+        mtime = file_path.stat().st_mtime
+        date_str = datetime.datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M:%S')
+        log_list.append({
+            "path": file_path,
+            "filename": f"{display_parent}/{file_path.name}",
+            "date": date_str,
+            "mtime": mtime
+        })
 
     def _on_select_change(self, event):
         pass # Optional: Add preview logic here if needed
@@ -171,10 +184,10 @@ class RecoveryNotificationWindow:
         self.setup_ui(backed_up_paths, log_path)
 
     def _load_geometry(self):
-        app_utils.load_window_geometry(self.window, self.app.CONFIG_FILE, "recovery_notify_geometry", 400, 300)
+        app_utils.load_popup_window_geometry(self.window, self.app.CONFIG_FILE, "recovery_notify_geometry", 400, 300)
 
     def _save_geometry(self):
-        app_utils.save_window_geometry(self.window, self.app.CONFIG_FILE, "recovery_notify_geometry")
+        app_utils.save_popup_window_geometry(self.window, self.app.CONFIG_FILE, "recovery_notify_geometry")
 
     def setup_ui(self, backed_up_paths, log_path):
         main_frame = ttk.Frame(self.window, padding=15)

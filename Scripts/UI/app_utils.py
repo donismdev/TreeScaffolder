@@ -100,8 +100,8 @@ def log_message(app, message: str, level: str = "info", buffer_list: list = None
     app.log_text.config(state=tk.DISABLED)
     app.root.update_idletasks()
 
-def load_window_geometry(app):
-    """Loads window geometry and sash positions from config.json if available."""
+def load_app_window_geometry(app):
+    """Loads window geometry and sash positions from config.json for the MAIN application."""
     config_path = Path.cwd() / app.CONFIG_FILE
     loaded_geometry = None
     open_folder_after_apply = False
@@ -157,8 +157,8 @@ def load_window_geometry(app):
             default_pos = diff_frame_width // 2
             if default_pos > 0: app.diff_paned_window.sash_place(0, default_pos, 0)
 
-def save_window_geometry(app):
-    """Saves current window geometry and sash positions to config.json."""
+def save_app_window_geometry(app):
+    """Saves current window geometry and sash positions to config.json for the MAIN application."""
     config_path = Path.cwd() / app.CONFIG_FILE
     try:
         config = {}
@@ -324,15 +324,15 @@ def save_config(config_file: str, data: dict):
     except Exception:
         pass
 
-def load_window_geometry(window: tk.Toplevel, config_file: str, key: str, min_w: int = 400, min_h: int = 300):
-    """Loads and applies window geometry from configuration."""
+def load_popup_window_geometry(window: tk.Toplevel, config_file: str, key: str, min_w: int = 400, min_h: int = 300):
+    """Loads and applies window geometry from configuration for POPUP windows."""
     config = load_config(config_file)
     geom = config.get(key)
     if validate_geometry(geom, min_w, min_h):
         window.geometry(geom)
 
-def save_window_geometry(window: tk.Toplevel, config_file: str, key: str):
-    """Saves the current window geometry to configuration."""
+def save_popup_window_geometry(window: tk.Toplevel, config_file: str, key: str):
+    """Saves the current window geometry to configuration for POPUP windows."""
     config = load_config(config_file)
     config[key] = window.geometry()
     save_config(config_file, config)

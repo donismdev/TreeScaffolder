@@ -126,8 +126,8 @@ class ScaffoldApp:
         self.editor_notebook.bind("<<NotebookTabChanged>>", lambda e: action_handler.on_editor_tab_changed(self, e))
         action_handler.on_editor_tab_changed(self, None) 
 
-        self.root.bind("<Destroy>", lambda event: app_utils.save_window_geometry(self) if event.widget == self.root else None)
-        app_utils.load_window_geometry(self) 
+        self.root.bind("<Destroy>", lambda event: app_utils.save_app_window_geometry(self) if event.widget == self.root else None)
+        app_utils.load_app_window_geometry(self) 
         app_utils.load_last_root_path(self)
         key_bindings.setup_key_bindings(self)
         
