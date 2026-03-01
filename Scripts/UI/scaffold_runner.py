@@ -18,40 +18,6 @@ from Scripts.Utils import logger
 from Scripts.Utils.i18n import t
 from Scripts.Core import scaffold_core
 
-def _is_excluded_by_parent(app, path):
-    """Checks if any parent directory of the path is unchecked in selected_paths."""
-    plan = app.current_plan
-    if not plan: return False
-    
-    parent = path.parent
-    root_path = plan.root_path
-    
-    while parent != root_path and parent.is_relative_to(root_path):
-        if parent in app.selected_paths and not app.selected_paths[parent]:
-            return True
-        parent = parent.parent
-    return False
-
-def _is_effectively_selected(app, path):
-    """Checks if a path is directly or indirectly (via parent) unchecked."""
-    if not app.selected_paths.get(path, True):
-        return False
-    return not _is_excluded_by_parent(app, path)
-
-def _is_excluded_by_parent(app, path):
-    """Checks if any parent directory of the path is unchecked in selected_paths."""
-    plan = app.current_plan
-    if not plan: return False
-    
-    parent = path.parent
-    root_path = plan.root_path
-    
-    while parent != root_path and parent.is_relative_to(root_path):
-        if parent in app.selected_paths and not app.selected_paths[parent]:
-            return True
-        parent = parent.parent
-    return False
-
 def execute_scaffold(app):
     """Performs the actual file and directory creation."""
     plan = app.current_plan
@@ -86,12 +52,12 @@ def execute_scaffold(app):
     total_content_lines = sum(
         len(content.splitlines()) 
         for path, content in plan.file_contents.items() 
-        if _is_effectively_selected(app, path)
+        if app_utils.is_effectively_selected(app, path)
     )
 
-    num_planned_new_dirs = len([p for p in plan.planned_dirs if plan.path_states.get(p) == 'new' and _is_effectively_selected(app, p)])
-    num_planned_new_files = len([p for p in plan.planned_files if plan.path_states.get(p) == 'new' and _is_effectively_selected(app, p)])
-    num_planned_overwrite_files = len([p for p in plan.planned_files if plan.path_states.get(p) == 'overwrite' and _is_effectively_selected(app, p)])
+    num_planned_new_dirs = len([p for p in plan.planned_dirs if plan.path_states.get(p) == 'new' and app_utils.is_effectively_selected(app, p)])
+    num_planned_new_files = len([p for p in plan.planned_files if plan.path_states.get(p) == 'new' and app_utils.is_effectively_selected(app, p)])
+    num_planned_overwrite_files = len([p for p in plan.planned_files if plan.path_states.get(p) == 'overwrite' and app_utils.is_effectively_selected(app, p)])
 
     log_exec(f"\nPlanned Actions Summary:")
     log_exec(f"- New directories: {num_planned_new_dirs}")
@@ -114,7 +80,7 @@ def execute_scaffold(app):
         state = plan.path_states.get(path)
 
         # Check if user deselected this path OR if any parent is deselected
-        if (path in app.selected_paths and not app.selected_paths[path]) or _is_excluded_by_parent(app, path):
+        if (path in app.selected_paths and not app.selected_paths[path]) or app_utils.is_excluded_by_parent(app, path):
             log_exec(f"[USER SKIP] {path}", "skip")
             stats["dirs_skipped"] += 1
             continue
@@ -137,7 +103,7 @@ def execute_scaffold(app):
         content = plan.file_contents.get(path.resolve())
 
         # Check if user deselected this path OR if any parent is deselected
-        if (path in app.selected_paths and not app.selected_paths[path]) or _is_excluded_by_parent(app, path):
+        if (path in app.selected_paths and not app.selected_paths[path]) or app_utils.is_excluded_by_parent(app, path):
             log_exec(f"[USER SKIP] {path}", "skip")
             stats["files_skipped"] += 1
             continue
@@ -260,7 +226,7 @@ def execute_scaffold(app):
         recovery_file = _write_recovery_v2_log(app, overwritten_backups)
         if recovery_file:
             from Scripts.UI import recovery_ui
-            recovery_ui.show_recovery_notification(app, list(overwritten_backups.keys()), recovery_file)
+            recovery_ui.show_recovery_notification(app.root, app, list(overwritten_backups.keys()), recovery_file)
         
     app.log_text.config(state="normal")
     app.log_text.delete("1.0", "end")
@@ -325,7 +291,7 @@ def _write_execution_log(app, plan, stats: dict, is_dry_run: bool, captured_logs
     full_planned_paths = plan.planned_dirs.union(plan.planned_files)
     unchecked_paths = set()
     for p in full_planned_paths:
-        if not _is_effectively_selected(app, p):
+        if not app_utils.is_effectively_selected(app, p):
             unchecked_paths.add(p)
 
     unified_tree_text = scaffold_core.reconstruct_tree_string(

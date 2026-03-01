@@ -43,24 +43,9 @@ def handle_data_cleared(app):
 
 def handle_diff_computed(app, plan):
     """Called after a plan is successfully generated or selection changed."""
-    # Only count items that are selected AND not excluded by an unchecked parent
-    def is_effectively_selected(path):
-        # 1. Check if the item itself is unchecked
-        if not app.selected_paths.get(path, True):
-            return False
-            
-        # 2. Check if any parent is unchecked (matching _is_excluded_by_parent logic)
-        root_path = plan.root_path
-        parent = path.parent
-        while parent != root_path and parent.is_relative_to(root_path):
-            if parent in app.selected_paths and not app.selected_paths[parent]:
-                return False
-            parent = parent.parent
-        return True
-
-    new_files = sum(1 for p, s in plan.path_states.items() if s == 'new' and p in plan.planned_files and is_effectively_selected(p))
-    new_dirs = sum(1 for p, s in plan.path_states.items() if s == 'new' and p in plan.planned_dirs and is_effectively_selected(p))
-    overwrites = sum(1 for p, s in plan.path_states.items() if p in plan.planned_files and s == 'overwrite' and is_effectively_selected(p))
+    new_files = sum(1 for p, s in plan.path_states.items() if s == 'new' and p in plan.planned_files and app_utils.is_effectively_selected(app, p))
+    new_dirs = sum(1 for p, s in plan.path_states.items() if s == 'new' and p in plan.planned_dirs and app_utils.is_effectively_selected(app, p))
+    overwrites = sum(1 for p, s in plan.path_states.items() if p in plan.planned_files and s == 'overwrite' and app_utils.is_effectively_selected(app, p))
     
     update_summary(app, "diff_computed", dirs=new_dirs, files=new_files, overwrites=overwrites)
 
@@ -347,25 +332,13 @@ def on_apply(app):
 
     is_dry_run = app.dry_run.get()
     
-    # --- Helper for counting effectively selected items ---
-    def is_effectively_selected(path):
-        if not app.selected_paths.get(path, True):
-            return False
-        root_path = app.current_plan.root_path
-        parent = path.parent
-        while parent != root_path and parent.is_relative_to(root_path):
-            if parent in app.selected_paths and not app.selected_paths[parent]:
-                return False
-            parent = parent.parent
-        return True
-
     # 변경 사항 카운트 (체크박스 선택 상태 반영)
     new_files = sum(1 for p, s in app.current_plan.path_states.items() 
-                    if s == 'new' and p in app.current_plan.planned_files and is_effectively_selected(p))
+                    if s == 'new' and p in app.current_plan.planned_files and app_utils.is_effectively_selected(app, p))
     new_dirs = sum(1 for p, s in app.current_plan.path_states.items() 
-                   if s == 'new' and p in app.current_plan.planned_dirs and is_effectively_selected(p))
+                   if s == 'new' and p in app.current_plan.planned_dirs and app_utils.is_effectively_selected(app, p))
     overwrites = sum(1 for p, s in app.current_plan.path_states.items() 
-                     if s == 'overwrite' and is_effectively_selected(p))
+                     if s == 'overwrite' and app_utils.is_effectively_selected(app, p))
 
     if is_dry_run:
         title = t("message.confirm_dry_run_title")

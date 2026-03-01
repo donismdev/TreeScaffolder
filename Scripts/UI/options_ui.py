@@ -10,7 +10,8 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, messagebox
 from Scripts.Utils.i18n import t, set_language, get_current_language
-from Scripts.UI import action_handler
+from Scripts.Utils.i18n import t
+from Scripts.UI import app_utils
 
 def _validate_geometry(geom_str, min_w=400, min_h=500):
     """Validates geometry string and ensures it's within reasonable bounds."""
@@ -28,6 +29,7 @@ def _validate_geometry(geom_str, min_w=400, min_h=500):
     except: return False
 
 class OptionsWindow:
+
     _instance = None
 
     def __init__(self, parent, app_instance):
@@ -62,24 +64,18 @@ class OptionsWindow:
         self.window.destroy()
 
     def _load_config(self):
-        config_path = Path(self.app.CONFIG_FILE)
-        if config_path.exists():
-            try:
-                with open(config_path, "r", encoding="utf-8") as f:
-                    return json.load(f)
-            except Exception:
-                pass
-        return {}
+        return app_utils.load_config(self.app.CONFIG_FILE)
 
     def _save_config(self, key, value):
-        config_path = Path(self.app.CONFIG_FILE)
         config = self._load_config()
         config[key] = value
-        try:
-            with open(config_path, "w", encoding="utf-8") as f:
-                json.dump(config, f, indent=4)
-        except Exception:
-            pass
+        app_utils.save_config(self.app.CONFIG_FILE, config)
+
+    def _load_geometry(self):
+        app_utils.load_window_geometry(self.window, self.app.CONFIG_FILE, "options_window_geometry", 400, 500)
+
+    def _save_geometry(self):
+        app_utils.save_window_geometry(self.window, self.app.CONFIG_FILE, "options_window_geometry")
 
     def _load_geometry(self):
         try:

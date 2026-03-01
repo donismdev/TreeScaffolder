@@ -67,30 +67,7 @@ TreeScaffolder uses a unique block format for seamless communication with LLMs.
 
 ---
 
-## 4. Configuration (`config.json`)
-
--   `debug_level` (0~3): Setting this to 2 or higher enables the **[Check Folder]** debug button.
--   `log_cleanup_limit`: Number of recent log session folders to keep.
-
----
-
-## 5. Keyboard Shortcuts (Quick Reference)
-
-| Key | Action | Description |
-| :--- | :--- | :--- |
-| `d` | **Compute Diff** | Calculate plan based on current inputs |
-| `4` | **Focus Job Name** | Move focus to job name field (enabled after analysis) |
-| `f` | **Apply Scaffold** | Apply plan to file system (shows confirmation) |
-| `q` | **Recovery** | Open window for automatic backup logs |
-| `r` | **Clear Data** | Reset all inputs and planned data |
-| `e` | **Prev Folder** | Load previous working directory |
-| `w` | **Browse Folder** | Select a new working directory |
-| `o` | **Options** | Open Language and Debug settings |
-| `Space` | **Toggle** | (In After View) Toggle checkbox for selected item |
-
----
-
-## 7. LLM Prompting Guide
+## 4. LLM Prompting Guide
 
 To get the best output from an LLM that can be directly pasted into TreeScaffolder, copy and use the following prompt template.
 
@@ -132,7 +109,30 @@ When generating a tree, follow this format (Tabs required):
 
 ---
 
-## 8. Indentation Principle
+## 5. Configuration (`config.json`)
+
+-   `debug_level` (0~3): Setting this to 2 or higher enables the **[Check Folder]** debug button.
+-   `log_cleanup_limit`: Number of recent log session folders to keep.
+
+---
+
+## 6. Keyboard Shortcuts (Quick Reference)
+
+| Key | Action | Description |
+| :--- | :--- | :--- |
+| `d` | **Compute Diff** | Calculate plan based on current inputs |
+| `4` | **Focus Job Name** | Move focus to job name field (enabled after analysis) |
+| `f` | **Apply Scaffold** | Apply plan to file system (shows confirmation) |
+| `q` | **Recovery** | Open window for automatic backup logs |
+| `r` | **Clear Data** | Reset all inputs and planned data |
+| `e` | **Prev Folder** | Load previous working directory |
+| `w` | **Browse Folder** | Select a new working directory |
+| `o` | **Options** | Open Language and Debug settings |
+| `Space` | **Toggle** | (In After View) Toggle checkbox for selected item |
+
+---
+
+## 7. Indentation Principle
 
 TreeScaffolder interprets tree structures based on **Strict Python-style Indentation**.
 
@@ -142,7 +142,7 @@ TreeScaffolder interprets tree structures based on **Strict Python-style Indenta
 
 ---
 
-## 9. Design Philosophy: Safety First
+## 8. Design Philosophy: Safety First
 
 This tool respects **Empirical Logic**.
 -   **No AI Refactoring**: We prioritize safety code proven through trial and error over mechanical "clean code" optimizations.
