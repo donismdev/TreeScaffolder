@@ -208,4 +208,5 @@ __marimo__/
 
 # Local test and config files
 Resources/config.json
-Test/
+Dev/
+Log/

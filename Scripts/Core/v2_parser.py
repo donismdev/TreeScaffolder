@@ -71,10 +71,13 @@ def parse_v2_format(text: str, root_marker: str | None = None, root_marker_name:
     # 2. If validation passes, proceed with extracting content.
     file_blocks = []
     
+    # Updated pattern: Matches everything after BEGIN line's \n
+    # until it hits the final \n@@@..._END.
+    # The content is defined as all characters between the first \n and the last \n.
     block_pattern = re.compile(
         r"@@@(?P<keyword>[A-Z_]+)_BEGIN(?P<header>.*?)\n"
         r"(?P<content>.*?)"
-        r"\n?@@@(?P=keyword)_END",
+        r"\n@@@(?P=keyword)_END",
         re.DOTALL
     )
 
@@ -107,10 +110,6 @@ def parse_v2_format(text: str, root_marker: str | None = None, root_marker_name:
                 line_num = text.count('\n', 0, match.start()) + 1
                 raise V2ParserError(f"FILE_BEGIN block at line {line_num} has no path defined.")
 
-            # Apply root marker replacement
-            if root_marker and path.startswith(root_marker):
-                path = path.replace(root_marker, '', 1).lstrip('/\\')
-            
             file_blocks.append({'path': path, 'content': content})
 
     return file_blocks

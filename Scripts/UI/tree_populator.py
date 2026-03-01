@@ -81,8 +81,8 @@ def populate_after_tree(app, plan):
 
         state = plan.path_states.get(p_path)
         
-        # A path contributes to modified parents if its current state is 'new', 'overwrite', or 'conflict'
-        if state in ('new', 'overwrite', 'conflict_file', 'conflict_dir'):
+        # A path contributes to modified parents if its current state is 'new', 'overwrite', 'conflict', OR 'identical'
+        if state in ('new', 'overwrite', 'conflict_file', 'conflict_dir', 'identical'):
             current_parent = p_path.parent
             while current_parent != root_path and current_parent.is_relative_to(root_path):
                 modified_parent_dirs.add(current_parent)
@@ -91,21 +91,50 @@ def populate_after_tree(app, plan):
             if root_path in p_path.parents:
                 modified_parent_dirs.add(root_path)
 
-    # Populate the main 'After (Planned State)' tree
+    # Populate the main 'After (Planned State)' tree (Full View)
+    app.after_tree_map = {}
     _populate_treeview_from_plan(app, app.after_tree, plan, root_path, 
-                                     lambda p, plan_obj, mpd: True, modified_parent_dirs, auto_open_modified=True)
+                                     lambda p, plan_obj, mpd: True, modified_parent_dirs, auto_open_modified=True, should_show_root=True, node_map=app.after_tree_map)
     
-    # Populate the 'Apply Tree' (after_list)
-    _populate_treeview_from_plan(app, app.after_list, plan, root_path, 
-                                     lambda p, plan_obj, mpd: plan_obj.path_states.get(p) in ('new', 'overwrite', 'conflict_file', 'conflict_dir', 'exists', 'identical') or p in mpd, modified_parent_dirs, auto_open_modified=True)
+    # Populate the 'Apply Tree' (after_list) (Changes Only View)
+    # Filter: Show items that are part of the plan (new, overwrite, conflict, identical, OR recently applied 'exists')
+    # and parents of such items.
+    app.after_list_map = {}
+    
+    def apply_tree_filter(p, plan_obj, mpd):
+        # 1. Show if it's a modified/planned state (New, Overwrite, Conflict, Identical)
+        state = plan_obj.path_states.get(p)
+        if state in ('new', 'overwrite', 'conflict_file', 'conflict_dir', 'identical'):
+            return True
+        
+        # 2. Show if it's a parent of a modified item (highlighted folder)
+        if p in mpd:
+            return True
+            
+        # 3. Show if it's 'exists' but was explicitly part of the planned structure
+        # This includes files from Tree editor or Source blocks that are now applied.
+        if p in plan_obj.planned_files or p in plan_obj.planned_dirs:
+            return True
+            
+        return False
 
-def _populate_treeview_from_plan(app, tree_widget: ttk.Treeview, plan_obj, root_path_param: Path, filter_func, modified_parent_dirs: set, auto_open_modified: bool):
+    _populate_treeview_from_plan(app, app.after_list, plan, root_path, 
+                                     apply_tree_filter, modified_parent_dirs, auto_open_modified=True, should_show_root=False, node_map=app.after_list_map)
+
+def _populate_treeview_from_plan(app, tree_widget: ttk.Treeview, plan_obj, root_path_param: Path, filter_func, modified_parent_dirs: set, auto_open_modified: bool, should_show_root: bool = True, node_map: dict = None):
     dir_nodes = {}
 
-    # 1. Insert the root node
-    icon = app.classifier.classify_path(root_path_param)
-    root_node_id = tree_widget.insert("", "end", text=f"{icon} {root_path_param.name}", open=True, values=[str(root_path_param)])
-    dir_nodes[root_path_param] = root_node_id
+    # 1. Insert the root node if requested
+    root_node_id = ""
+    if should_show_root:
+        icon = app.classifier.classify_path(root_path_param)
+        root_node_id = tree_widget.insert("", "end", text=f"{icon} {root_path_param.name}", open=True, values=[str(root_path_param)])
+        dir_nodes[root_path_param] = root_node_id
+        if node_map is not None:
+            node_map[str(root_path_param)] = root_node_id
+    else:
+        # If not showing root, use the empty string as parent for top-level items
+        dir_nodes[root_path_param] = ""
 
     # Gather all relevant paths
     all_paths_to_consider = set(plan_obj.planned_dirs).union(plan_obj.planned_files)
@@ -136,12 +165,21 @@ def _populate_treeview_from_plan(app, tree_widget: ttk.Treeview, plan_obj, root_
             for ancestor_path in ancestors_to_process:
                 parent_of_ancestor_id = dir_nodes.get(ancestor_path.parent, root_node_id)
 
-                intermediate_icon = app.classifier.classify_path(ancestor_path, is_planned_dir=ancestor_path.is_dir() or ancestor_path in plan_obj.planned_dirs)
+                # Robust directory check (case-insensitive) for icon classification
+                try:
+                    anc_res_lower = str(ancestor_path.resolve()).lower()
+                except Exception:
+                    anc_res_lower = str(ancestor_path).lower()
+                
+                is_actually_planned_dir = any(str(p.resolve()).lower() == anc_res_lower for p in plan_obj.planned_dirs) if plan_obj.planned_dirs else False
+                intermediate_icon = app.classifier.classify_path(ancestor_path, is_planned_dir=ancestor_path.is_dir() or is_actually_planned_dir)
                 intermediate_tags = ['modified_parent'] if ancestor_path in modified_parent_dirs else []
                 
                 if ancestor_path not in dir_nodes:
                     node = tree_widget.insert(parent_of_ancestor_id, "end", text=f"{intermediate_icon} {ancestor_path.name}", open=auto_open_modified, tags=intermediate_tags, values=[str(ancestor_path)])
                     dir_nodes[ancestor_path] = node
+                    if node_map is not None:
+                        node_map[str(ancestor_path)] = node
                 elif auto_open_modified:
                     tree_widget.item(dir_nodes[ancestor_path], open=True)
             
@@ -150,12 +188,33 @@ def _populate_treeview_from_plan(app, tree_widget: ttk.Treeview, plan_obj, root_
             tags = []
             state = plan_obj.path_states.get(path)
             if state == 'new': tags.append('new')
-            elif state == 'overwrite': tags.append('overwrite')
+            elif state == 'overwrite':
+                # SPECIAL: If overwriting with EMPTY content, show as red (conflict)
+                planned_content = plan_obj.file_contents.get(path.resolve())
+                if planned_content is not None and not planned_content.strip():
+                    tags.append('conflict')
+                else:
+                    tags.append('overwrite')
             elif state == 'identical': tags.append('warning')
             elif state in ('conflict_file', 'conflict_dir'): tags.append('conflict')
+            
+            # ALSO: Check for similarity warnings even for new files
+            if path in plan_obj.similarity_warnings:
+                if 'warning' not in tags:
+                    tags.append('warning')
+
             if path in modified_parent_dirs: tags.append('modified_parent')
             
-            icon = app.classifier.classify_path(path, is_planned_dir=path.is_dir() or path in plan_obj.planned_dirs)
+            # Robust directory check (case-insensitive)
+            try:
+                path_res_lower = str(path.resolve()).lower()
+            except Exception:
+                path_res_lower = str(path).lower()
+            
+            is_actually_planned_dir = any(str(p.resolve()).lower() == path_res_lower for p in plan_obj.planned_dirs) if plan_obj.planned_dirs else False
+            item_is_directory = path.is_dir() or is_actually_planned_dir
+
+            icon = app.classifier.classify_path(path, is_planned_dir=item_is_directory)
             
             # --- Checkbox Logic ---
             prefix = ""
@@ -167,10 +226,12 @@ def _populate_treeview_from_plan(app, tree_widget: ttk.Treeview, plan_obj, root_
                 check_char = "☑" if app.selected_paths[path] else "☐"
                 prefix = f"{check_char} "
 
-            item_is_directory = path.is_dir() or path in plan_obj.planned_dirs
             should_open_this_item = auto_open_modified and item_is_directory
             
             node_id = tree_widget.insert(parent_node_id, "end", text=f"{prefix}{icon} {path.name}", tags=tags, values=[str(path)], open=should_open_this_item)
+            
+            if node_map is not None:
+                node_map[str(path)] = node_id
             
             if item_is_directory:
                 dir_nodes[path] = node_id

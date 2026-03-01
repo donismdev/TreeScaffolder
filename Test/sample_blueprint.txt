@@ -1,0 +1,266 @@
+@@@FILE_BEGIN {{Root}}/CDRGameDefs/CDRGameDefs.Build.cs
+using UnrealBuildTool;
+
+public class CDRGameDefs : ModuleRules
+{
+	public CDRGameDefs(ReadOnlyTargetRules Target) : base(Target)
+	{
+		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
+
+		PublicDependencyModuleNames.AddRange(new string[]
+		{
+			"Core",
+			"CoreUObject",
+			"Engine",
+		});
+	}
+}
+
+@@@FILE_END
+@@@FILE_BEGIN {{Root}}/CDRGameDefs/Public/SceneRoute/CDRSceneId.h
+#pragma once
+
+#include "CoreMinimal.h"
+#include "CDRSceneId.generated.h"
+
+UENUM()
+enum class ECDRSceneId : uint8
+{
+	None = 0,
+	MainHub = 1,
+	ScoreMode = 10,
+	MercenaryMode = 20,
+};
+
+@@@FILE_END
+@@@FILE_BEGIN {{Root}}/CDRGameDefs/Public/SceneRoute/CDRSceneRouteTypes.h
+#pragma once
+
+#include "CoreMinimal.h"
+#include "SceneRoute/CDRSceneId.h"
+#include "CDRSceneRouteTypes.generated.h"
+
+USTRUCT()
+struct FCDRSceneTransitionRequest final
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY()
+	ECDRSceneId From = ECDRSceneId::None;
+
+	UPROPERTY()
+	ECDRSceneId To = ECDRSceneId::None;
+
+	UPROPERTY()
+	FName Reason = NAME_None;
+
+	bool IsValid() const
+	{
+		if (From == ECDRSceneId::None)
+		{
+			return false;
+		}
+
+		if (To == ECDRSceneId::None)
+		{
+			return false;
+		}
+
+		return true;
+	}
+};
+
+@@@FILE_END
+@@@FILE_BEGIN {{Root}}/CDRGameDefs/Public/SceneRoute/CDRSceneRouterSubsystem.h
+#pragma once
+
+#include "CoreMinimal.h"
+#include "Subsystems/GameInstanceSubsystem.h"
+#include "SceneRoute/CDRSceneId.h"
+#include "SceneRoute/CDRSceneRouteTypes.h"
+#include "CDRSceneRouterSubsystem.generated.h"
+
+UCLASS()
+class UCDRSceneRouterSubsystem final : public UGameInstanceSubsystem
+{
+	GENERATED_BODY()
+
+public:
+	static const TCHAR* ToSceneName(const ECDRSceneId InSceneId);
+
+	bool CanTransition(const ECDRSceneId FromSceneId, const ECDRSceneId ToSceneId) const;
+
+	bool BuildTransitionRequest(
+		const ECDRSceneId FromSceneId,
+		const ECDRSceneId ToSceneId,
+		const FName Reason,
+		FCDRSceneTransitionRequest& OutRequest
+	) const;
+};
+
+@@@FILE_END
+@@@FILE_BEGIN {{Root}}/CDRGameDefs/Private/SceneRoute/CDRSceneRouterSubsystem.cpp
+#include "SceneRoute/CDRSceneRouterSubsystem.h"
+
+DEFINE_LOG_CATEGORY_STATIC(LogCDRSceneRouter, Log, All);
+
+const TCHAR* UCDRSceneRouterSubsystem::ToSceneName(const ECDRSceneId InSceneId)
+{
+	switch (InSceneId)
+	{
+	case ECDRSceneId::MainHub: return TEXT("MainHub");
+	case ECDRSceneId::ScoreMode: return TEXT("ScoreMode");
+	case ECDRSceneId::MercenaryMode: return TEXT("MercenaryMode");
+	default: return TEXT("None");
+	}
+}
+
+bool UCDRSceneRouterSubsystem::CanTransition(const ECDRSceneId FromSceneId, const ECDRSceneId ToSceneId) const
+{
+	if (FromSceneId == ECDRSceneId::None)
+	{
+		return false;
+	}
+
+	if (ToSceneId == ECDRSceneId::None)
+	{
+		return false;
+	}
+
+	if (FromSceneId == ECDRSceneId::MainHub)
+	{
+		if (ToSceneId == ECDRSceneId::ScoreMode)
+		{
+			return true;
+		}
+		if (ToSceneId == ECDRSceneId::MercenaryMode)
+		{
+			return true;
+		}
+		return false;
+	}
+
+	if (FromSceneId == ECDRSceneId::ScoreMode)
+	{
+		if (ToSceneId == ECDRSceneId::MainHub)
+		{
+			return true;
+		}
+		return false;
+	}
+
+	if (FromSceneId == ECDRSceneId::MercenaryMode)
+	{
+		if (ToSceneId == ECDRSceneId::MainHub)
+		{
+			return true;
+		}
+		return false;
+	}
+
+	return false;
+}
+
+bool UCDRSceneRouterSubsystem::BuildTransitionRequest(
+	const ECDRSceneId FromSceneId,
+	const ECDRSceneId ToSceneId,
+	const FName Reason,
+	FCDRSceneTransitionRequest& OutRequest
+) const
+{
+	OutRequest = FCDRSceneTransitionRequest();
+
+	const bool bAllowed = CanTransition(FromSceneId, ToSceneId);
+	if (bAllowed == false)
+	{
+		UE_LOG(LogCDRSceneRouter, Warning, TEXT("Blocked Transition: %s -> %s"),
+			ToSceneName(FromSceneId),
+			ToSceneName(ToSceneId)
+		);
+		return false;
+	}
+
+	OutRequest.From = FromSceneId;
+	OutRequest.To = ToSceneId;
+	OutRequest.Reason = Reason;
+
+	UE_LOG(LogCDRSceneRouter, Log, TEXT("Transition OK: %s -> %s (Reason=%s)"),
+		ToSceneName(OutRequest.From),
+		ToSceneName(OutRequest.To),
+		*Reason.ToString()
+	);
+
+	return (OutRequest.IsValid() == true);
+}
+
+@@@FILE_END
+@@@FILE_BEGIN {{Root}}/ScoreMode/ScoreMode.Build.cs
+using UnrealBuildTool;
+
+public class ScoreMode : ModuleRules
+{
+	public ScoreMode(ReadOnlyTargetRules Target) : base(Target)
+	{
+		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
+
+		PublicDependencyModuleNames.AddRange(new string[]
+		{
+			"Core",
+			"CoreUObject",
+			"Engine",
+		});
+
+		PrivateDependencyModuleNames.AddRange(new string[]
+		{
+			"CDR",
+			"GameplayCore",
+			"RegistryRuntime",
+			"CDRGameDefs",
+		});
+	}
+}
+
+@@@FILE_END
+@@@FILE_BEGIN {{Root}}/ScoreMode/Private/ScoreModeCore.cpp
+#include "ScoreModeCore.h"
+#include "Engine/World.h"
+#include "SceneRoute/CDRSceneRouterSubsystem.h"
+
+DEFINE_LOG_CATEGORY_STATIC(LogScoreModeCore, Log, All);
+
+void UScoreModeCore::RequestExitToMainHub()
+{
+	if (CachedWorld == nullptr)
+	{
+		return;
+	}
+
+	UGameInstance* const GI = CachedWorld->GetGameInstance();
+	if (GI == nullptr)
+	{
+		return;
+	}
+
+	UCDRSceneRouterSubsystem* const Router = GI->GetSubsystem<UCDRSceneRouterSubsystem>();
+	if (Router == nullptr)
+	{
+		return;
+	}
+
+	FCDRSceneTransitionRequest Req;
+
+	const bool bBuilt = Router->BuildTransitionRequest(
+		ECDRSceneId::ScoreMode,
+		ECDRSceneId::MainHub,
+		FName(TEXT("ScoreRunCompleted")),
+		Req
+	);
+
+	if (bBuilt == true)
+	{
+		UE_LOG(LogScoreModeCore, Log, TEXT("ScoreMode requested MainHub transition"));
+	}
+}
+
+@@@FILE_END

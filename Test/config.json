@@ -1,16 +1,15 @@
 {
     "language": "en",
-    "debug_level": 1,
+    "debug_level": 3,
     "log_cleanup_limit": 5,
-    "last_root_path": "",
-    "geometry": "1200x700+148+20",
-    "window_state": "normal",
+    "last_root_path": "C:\\Users\\azuli\\Documents\\Unreal Projects\\CDR\\Programming\\Source",
+    "geometry": "1536x793+51+40",
+    "window_state": "zoomed",
     "main_sash_pos": 0,
     "diff_sash_pos": 0,
     "OPEN_FOLDER_AFTER_APPLY": false,
     "CREATE_GITKEEP": false,
     "ENABLE_SIMILARITY_SCAN": true,
     "SIMILARITY_RATIO_THRESHOLD": 0.86,
-    "recovery_window_geometry": "600x400+26+26",
-    "recovery_notify_geometry": "500x400+190+239"
+    "options_window_geometry": "450x550+214+56"
 }

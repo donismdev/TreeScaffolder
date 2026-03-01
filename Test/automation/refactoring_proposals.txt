@@ -1,0 +1,49 @@
+# TreeScaffolder v0.8+ 테스터블 코드 개선 제안 (Refactoring Proposals)
+
+본 문서는 `expected_errors.txt`에서 지적된 문제를 해결하기 위한 구체적인 코드 수정 방안을 제시합니다.
+
+## 1. scaffold_runner.py 개선
+
+### 1.1. execute_scaffold 리팩토링
+- **현상**: `app` 객체 전체를 전달받아 내부에서 모든 상태를 직접 제어함.
+- **제안**: 파일 생성 로직만 담당하는 `run_scaffold_engine` 함수를 별도로 추출.
+```python
+# AS-IS
+def execute_scaffold(app):
+    plan = app.current_plan
+    is_dry_run = app.dry_run.get()
+    # ... (생략)
+
+# TO-BE (Testable)
+def run_scaffold_engine(plan, config, log_callback, error_callback):
+    # app 객체 없이 plan과 config만으로 파일 작업 수행
+    # log_callback을 통해 외부(UI 혹은 테스트기)로 진행 상황 전달
+    # ...
+```
+
+### 1.2. 로그 저장 로직 분리
+- **현상**: `_write_execution_log` 내부에서 파일 쓰기(`open().write()`)를 직접 수행.
+- **제안**: 로그 '내용'을 생성하는 함수와 '저장'하는 함수를 분리. 테스트 시에는 내용 생성 함수만 호출하여 문자열 일치 여부 확인 가능.
+
+## 2. action_handler.py 개선
+
+### 2.1. 폴더 스캔 로직 유틸리티화
+- **현상**: `on_check_folder` 내부에 파일 개수 세는 로직이 박혀 있음.
+- **제안**: `Scripts/Utils/file_utils.py` 등을 만들어 순수하게 개수만 세는 함수로 분리.
+```python
+# TO-BE
+def count_folder_contents(path):
+    # 순수하게 dict 형태의 통계 리턴
+    return {"dirs": 10, "files": 20, "gitkeep": 2}
+```
+
+## 3. UI 종속성 제거 (Mocking Support)
+
+### 3.1. UI Facade 패턴 도입
+- **제안**: `messagebox`를 직접 부르지 않고 `app.ui.show_error()`와 같은 형태로 호출하도록 구조 변경.
+- **효과**: 테스트 환경에서는 `app.ui`를 가짜(Mock) 객체로 바꿔치기하여 팝업 없이 결과를 검증 가능.
+
+## 4. 경로 처리 무결성 (Windows)
+
+### 4.1. Case-Insensitive Key 적용
+- **제안**: `path_states` 등의 키로 사용할 때 반드시 `str(path.resolve()).lower()`를 사용하도록 강제하는 래퍼 클래스 도입.
