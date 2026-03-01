@@ -8,10 +8,8 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 from pathlib import Path
 import re
-import json
 import datetime
 from Scripts.Utils.i18n import t
-from Scripts.Core import scaffold_core
 from Scripts.UI import app_utils
 
 class RecoveryWindow:

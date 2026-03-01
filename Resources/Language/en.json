@@ -44,6 +44,7 @@
         "recovery_date": "Date Modified",
         "restore": "Restore Selected",
         "refresh": "Refresh",
+        "apply": "Apply",
         "options_title": "Application Options",
         "options_desc": "Settings will be added here.",
         "language": "Language",
