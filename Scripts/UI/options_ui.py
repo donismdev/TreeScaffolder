@@ -10,7 +10,6 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, messagebox
 from Scripts.Utils.i18n import t, set_language, get_current_language
-from Scripts.Utils.i18n import t
 from Scripts.UI import app_utils
 
 def _validate_geometry(geom_str, min_w=400, min_h=500):
@@ -60,6 +59,7 @@ class OptionsWindow:
 
     def _on_close(self):
         OptionsWindow._instance = None
+        from Scripts.UI import action_handler
         action_handler.handle_options_closed(self.app)
         self.window.destroy()
 
@@ -72,27 +72,10 @@ class OptionsWindow:
         app_utils.save_config(self.app.CONFIG_FILE, config)
 
     def _load_geometry(self):
-        app_utils.load_window_geometry(self.window, self.app.CONFIG_FILE, "options_window_geometry", 400, 500)
+        app_utils.load_popup_window_geometry(self.window, self.app.CONFIG_FILE, "options_window_geometry", 400, 500)
 
     def _save_geometry(self):
-        app_utils.save_window_geometry(self.window, self.app.CONFIG_FILE, "options_window_geometry")
-
-    def _load_geometry(self):
-        try:
-            config = self._load_config()
-            geom = config.get("options_window_geometry")
-            if _validate_geometry(geom):
-                self.window.geometry(geom)
-        except: pass
-
-    def _save_geometry(self):
-        try:
-            config_path = Path(self.app.CONFIG_FILE)
-            config = self._load_config()
-            config["options_window_geometry"] = self.window.geometry()
-            with open(config_path, "w", encoding="utf-8") as f:
-                json.dump(config, f, indent=4)
-        except: pass
+        app_utils.save_popup_window_geometry(self.window, self.app.CONFIG_FILE, "options_window_geometry")
 
     def setup_ui(self):
         # Clear current UI if re-running
@@ -134,6 +117,7 @@ class OptionsWindow:
         # Open Folder after Apply
         self.open_folder_var = tk.BooleanVar(value=self.app.open_folder_after_apply.get())
         def toggle_open_folder():
+            from Scripts.UI import action_handler
             val = self.open_folder_var.get()
             self.app.open_folder_after_apply.set(val)
             self._save_config("OPEN_FOLDER_AFTER_APPLY", val)
@@ -144,6 +128,7 @@ class OptionsWindow:
         # Create .gitkeep
         self.create_gitkeep_var = tk.BooleanVar(value=self.app.create_gitkeep.get())
         def toggle_gitkeep():
+            from Scripts.UI import action_handler
             val = self.create_gitkeep_var.get()
             self.app.create_gitkeep.set(val)
             self._save_config("CREATE_GITKEEP", val)
@@ -157,6 +142,7 @@ class OptionsWindow:
 
         self.sim_scan_var = tk.BooleanVar(value=self.app.enable_similarity_scan.get())
         def toggle_sim_scan():
+            from Scripts.UI import action_handler
             val = self.sim_scan_var.get()
             self.app.enable_similarity_scan.set(val)
             self._save_config("ENABLE_SIMILARITY_SCAN", val)
@@ -215,6 +201,7 @@ class OptionsWindow:
         ttk.Label(btn_frame, text=t("ui.esc_to_close"), foreground="gray", font=("Segoe UI", 8)).pack(side=tk.RIGHT, padx=10)
 
     def _on_lang_change(self, event):
+        from Scripts.UI import action_handler
         new_lang = self.lang_var.get()
         if new_lang != get_current_language():
             set_language(new_lang)
@@ -228,6 +215,7 @@ class OptionsWindow:
             self.setup_ui() 
 
     def _on_debug_change(self, event):
+        from Scripts.UI import action_handler
         new_level = int(self.debug_var.get())
         from Scripts.Utils import logger
         logger.set_log_level(new_level)
