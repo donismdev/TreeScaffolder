@@ -333,6 +333,10 @@ def load_popup_window_geometry(window: tk.Toplevel, config_file: str, key: str, 
 
 def save_popup_window_geometry(window: tk.Toplevel, config_file: str, key: str):
     """Saves the current window geometry to configuration for POPUP windows."""
-    config = load_config(config_file)
-    config[key] = window.geometry()
-    save_config(config_file, config)
+    try:
+        if window.winfo_exists():
+            config = load_config(config_file)
+            config[key] = window.geometry()
+            save_config(config_file, config)
+    except Exception:
+        pass # Ignore errors during destruction phase
