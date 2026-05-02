@@ -1,0 +1,10 @@
+@@@PATCH_BEGIN {{Root}}/large.txt
+@@@FIND_BEGIN {{None}}
+void Function()
+{
+	// Line 1
+	// Line 2
+}@@@FIND_END
+@@@REPLACE_BEGIN {{None}}
+// REPLACED@@@REPLACE_END
+@@@PATCH_END

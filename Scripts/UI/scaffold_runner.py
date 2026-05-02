@@ -16,6 +16,7 @@ from Scripts.UI import action_handler
 from Scripts.UI.tree_populator import populate_before_tree, populate_after_tree
 from Scripts.Utils import logger
 from Scripts.Utils.i18n import t
+from Scripts.Utils.line_endings import ensure_native
 from Scripts.Core import scaffold_core
 
 def execute_scaffold(app):
@@ -519,9 +520,8 @@ def _ensure_file(app, path: Path, dry_run: bool, content: str | None, is_overwri
     if not dry_run:
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
-            raw_content = content or ""
-            temp_content = raw_content.replace('\r\n', '\n').replace('\r', '\n')
-            final_content = temp_content.replace('\n', '\r\n')
+            # Use centralized utility to ensure native line endings
+            final_content = ensure_native(content or "")
             path.write_bytes(final_content.encode('utf-8'))
         except Exception as e:
             log_exec(f"[ERROR] write file failed: {path} | {e}", "error")

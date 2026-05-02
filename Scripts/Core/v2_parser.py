@@ -7,6 +7,8 @@ and ends with '@@@<KEYWORD>_END'.
 """
 import re
 from typing import List, Dict, Any, Optional
+from Scripts.Utils.line_endings import ensure_lf
+from Scripts.Utils import logger as sys_logger
 
 class V2ParserError(Exception):
     """Custom exception for parsing errors."""
@@ -21,10 +23,13 @@ RECOGNIZED_KEYWORDS = {
 CONTAINER_KEYWORDS = {"PATCH"}
 
 def _get_parameter(header: Optional[str]) -> str:
-    """Extracts the parameter from the header line."""
+    """Extracts the parameter from the header line, HARDENING against all control chars."""
     if not header:
         return ""
-    return header.strip()
+    # Remove EVERYTHING that isn't a printable character or a tab.
+    # This kills \n, \r, and any other invisible garbage.
+    cleaned = "".join(c for c in header if ord(c) >= 32 or c == '\t').strip()
+    return cleaned
 
 def parse_v2_format(text: str) -> List[Dict[str, Any]]:
     """
@@ -34,13 +39,12 @@ def parse_v2_format(text: str) -> List[Dict[str, Any]]:
     if not text.strip():
         return []
 
-    # Normalize line endings to \n
-    text = text.replace('\r\n', '\n')
+    # 1. Standardize internal line endings to LF
+    text = ensure_lf(text)
 
-    # Tokenize the text into markers and content
-    # We look for @@@KEYWORD_BEGIN {{Parameter}} and @@@KEYWORD_END
-    # The marker must be followed by a newline or the end of the string.
-    marker_pattern = re.compile(r"@@@(?P<keyword>[A-Z_]+)_(?P<tag_type>BEGIN|END)(?: (?P<header>.*?))?(?:\n|$)")
+    # 2. Tokenize markers and content.
+    # Greedy header matching [^\n]* and mandatory space after tag type.
+    marker_pattern = re.compile(r"@@@(?P<keyword>[A-Z_]+)_(?P<tag_type>BEGIN|END)(?: (?P<header>[^\n]*))?(?:\n|$)")
     
     tokens = []
     last_pos = 0
@@ -55,9 +59,7 @@ def parse_v2_format(text: str) -> List[Dict[str, Any]]:
         header = match.group("header")
         
         if keyword not in RECOGNIZED_KEYWORDS:
-            # If not a recognized keyword, treat it as normal content?
-            # For strictness, we might want to error, but for now let's be flexible
-            # unless it looks exactly like our format.
+            # Not a keyword, treat as literal content
             tokens.append(('CONTENT', match.group(0)))
         else:
             tokens.append(('MARKER', {
@@ -74,9 +76,9 @@ def parse_v2_format(text: str) -> List[Dict[str, Any]]:
     if content:
         tokens.append(('CONTENT', content))
 
-    # Build the block tree
+    # 3. Build hierarchical block tree
     blocks = []
-    stack = [] # Stores (block_dict, start_line_num)
+    stack = [] # (block_dict, start_line)
 
     for t_type, t_value in tokens:
         if t_type == 'CONTENT':
@@ -96,9 +98,8 @@ def parse_v2_format(text: str) -> List[Dict[str, Any]]:
                     'line_num': line_num
                 }
                 
-                # Check for nesting rules
                 if stack:
-                    parent_block, parent_line = stack[-1]
+                    parent_block, _ = stack[-1]
                     if parent_block['keyword'] not in CONTAINER_KEYWORDS:
                         raise V2ParserError(
                             f"Parsing Error: Block '{keyword}' at line {line_num} cannot be nested inside '{parent_block['keyword']}'."
@@ -110,20 +111,20 @@ def parse_v2_format(text: str) -> List[Dict[str, Any]]:
                 if not stack:
                     raise V2ParserError(f"Parsing Error: Unexpected '@@@{keyword}_END' at line {line_num} with no open block.")
                 
-                closed_block, start_line = stack.pop()
+                closed_block, _ = stack.pop()
                 if closed_block['keyword'] != keyword:
                     raise V2ParserError(
                         f"Parsing Error: Mismatched block tags. Expected '@@@{closed_block['keyword']}_END' but found '@@@{keyword}_END' at line {line_num}."
                     )
                 
-                # Framing Rule: The newline immediately preceding the END tag is framing, not content.
+                # Framing Rule: The content is defined as characters BETWEEN the BEGIN line and END line.
+                # Since our marker_pattern consumes the \n after BEGIN, 
+                # we just need to strip the \n immediately before the END marker.
                 if closed_block['content'].endswith('\n'):
                     closed_block['content'] = closed_block['content'][:-1]
-
+                
                 if stack:
                     stack[-1][0]['children'].append(closed_block)
-                    # We might want to keep the "naked" content in the parent too, 
-                    # but usually for PATCH, content is just the children.
                 else:
                     blocks.append(closed_block)
 

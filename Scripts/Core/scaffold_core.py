@@ -16,6 +16,9 @@ from typing import List, Dict, Set, Optional
 from .v2_parser import parse_v2_format, V2ParserError
 from Scripts.Utils.i18n import t
 from Scripts.Utils.similarity_checker import find_similar_candidates
+from Scripts.Utils.line_endings import ensure_lf
+from Scripts.Utils import logger as sys_logger
+import difflib
 
 # ---------- Data Structures ----------
 
@@ -197,12 +200,9 @@ def is_content_identical(actual: str, planned: str) -> bool:
     """Strictly compares two contents including the exact number of newlines. 
     Only normalizes line endings to a common '\n' format for comparison.
     """
-    def to_lf(text):
-        if text is None: return ""
-        # Convert all to LF so we can compare the raw content and newline counts fairly
-        return text.replace('\r\n', '\n').replace('\r', '\n')
+    return ensure_lf(actual) == ensure_lf(planned)
 
-    return to_lf(actual) == to_lf(planned)
+import difflib
 
 def apply_v2_patch(content: str, instructions: List[Dict[str, Any]]) -> tuple[str, Optional[str]]:
     """
@@ -234,15 +234,60 @@ def apply_v2_patch(content: str, instructions: List[Dict[str, Any]]) -> tuple[st
             if last_find is None:
                 return current_content, f"Operation '{keyword}' requires a preceding 'FIND' block."
             
-            # Exact match check (Mandatory: Exactly one match)
-            matches = list(re.finditer(re.escape(last_find), current_content))
-            if len(matches) == 0:
-                return current_content, f"FIND failed: Text not found for '{keyword}'."
-            if len(matches) > 1:
-                return current_content, f"FIND failed: Multiple matches found ({len(matches)}) for '{keyword}'. Operation must be unambiguous."
+            # --- LITERAL MATCH CHECK (Mandatory: Exactly one match) ---
+            # We use direct string operations to avoid regex-escape issues with newlines/tabs.
+            match_count = current_content.count(last_find)
             
-            match = matches[0]
-            start, end = match.start(), match.end()
+            if match_count == 0:
+                # --- DIAGNOSTIC LOGGING ---
+                sys_logger.error(f"[DIAGNOSTIC] FIND failed for {keyword}")
+                sys_logger.error(f"[DIAGNOSTIC] last_find (len={len(last_find)}): {repr(last_find)}")
+                sys_logger.error(f"[DIAGNOSTIC] last_find hex: {last_find.encode('utf-8').hex()}")
+                sys_logger.error(f"[DIAGNOSTIC] current_content total len: {len(current_content)}")
+                
+                # Check for Tab vs Space mismatch
+                lf_no_tabs = last_find.replace('\t', '    ')
+                cc_no_tabs = current_content.replace('\t', '    ')
+                if lf_no_tabs in cc_no_tabs:
+                    sys_logger.error("[DIAGNOSTIC] Match found after normalizing TABS to SPACES. Please check indentation consistency.")
+                
+                # Check for common issues: whitespace mismatches
+                if last_find.strip() in current_content:
+                    sys_logger.error("[DIAGNOSTIC] Found stripped version of last_find. Likely whitespace mismatch at start/end.")
+                
+                # --- FUZZY DIFF LOGGING ---
+                # Try to find the best match to show what is different
+                sys_logger.error("[DIAGNOSTIC] Attempting fuzzy match to identify differences...")
+                lines_cc = current_content.splitlines()
+                lines_lf = last_find.splitlines()
+                
+                if lines_lf:
+                    first_line = lines_lf[0].strip()
+                    # Find all lines in content that contain the first line of our search block
+                    potential_starts = [i for i, line in enumerate(lines_cc) if first_line in line]
+                    
+                    if potential_starts:
+                        # Take the first potential start for comparison
+                        best_idx = potential_starts[0]
+                        window = lines_cc[best_idx : best_idx + len(lines_lf)]
+                        
+                        sys_logger.error(f"[DIAGNOSTIC] Potential match found starting at line {best_idx + 1}")
+                        diff = difflib.ndiff(lines_lf, window)
+                        sys_logger.error("[DIAGNOSTIC] Line-by-line Diff (-: Expected, +: Actual):")
+                        for line in diff:
+                            if line.startswith(('-', '+', '?')):
+                                sys_logger.error(f"[DIAGNOSTIC] {repr(line)}")
+                    else:
+                        sys_logger.error("[DIAGNOSTIC] Could not even find the first line of the search block in the file.")
+                
+                return current_content, f"FIND failed: Text not found for '{keyword}'."
+            
+            if match_count > 1:
+                return current_content, f"FIND failed: Multiple matches found ({match_count}) for '{keyword}'. Operation must be unambiguous."
+            
+            # Find the start and end of the literal match
+            start = current_content.find(last_find)
+            end = start + len(last_find)
             
             if keyword == "REPLACE":
                 current_content = current_content[:start] + block_content + current_content[end:]
@@ -392,9 +437,11 @@ def generate_plan(root_path: Path, text_input: str, config: dict) -> Plan:
 				initial_content = plan.file_contents[target_path]
 			elif target_path.is_file():
 				try:
-					initial_content = target_path.read_text(encoding='utf-8', errors='replace')
+					raw_disk_content = target_path.read_text(encoding='utf-8')
+					# CRITICAL: Normalize disk content to \n for matching with V2 blocks
+					initial_content = ensure_lf(raw_disk_content)
 				except Exception as e:
-					plan.errors.append(f"Could not read existing file for PATCH: {target_path}. Error: {e}")
+					plan.errors.append(f"Could not read existing file for PATCH (UTF-8 required): {target_path}. Error: {e}")
 					continue
 			
 			updated_content, patch_err = apply_v2_patch(initial_content, block['children'])
@@ -553,4 +600,3 @@ def reconstruct_tree_string(plan: Plan, filter_paths: Optional[Set[Path]] = None
 		lines.append(f"{indent}{name}{annotation}")
 		
 	return "\n".join(lines)
-	
