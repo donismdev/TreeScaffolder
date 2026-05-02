@@ -194,11 +194,11 @@ def on_recompute(app, silent=False):
         if reconstructed_tree:
             source_content = app.source_code_text.get("1.0", tk.END).rstrip()
             
-            comment_header = "@@@COMMENT_BEGIN Source Code Structure"
+            comment_header = "@@@COMMENT_BEGIN {{None}}\nSource Code Structure"
             comment_footer = "@@@COMMENT_END"
             
             # Find and replace either old 'Unified' or new 'Source Code' comment if it exists
-            pattern = re.compile(rf"@@@COMMENT_BEGIN (Unified Scaffold|Source Code) Structure[\s\S]*?{comment_footer}")
+            pattern = re.compile(rf"@@@COMMENT_BEGIN \{{{{(Unified Scaffold|Source Code|None)}}}}\}}[\s\S]*?{comment_footer}")
             new_comment_block = f"\n\n{comment_header}\n{reconstructed_tree}\n{comment_footer}"
             
             if pattern.search(source_content):

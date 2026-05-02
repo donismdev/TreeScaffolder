@@ -204,6 +204,69 @@ def is_content_identical(actual: str, planned: str) -> bool:
 
     return to_lf(actual) == to_lf(planned)
 
+def apply_v2_patch(content: str, instructions: List[Dict[str, Any]]) -> tuple[str, Optional[str]]:
+    """
+    Applies V2 patch instructions to the given content.
+    Returns (updated_content, error_message).
+    """
+    current_content = content
+    last_find = None
+    
+    for instr in instructions:
+        keyword = instr['keyword']
+        block_content = instr['content']
+        
+        if keyword == "FIND":
+            last_find = block_content
+            continue
+        
+        if keyword == "INSERT_TOP":
+            current_content = block_content + current_content
+        elif keyword == "INSERT_BOTTOM":
+            # Section 11 Spec: "The tool should normalize the final newline safely... 
+            # the resulting file should end with a newline."
+            if current_content and not current_content.endswith("\n"):
+                current_content += "\n"
+            current_content += block_content
+            if not current_content.endswith("\n"):
+                current_content += "\n"
+        elif keyword in ("REPLACE", "INSERT_AFTER", "REMOVE", "CLEAR_AFTER"):
+            if last_find is None:
+                return current_content, f"Operation '{keyword}' requires a preceding 'FIND' block."
+            
+            # Exact match check (Mandatory: Exactly one match)
+            matches = list(re.finditer(re.escape(last_find), current_content))
+            if len(matches) == 0:
+                return current_content, f"FIND failed: Text not found for '{keyword}'."
+            if len(matches) > 1:
+                return current_content, f"FIND failed: Multiple matches found ({len(matches)}) for '{keyword}'. Operation must be unambiguous."
+            
+            match = matches[0]
+            start, end = match.start(), match.end()
+            
+            if keyword == "REPLACE":
+                current_content = current_content[:start] + block_content + current_content[end:]
+            elif keyword == "INSERT_AFTER":
+                current_content = current_content[:end] + block_content + current_content[end:]
+            elif keyword == "REMOVE":
+                current_content = current_content[:start] + current_content[end:]
+            elif keyword == "CLEAR_AFTER":
+                # CLEAR_AFTER: The line containing the first found FIND text remains. All content below that line is deleted.
+                # Find the end of the line containing the match
+                next_newline = current_content.find('\n', end)
+                if next_newline == -1:
+                    current_content = current_content[:end]
+                else:
+                    current_content = current_content[:next_newline + 1]
+            
+            last_find = None # Reset last_find after use? The spec implies one FIND per operation.
+        elif keyword == "COMMENT":
+            pass
+        else:
+            return current_content, f"Unsupported keyword '{keyword}' inside PATCH."
+            
+    return current_content, None
+
 def generate_plan(root_path: Path, text_input: str, config: dict) -> Plan:
 	"""
 	Generates a unified plan from a text input that may contain both a
@@ -274,26 +337,31 @@ def generate_plan(root_path: Path, text_input: str, config: dict) -> Plan:
 	# Determine a best-guess root marker for substitution.
 	effective_root_marker = root_marker if root_marker else "{{Root}}"
 	
-	for item in patch_data:
-		raw_path_str = item['path'].strip()
-		content = item['content']
+	for block in patch_data:
+		keyword = block['keyword']
+		raw_path_str = block['parameter'].strip()
 		
-		# CRITICAL SECURITY: Strictly forbid '..' to ensure paths ONLY move downwards
-		if '..' in raw_path_str:
-			plan.errors.append(f"Security Violation: Path traversal '..' is strictly forbidden in '{raw_path_str}'. All paths must move downwards from the root.")
+		# Skip COMMENT blocks at top level
+		if keyword == "COMMENT":
 			continue
 
 		norm_path = raw_path_str.replace('\\', '/').strip()
+		# CRITICAL SECURITY: Strictly forbid '..' to ensure paths ONLY move downwards
+		if '..' in raw_path_str or '..' in norm_path:
+			plan.errors.append(f"Security Violation: Path traversal '..' is strictly forbidden in '{raw_path_str}'. All paths must move downwards from the root.")
+			continue
+
+		norm_path = norm_path.lstrip('/')
 		markers = ["{{Root}}"]
 		if effective_root_marker and effective_root_marker.lower() != "{{root}}":
 			markers.insert(0, effective_root_marker)
 		
 		target_path = None
-		temp_path = norm_path.lstrip('/')
 		for m in markers:
-			if temp_path.lower().startswith(m.lower()):
-				rel_part = temp_path[len(m):].lstrip('/')
-				target_path = (root_path / rel_part).resolve()
+			if norm_path.lower().startswith(m.lower()):
+				rel_part = norm_path[len(m):].lstrip('/')
+				# Use joinpath and normpath
+				target_path = root_path.joinpath(rel_part)
 				break
 		
 		# CRITICAL: Strict Enforcement of Root Marker
@@ -301,17 +369,42 @@ def generate_plan(root_path: Path, text_input: str, config: dict) -> Plan:
 			plan.errors.append(f"Invalid path format: '{raw_path_str}'. Every file path in Source Code MUST start with the '{{{{Root}}}}' marker.")
 			continue
 		
+		# Ensure the path is actually under the root (extra safety)
 		try:
-			if not target_path.is_relative_to(root_path):
-				plan.errors.append(f"Path resolves outside of target root: '{raw_path_str}'")
-				continue
+			# On Windows, this also handles drive mismatches if both are absolute
+			if not str(target_path.resolve()).lower().startswith(str(root_path.resolve()).lower()):
+				raise ValueError()
 		except Exception:
-			plan.errors.append(f"Invalid path resolution: '{raw_path_str}'")
+			plan.errors.append(f"Path resolves outside of target root: '{raw_path_str}'")
 			continue
 
-		# V2 block content takes precedence over the tree
-		plan.planned_files.add(target_path)
-		plan.file_contents[target_path] = content
+		# Process block content based on keyword
+		if keyword == "FILE":
+			plan.planned_files.add(target_path)
+			plan.file_contents[target_path] = block['content']
+		elif keyword == "CLEAR_FILE":
+			plan.planned_files.add(target_path)
+			plan.file_contents[target_path] = ""
+		elif keyword == "PATCH":
+			# PATCH applies to either existing planned content or physical disk content
+			initial_content = ""
+			if target_path in plan.file_contents:
+				initial_content = plan.file_contents[target_path]
+			elif target_path.is_file():
+				try:
+					initial_content = target_path.read_text(encoding='utf-8', errors='replace')
+				except Exception as e:
+					plan.errors.append(f"Could not read existing file for PATCH: {target_path}. Error: {e}")
+					continue
+			
+			updated_content, patch_err = apply_v2_patch(initial_content, block['children'])
+			if patch_err:
+				plan.errors.append(f"Patch error in '{raw_path_str}': {patch_err}")
+				continue
+			
+			plan.planned_files.add(target_path)
+			plan.file_contents[target_path] = updated_content
+		
 		# Ensure parents are planned as directories
 		for parent in target_path.parents:
 			if parent != root_path and parent.is_relative_to(root_path):

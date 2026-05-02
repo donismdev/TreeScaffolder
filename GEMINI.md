@@ -38,18 +38,44 @@ The application must treat the current state of the filesystem (Before) and the 
 - **Caching Strategy**: Each view maintains its own independent cache (`before_cache` and `after_cache`). These caches must be purged only during full recomputations (`on_recompute`) or data clears (`on_clear_data`).
 - **Path Matching**: Due to Windows-specific casing and resolution inconsistencies, all path comparisons must be performed using the lowercase string representation of the `resolve()`'d absolute path.
 
-## 4. V2 Multipatch Format (@@@ Blocks)
+## 4. V2 Multipatch Format v1.1 (@@@ Blocks)
 
-All source code definitions and recovery logs must strictly follow the **V2 Multipatch Format**. This format ensures data integrity and prevents parsing ambiguities.
+All source code definitions and recovery logs must strictly follow the **V2 Multipatch Format v1.1**. This format ensures data integrity and prevents parsing ambiguities.
 
-- **Mandatory Paired Tags**: Every block MUST start with `@@@<KEYWORD>_BEGIN` and end with `@@@<KEYWORD>_END`. Unpaired tags or nested blocks are strictly forbidden.
-- **Recognized Keywords**:
-    - `FILE`: Used for defining file content. The path (including the `{{Root}}` marker) should follow the BEGIN tag.
-    - `COMMENT`: Used for metadata, logs, or instructions. This content is ignored during the scaffold application phase.
-- **Path Mapping**: Always use the `{{Root}}` marker at the start of paths within `FILE` blocks (e.g., `@@@FILE_BEGIN {{Root}}/path/to/file.txt`).
-- **No Naked Directives in Logs**: Recovery logs and patch files should NOT contain a top-level `@ROOT` directive outside of a `COMMENT` block, as this can confuse the tree parser. Essential metadata (like the target absolute path) must be placed inside `@@@COMMENT` blocks.
+- **Mandatory Paired Tags**: Every block MUST start with `@@@<KEYWORD>_BEGIN {{Parameter}}` and end with `@@@<KEYWORD>_END`. Unpaired tags or nested blocks are forbidden (except for operations inside `PATCH`).
+- **Mandatory Parameters**: Every BEGIN tag must have a `{{Parameter}}`. If no parameter is needed, use `{{None}}`.
+- **Supported Keywords**:
+    - `FILE_BEGIN {{Root}}/Path` / `FILE_END`: Overwrites entire file.
+    - `PATCH_BEGIN {{Root}}/Path` / `PATCH_END`: Modifies part of a file.
+    - `FIND_BEGIN {{None}}` / `FIND_END`: Context for subsequent operations.
+    - `REPLACE_BEGIN {{None}}` / `REPLACE_END`: Replaces found text.
+    - `INSERT_AFTER_BEGIN {{None}}` / `INSERT_AFTER_END`: Inserts after found text.
+    - `INSERT_TOP_BEGIN {{None}}` / `INSERT_TOP_END`: Inserts at file start.
+    - `INSERT_BOTTOM_BEGIN {{None}}` / `INSERT_BOTTOM_END`: Inserts at file end.
+    - `REMOVE_BEGIN {{None}}` / `REMOVE_END`: Removes found text.
+    - `CLEAR_FILE_BEGIN {{Root}}/Path` / `CLEAR_FILE_END`: Empties file content.
+    - `CLEAR_AFTER_BEGIN {{None}}` / `CLEAR_AFTER_END`: Clears everything after found text.
+    - `COMMENT_BEGIN {{None}}` / `COMMENT_END`: Metadata or logs.
+- **Safety Rules**:
+    - **Exactly One Match**: Operations using `FIND` (REPLACE, INSERT_AFTER, REMOVE, CLEAR_AFTER) MUST only apply if exactly one match is found in the target content.
+    - **No Deletion**: Destructive operations (CLEAR_FILE, REMOVE) only modify content; they NEVER delete the file itself from the filesystem.
+    - **Path Mapping**: Always use the `{{Root}}` marker at the start of paths within `FILE`, `PATCH`, and `CLEAR_FILE` blocks.
+- **No Naked Directives in Logs**: Recovery logs and patch files should NOT contain a top-level `@ROOT` directive outside of a `COMMENT` block. Essential metadata must be placed inside `@@@COMMENT` blocks.
 
-## 5. Operational Directives (AI & Developers)
+## 5. Mandatory Verification & Testing
+
+To ensure 100% data integrity and prevent regressions in the core V2 processing logic, the following protocol is MANDATORY:
+
+- **Test Runner**: The primary test entry point is `main_tester.py`. It automatically discovers and executes all test suites in the `TestCase/` folder.
+- **Verification Protocol**: For every modification to `Scripts/Core/v2_parser.py` or `Scripts/Core/scaffold_core.py`, the developer (or AI) MUST run `python main_tester.py`.
+- **Test Case Maintenance**:
+    - **Update**: If logic changes intentionally, corresponding test cases in existing files (e.g., `TestCase/test_v2_v1_1.py`) must be updated.
+    - **Add**: For significant new features or critical bug fixes, a NEW test file must be added (e.g., `TestCase/test_v2_new_feature.py`). NEVER delete existing test files.
+    - **Documentation**: Every test case MUST include a docstring or comment explaining exactly **why** it is being tested and what behavior it validates.
+- **Reporting Requirement**: Completion of a task involving V2 logic is NOT valid until the test results from `main_tester.py` (e.g., "ALL TESTS PASSED SUCCESSFULLY!") are explicitly reported to the user.
+- **Literal Integrity Check**: Any test failure regarding "Literal" content or "Framing" (especially newline handling) must be treated as a critical blocker. The tool must never ship with logic that alters user content by even a single byte.
+
+## 6. Operational Directives (AI & Developers)
 
 ### 5.1. AI Refactoring & Optimization Prohibition (CRITICAL)
 - **Mandate**: NEVER attempt to "clean up," "refactor," or "optimize" existing logic based on AI-standard best practices.

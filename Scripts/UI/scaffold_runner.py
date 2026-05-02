@@ -398,7 +398,7 @@ def _write_execution_log(app, plan, stats: dict, is_dry_run: bool, captured_logs
         source_content,
         "=" * 80,
         "",
-        "@@@COMMENT_BEGIN Actually Applied Detail Overview",
+        "@@@COMMENT_BEGIN {{None}}\nActually Applied Detail Overview",
         t("log_sections.applied_detail_desc"),
         applied_details_text,
         "@@@COMMENT_END",
@@ -408,7 +408,7 @@ def _write_execution_log(app, plan, stats: dict, is_dry_run: bool, captured_logs
         "=" * 80,
         unified_tree_text,
         "",
-        "@@@COMMENT_BEGIN FINAL BRIEFING",
+        "@@@COMMENT_BEGIN {{None}}\nFINAL BRIEFING",
         f"SCAFFOLD APPLY STATUS: {status_str}{display_name}",
         f"- New Directories: {stats['dirs_created']}",
         f"- New Files: {stats['files_created']}",
@@ -421,7 +421,7 @@ def _write_execution_log(app, plan, stats: dict, is_dry_run: bool, captured_logs
     if applied_structure_text:
         log_entries.extend([
             "",
-            "@@@COMMENT_BEGIN Actually Applied Structure (Newly Created/Updated Only)",
+            "@@@COMMENT_BEGIN {{None}}\nActually Applied Structure (Newly Created/Updated Only)",
             t("log_sections.applied_structure_desc"),
             applied_structure_text,
             "@@@COMMENT_END"
@@ -430,7 +430,7 @@ def _write_execution_log(app, plan, stats: dict, is_dry_run: bool, captured_logs
     if gitkeep_structure_text:
         log_entries.extend([
             "",
-            "@@@COMMENT_BEGIN Actually Applied .gitkeep Structure",
+            "@@@COMMENT_BEGIN {{None}}\nActually Applied .gitkeep Structure",
             t("log_sections.gitkeep_structure_desc"),
             gitkeep_structure_text,
             "@@@COMMENT_END"
@@ -461,8 +461,7 @@ def _write_recovery_v2_log(app, overwritten_backups: dict):
     root_path = plan.root_path
 
     log_entries = [
-        "@@@COMMENT_BEGIN",
-        "SCAFFOLD EXECUTION RECOVERY LOG",
+        "@@@COMMENT_BEGIN {{None}}\nSCAFFOLD EXECUTION RECOVERY LOG",
         f"Date: {datetime.datetime.now().isoformat()}",
         f"Target Root Folder: {root_path}",
         f"Number of Overwritten Files: {len(overwritten_backups)}",
@@ -481,7 +480,7 @@ def _write_recovery_v2_log(app, overwritten_backups: dict):
             
         log_entries.append(f"@@@FILE_BEGIN {display_path}")
         log_entries.append(content if content is not None else "")
-        log_entries.append(f"@@@FILE_END {display_path}")
+        log_entries.append(f"@@@FILE_END")
         log_entries.append("")
 
     try:

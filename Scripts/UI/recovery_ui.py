@@ -149,12 +149,17 @@ class RecoveryWindow:
                 
                 # Extract root path
                 root_path_str = None
-                comment_pattern = re.compile(r"@@@COMMENT_BEGIN\n(.*?)\n@@@COMMENT_END", re.DOTALL)
+                # Updated pattern to handle {{Parameter}} and be more robust
+                comment_pattern = re.compile(r"@@@COMMENT_BEGIN(?P<header>.*?)\n(?P<content>.*?)\n@@@COMMENT_END", re.DOTALL)
                 for comment_match in comment_pattern.finditer(content):
-                    comment_content = comment_match.group(1)
+                    comment_content = comment_match.group("content")
+                    # Support both @ROOT and Target Root Folder:
                     root_match = re.search(r"@ROOT\s+([^{\s}]+|{{[\w-]+}})", comment_content)
+                    if not root_match:
+                        root_match = re.search(r"Target Root Folder:\s*(.*)", comment_content)
+                    
                     if root_match:
-                        root_path_str = root_match.group(1)
+                        root_path_str = root_match.group(1).strip()
                         break
                 
                 if root_path_str and messagebox.askyesno(t("ui.recovery_title"), t("message.recovery_set_root", path=root_path_str)):

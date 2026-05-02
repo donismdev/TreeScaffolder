@@ -1,0 +1,7 @@
+@@@FILE_BEGIN {{Root}}/raw_binary_sim.txt
+  Line with leading spaces
+		Line with tabs
+Multiple empty lines follow:
+
+
+Final line without newline@@@FILE_END

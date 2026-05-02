@@ -1,0 +1,7 @@
+@@@FILE_BEGIN {{Root}}/integrity_test.bin
+Line 1: With Spaces and Tabs	
+  Line 2: Leading spaces
+Line 3: Multiple newlines below
+
+
+@@@FILE_END
