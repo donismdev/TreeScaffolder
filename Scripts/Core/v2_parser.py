@@ -102,19 +102,19 @@ def parse_v2_format(text: str) -> List[Dict[str, Any]]:
                     parent_block, _ = stack[-1]
                     if parent_block['keyword'] not in CONTAINER_KEYWORDS:
                         raise V2ParserError(
-                            f"Parsing Error: Block '{keyword}' at line {line_num} cannot be nested inside '{parent_block['keyword']}'."
+                            f"[V2-004] Parsing Error: Block '{keyword}' at line {line_num} cannot be nested inside '{parent_block['keyword']}'."
                         )
                 
                 stack.append((new_block, line_num))
             
             elif tag_type == 'END':
                 if not stack:
-                    raise V2ParserError(f"Parsing Error: Unexpected '@@@{keyword}_END' at line {line_num} with no open block.")
+                    raise V2ParserError(f"[V2-003] Parsing Error: Unexpected '@@@{keyword}_END' at line {line_num} with no open block.")
                 
                 closed_block, _ = stack.pop()
                 if closed_block['keyword'] != keyword:
                     raise V2ParserError(
-                        f"Parsing Error: Mismatched block tags. Expected '@@@{closed_block['keyword']}_END' but found '@@@{keyword}_END' at line {line_num}."
+                        f"[V2-001] Parsing Error: Mismatched block tags. Expected '@@@{closed_block['keyword']}_END' but found '@@@{keyword}_END' at line {line_num}."
                     )
                 
                 # Framing Rule: The content is defined as characters BETWEEN the BEGIN line and END line.
@@ -130,6 +130,6 @@ def parse_v2_format(text: str) -> List[Dict[str, Any]]:
 
     if stack:
         keyword, line_num = stack[0][0]['keyword'], stack[0][1]
-        raise V2ParserError(f"Parsing Error: Block '{keyword}' began at line {line_num} but was never closed.")
+        raise V2ParserError(f"[V2-002] Parsing Error: Block '{keyword}' began at line {line_num} but was never closed.")
 
     return blocks

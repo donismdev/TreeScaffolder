@@ -232,12 +232,16 @@ def apply_v2_patch(content: str, instructions: List[Dict[str, Any]]) -> tuple[st
                 current_content += "\n"
         elif keyword in ("REPLACE", "INSERT_AFTER", "REMOVE", "CLEAR_AFTER"):
             if last_find is None:
-                return current_content, f"Operation '{keyword}' requires a preceding 'FIND' block."
+                return current_content, f"[V2-012] Missing Context: Operation '{keyword}' requires a preceding 'FIND' block."
             
             # --- LITERAL MATCH CHECK (Mandatory: Exactly one match) ---
             # We use direct string operations to avoid regex-escape issues with newlines/tabs.
             match_count = current_content.count(last_find)
             
+            # Prepare a short snippet for the UI error message
+            find_snippet = (last_find[:40] + "...") if len(last_find) > 40 else last_find
+            find_snippet_repr = repr(find_snippet)
+
             if match_count == 0:
                 # --- DIAGNOSTIC LOGGING ---
                 sys_logger.error(f"[DIAGNOSTIC] FIND failed for {keyword}")
@@ -280,10 +284,10 @@ def apply_v2_patch(content: str, instructions: List[Dict[str, Any]]) -> tuple[st
                     else:
                         sys_logger.error("[DIAGNOSTIC] Could not even find the first line of the search block in the file.")
                 
-                return current_content, f"FIND failed: Text not found for '{keyword}'."
+                return current_content, f"[V2-010] Text Not Found: Match failed for '{keyword}'. Searched for: {find_snippet_repr}"
             
             if match_count > 1:
-                return current_content, f"FIND failed: Multiple matches found ({match_count}) for '{keyword}'. Operation must be unambiguous."
+                return current_content, f"[V2-011] Ambiguous Match: Found {match_count} occurrences for '{keyword}'. Searched for: {find_snippet_repr}"
             
             # Find the start and end of the literal match
             start = current_content.find(last_find)
