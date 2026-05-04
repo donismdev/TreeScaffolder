@@ -60,13 +60,13 @@ class TestV2V11(unittest.TestCase):
         # 0 matches: Fail
         instr_zero = [{'keyword': 'FIND', 'content': 'ddd'}, {'keyword': 'REPLACE', 'content': 'X'}]
         _, err = scaffold_core.apply_v2_patch(content, instr_zero)
-        self.assertIn("FIND failed: Text not found", err)
+        self.assertIn("V2-010", err)
 
         # 2 matches: Fail
         content_multi = "aaa\nbbb\nbbb\nccc"
         instr_multi = [{'keyword': 'FIND', 'content': 'bbb'}, {'keyword': 'REPLACE', 'content': 'X'}]
         _, err = scaffold_core.apply_v2_patch(content_multi, instr_multi)
-        self.assertIn("Multiple matches found", err)
+        self.assertIn("V2-011", err)
 
     def test_op_insert_top_bottom(self):
         """Test TOP/BOTTOM insertions with literal integrity."""

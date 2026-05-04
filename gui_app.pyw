@@ -66,18 +66,16 @@ class ScaffoldApp:
         self.style.theme_use('vista')
 
         # --- Member Variables ---
-        config_data = {}
-        try:
-            if Path(self.CONFIG_FILE).exists():
-                with open(self.CONFIG_FILE, "r", encoding="utf-8") as f:
-                    config_data = json.load(f)
-        except: pass
-
         self.target_root_path = tk.StringVar(value=t("ui.no_folder_selected"))
         self.dry_run = tk.BooleanVar(value=True)
-        self.open_folder_after_apply = tk.BooleanVar(value=config_data.get("OPEN_FOLDER_AFTER_APPLY", False))
-        self.create_gitkeep = tk.BooleanVar(value=config_data.get("CREATE_GITKEEP", False))
-        self.enable_similarity_scan = tk.BooleanVar(value=config_data.get("ENABLE_SIMILARITY_SCAN", True))
+        self.open_folder_after_apply = tk.BooleanVar(value=False)
+        self.create_gitkeep = tk.BooleanVar(value=False)
+        self.show_recovery_after_overwrite = tk.BooleanVar(value=True)
+        self.enable_similarity_scan = tk.BooleanVar(value=True)
+        self.show_console = tk.BooleanVar(value=False)
+        
+        # Load initial config to get threshold and other non-geometry settings
+        config_data = app_utils.load_config(self.CONFIG_FILE)
         self.similarity_threshold = tk.DoubleVar(value=config_data.get("SIMILARITY_RATIO_THRESHOLD", 0.86))
         self.last_root_path = None
 
@@ -128,6 +126,7 @@ class ScaffoldApp:
 
         self.root.bind("<Destroy>", lambda event: app_utils.save_app_window_geometry(self) if event.widget == self.root else None)
         app_utils.load_app_window_geometry(self) 
+        app_utils.set_console_visibility(self.show_console.get())
         app_utils.load_last_root_path(self)
         key_bindings.setup_key_bindings(self)
         

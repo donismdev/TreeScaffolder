@@ -48,7 +48,7 @@ class TestKeywordReplace(unittest.TestCase):
             "@@@PATCH_END"
         )
         plan = scaffold_core.generate_plan(self.test_dir, patch, {})
-        self.assertTrue(any("Multiple matches found" in e for e in plan.errors))
+        self.assertTrue(any("V2-011" in e for e in plan.errors))
 
 if __name__ == "__main__":
     unittest.main()

@@ -230,7 +230,7 @@ def apply_v2_patch(content: str, instructions: List[Dict[str, Any]]) -> tuple[st
             current_content += block_content
             if not current_content.endswith("\n"):
                 current_content += "\n"
-        elif keyword in ("REPLACE", "INSERT_AFTER", "REMOVE", "CLEAR_AFTER"):
+        elif keyword in ("REPLACE", "INSERT_AFTER", "INSERT_BEFORE", "REMOVE", "CLEAR_AFTER"):
             if last_find is None:
                 return current_content, f"[V2-012] Missing Context: Operation '{keyword}' requires a preceding 'FIND' block."
             
@@ -297,6 +297,8 @@ def apply_v2_patch(content: str, instructions: List[Dict[str, Any]]) -> tuple[st
                 current_content = current_content[:start] + block_content + current_content[end:]
             elif keyword == "INSERT_AFTER":
                 current_content = current_content[:end] + block_content + current_content[end:]
+            elif keyword == "INSERT_BEFORE":
+                current_content = current_content[:start] + block_content + current_content[start:]
             elif keyword == "REMOVE":
                 current_content = current_content[:start] + current_content[end:]
             elif keyword == "CLEAR_AFTER":

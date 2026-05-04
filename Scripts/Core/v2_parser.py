@@ -15,7 +15,7 @@ class V2ParserError(Exception):
     pass
 
 RECOGNIZED_KEYWORDS = {
-    "FILE", "PATCH", "FIND", "REPLACE", "INSERT_AFTER", "INSERT_TOP", 
+    "FILE", "PATCH", "FIND", "REPLACE", "INSERT_AFTER", "INSERT_BEFORE", "INSERT_TOP", 
     "INSERT_BOTTOM", "REMOVE", "CLEAR_FILE", "CLEAR_AFTER", "COMMENT"
 }
 
@@ -59,10 +59,11 @@ def parse_v2_format(text: str) -> List[Dict[str, Any]]:
         header = match.group("header")
         
         if keyword not in RECOGNIZED_KEYWORDS:
-            # Not a keyword, treat as literal content
-            tokens.append(('CONTENT', match.group(0)))
-        else:
-            tokens.append(('MARKER', {
+            # Strictly forbid @@@ patterns that are not recognized to prevent typos from failing silently
+            line_num = text.count('\n', 0, match.start()) + 1
+            raise V2ParserError(f"[V2-040] Parsing Error: Unsupported or unrecognized keyword '{keyword}' at line {line_num}.")
+        
+        tokens.append(('MARKER', {
                 'keyword': keyword,
                 'tag_type': tag_type,
                 'parameter': _get_parameter(header) if tag_type == "BEGIN" else None,

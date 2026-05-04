@@ -361,16 +361,22 @@ def on_apply(app):
                 app.recompute_button.config(state=tk.NORMAL)
                 app.apply_button.config(state=tk.NORMAL)
                 return
-            job_name = "Unnamed_Job"
+            job_name = t("ui.default_job_name")
 
         if logger.is_job_name_used(job_name):
-            # If name exists, append counter automatically
-            base_name = job_name if job_name else "unnamed"
-            counter = 2
-            new_name = f"{base_name}_{counter}"
+            # If name exists, append or increment counter automatically (using __ separator)
+            match = re.search(r'__(?P<num>\d+)$', job_name)
+            if match:
+                base_name = job_name[:match.start()]
+                counter = int(match.group('num')) + 1
+            else:
+                base_name = job_name
+                counter = 2
+            
+            new_name = f"{base_name}__{counter}"
             while logger.is_job_name_used(new_name):
                 counter += 1
-                new_name = f"{base_name}_{counter}"
+                new_name = f"{base_name}__{counter}"
             
             messagebox.showwarning(t("message.error_title"), f"Job name '{job_name}' already used in this session.\nRenaming to '{new_name}' for this execution.")
             job_name = new_name

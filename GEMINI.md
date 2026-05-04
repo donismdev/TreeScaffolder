@@ -50,6 +50,7 @@ All source code definitions and recovery logs must strictly follow the **V2 Mult
     - `FIND_BEGIN {{None}}` / `FIND_END`: Context for subsequent operations.
     - `REPLACE_BEGIN {{None}}` / `REPLACE_END`: Replaces found text.
     - `INSERT_AFTER_BEGIN {{None}}` / `INSERT_AFTER_END`: Inserts after found text.
+    - `INSERT_BEFORE_BEGIN {{None}}` / `INSERT_BEFORE_END`: Inserts before found text.
     - `INSERT_TOP_BEGIN {{None}}` / `INSERT_TOP_END`: Inserts at file start.
     - `INSERT_BOTTOM_BEGIN {{None}}` / `INSERT_BOTTOM_END`: Inserts at file end.
     - `REMOVE_BEGIN {{None}}` / `REMOVE_END`: Removes found text.

@@ -10,6 +10,7 @@ import logging
 import re
 import sys
 import subprocess
+import ctypes
 from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, messagebox
@@ -105,6 +106,10 @@ def load_app_window_geometry(app):
     config_path = Path.cwd() / app.CONFIG_FILE
     loaded_geometry = None
     open_folder_after_apply = False
+    create_gitkeep = False
+    show_recovery_after_overwrite = True
+    enable_similarity_scan = True
+    show_console = False
     main_sash_pos_loaded = None
     diff_sash_pos_loaded = None
     window_state_loaded = None
@@ -115,6 +120,10 @@ def load_app_window_geometry(app):
                 config = json.load(f)
                 if "geometry" in config: loaded_geometry = config["geometry"]
                 if "OPEN_FOLDER_AFTER_APPLY" in config: open_folder_after_apply = config["OPEN_FOLDER_AFTER_APPLY"]
+                if "CREATE_GITKEEP" in config: create_gitkeep = config["CREATE_GITKEEP"]
+                if "SHOW_RECOVERY_AFTER_OVERWRITE" in config: show_recovery_after_overwrite = config["SHOW_RECOVERY_AFTER_OVERWRITE"]
+                if "ENABLE_SIMILARITY_SCAN" in config: enable_similarity_scan = config["ENABLE_SIMILARITY_SCAN"]
+                if "SHOW_CONSOLE" in config: show_console = config["SHOW_CONSOLE"]
                 if "window_state" in config: window_state_loaded = config["window_state"]
                 if "main_sash_pos" in config: main_sash_pos_loaded = config["main_sash_pos"]
                 if "diff_sash_pos" in config: diff_sash_pos_loaded = config["diff_sash_pos"]
@@ -125,6 +134,10 @@ def load_app_window_geometry(app):
         config = {}
 
     app.open_folder_after_apply.set(open_folder_after_apply)
+    app.create_gitkeep.set(create_gitkeep)
+    app.show_recovery_after_overwrite.set(show_recovery_after_overwrite)
+    app.enable_similarity_scan.set(enable_similarity_scan)
+    app.show_console.set(show_console)
     geometry_to_apply = app.DEFAULT_GEOMETRY
     if loaded_geometry:
         try:
@@ -169,6 +182,10 @@ def save_app_window_geometry(app):
         config["geometry"] = app.root.geometry()
         config["window_state"] = app.root.state()
         config["OPEN_FOLDER_AFTER_APPLY"] = app.open_folder_after_apply.get()
+        config["CREATE_GITKEEP"] = app.create_gitkeep.get()
+        config["SHOW_RECOVERY_AFTER_OVERWRITE"] = app.show_recovery_after_overwrite.get()
+        config["ENABLE_SIMILARITY_SCAN"] = app.enable_similarity_scan.get()
+        config["SHOW_CONSOLE"] = app.show_console.get()
 
         if hasattr(app, 'main_paned_window') and app.main_paned_window.winfo_exists():
             config["main_sash_pos"] = app.main_paned_window.sash_coord(0)[0]
@@ -340,3 +357,29 @@ def save_popup_window_geometry(window: tk.Toplevel, config_file: str, key: str):
             save_config(config_file, config)
     except Exception:
         pass # Ignore errors during destruction phase
+
+def set_console_visibility(visible: bool):
+    """
+    Toggles the visibility of the console window on Windows.
+    If no console is allocated and visible is True, it allocates one.
+    """
+    if sys.platform != 'win32':
+        return
+
+    try:
+        kernel32 = ctypes.windll.kernel32
+        user32 = ctypes.windll.user32
+        
+        hwnd = kernel32.GetConsoleWindow()
+        if not hwnd:
+            if visible:
+                kernel32.AllocConsole()
+                # Redirect stdout/stderr to the new console
+                sys.stdout = open('CONOUT$', 'w')
+                sys.stderr = open('CONOUT$', 'w')
+            return
+
+        # SW_HIDE = 0, SW_SHOW = 5
+        user32.ShowWindow(hwnd, 5 if visible else 0)
+    except Exception as e:
+        logger.error(f"Error setting console visibility: {e}")

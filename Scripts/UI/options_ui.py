@@ -136,6 +136,25 @@ class OptionsWindow:
 
         ttk.Checkbutton(settings_group, text=t("ui.create_gitkeep"), variable=self.create_gitkeep_var, command=toggle_gitkeep).pack(anchor="w", pady=2)
 
+        # Show Recovery UI after Overwrite
+        self.show_recovery_var = tk.BooleanVar(value=self.app.show_recovery_after_overwrite.get())
+        def toggle_recovery_ui():
+            val = self.show_recovery_var.get()
+            self.app.show_recovery_after_overwrite.set(val)
+            self._save_config("SHOW_RECOVERY_AFTER_OVERWRITE", val)
+
+        ttk.Checkbutton(settings_group, text=t("ui.show_recovery_after_overwrite"), variable=self.show_recovery_var, command=toggle_recovery_ui).pack(anchor="w", pady=2)
+
+        # Show Debug Console Window
+        self.show_console_var = tk.BooleanVar(value=self.app.show_console.get())
+        def toggle_console():
+            val = self.show_console_var.get()
+            self.app.show_console.set(val)
+            self._save_config("SHOW_CONSOLE", val)
+            app_utils.set_console_visibility(val)
+
+        ttk.Checkbutton(settings_group, text=t("ui.show_console"), variable=self.show_console_var, command=toggle_console).pack(anchor="w", pady=2)
+
         # Similarity Scan Settings
         similarity_frame = ttk.Frame(settings_group)
         similarity_frame.pack(fill=tk.X, pady=5)

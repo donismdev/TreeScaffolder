@@ -1,4 +1,4 @@
-# Text Patch Format Manual v1.1
+# Text Patch Format Manual v1.2
 
 ## 0. Purpose
 
@@ -172,6 +172,9 @@ Only the following keywords are supported.
 
 @@@INSERT_AFTER_BEGIN {{None}}
 @@@INSERT_AFTER_END
+
+@@@INSERT_BEFORE_BEGIN {{None}}
+@@@INSERT_BEFORE_END
 
 @@@INSERT_TOP_BEGIN {{None}}
 @@@INSERT_TOP_END
@@ -917,6 +920,9 @@ Use only the following final keywords.
 
 @@@INSERT_AFTER_BEGIN {{None}}
 @@@INSERT_AFTER_END
+
+@@@INSERT_BEFORE_BEGIN {{None}}
+@@@INSERT_BEFORE_END
 
 @@@INSERT_TOP_BEGIN {{None}}
 @@@INSERT_TOP_END

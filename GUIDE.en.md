@@ -59,6 +59,7 @@ TreeScaffolder uses a unique block format for seamless communication with LLMs.
 
 ### Block Types
 -   **FILE**: Defines the path and content of an actual file.
+-   **PATCH**: Modifies specific parts of a file. (Supports FIND, REPLACE, INSERT_AFTER, INSERT_BEFORE, etc.)
 -   **COMMENT**: Contains documentation info like logs, descriptions, or the Unified Scaffold Structure.
 
 ### Rules

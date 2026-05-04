@@ -5,12 +5,13 @@
     "last_root_path": "",
     "geometry": "1200x700+148+20",
     "window_state": "normal",
-    "main_sash_pos": 0,
-    "diff_sash_pos": 0,
+    "main_sash_pos": 400,
+    "diff_sash_pos": 600,
     "OPEN_FOLDER_AFTER_APPLY": false,
     "CREATE_GITKEEP": false,
     "ENABLE_SIMILARITY_SCAN": true,
     "SIMILARITY_RATIO_THRESHOLD": 0.86,
+    "SHOW_CONSOLE": false,
     "recovery_window_geometry": "600x400+26+26",
     "recovery_notify_geometry": "500x400+190+239"
 }

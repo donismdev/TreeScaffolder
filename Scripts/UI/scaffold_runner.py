@@ -225,7 +225,7 @@ def execute_scaffold(app):
 
     if not is_dry_run and len(overwritten_backups) > 0:
         recovery_file = _write_recovery_v2_log(app, overwritten_backups)
-        if recovery_file:
+        if recovery_file and app.show_recovery_after_overwrite.get():
             from Scripts.UI import recovery_ui
             recovery_ui.show_recovery_notification(app.root, app, list(overwritten_backups.keys()), recovery_file)
         
