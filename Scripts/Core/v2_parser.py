@@ -16,7 +16,7 @@ class V2ParserError(Exception):
 
 RECOGNIZED_KEYWORDS = {
     "FILE", "PATCH", "FIND", "REPLACE", "INSERT_AFTER", "INSERT_BEFORE", "INSERT_TOP", 
-    "INSERT_BOTTOM", "REMOVE", "CLEAR_FILE", "CLEAR_AFTER", "COMMENT"
+    "INSERT_BOTTOM", "REMOVE", "CLEAR_FILE", "CLEAR_AFTER", "COMMENT", "LINE_RANGE"
 }
 
 # Keywords that can contain other blocks (currently only PATCH)

@@ -202,6 +202,36 @@ def is_content_identical(actual: str, planned: str) -> bool:
     """
     return ensure_lf(actual) == ensure_lf(planned)
 
+def _get_byte_range_from_lines(content: str, start_line: int, end_line: int) -> tuple[int, int]:
+    """Converts 1-indexed line numbers to 0-indexed character offsets in LF content."""
+    if start_line < 1: start_line = 1
+    
+    pos = 0
+    current_line = 1
+    start_offset = 0
+    
+    # Find start of start_line
+    while current_line < start_line and pos < len(content):
+        next_nl = content.find('\n', pos)
+        if next_nl == -1:
+            pos = len(content)
+            break
+        pos = next_nl + 1
+        current_line += 1
+    start_offset = pos
+    
+    # Find end of end_line (include the entire end_line)
+    while current_line <= end_line and pos < len(content):
+        next_nl = content.find('\n', pos)
+        if next_nl == -1:
+            pos = len(content)
+            break
+        pos = next_nl + 1
+        current_line += 1
+    end_offset = pos
+    
+    return start_offset, end_offset
+
 import difflib
 
 def apply_v2_patch(content: str, instructions: List[Dict[str, Any]]) -> tuple[str, Optional[str]]:
@@ -211,6 +241,7 @@ def apply_v2_patch(content: str, instructions: List[Dict[str, Any]]) -> tuple[st
     """
     current_content = content
     last_find = None
+    line_range = None
     
     for instr in instructions:
         keyword = instr['keyword']
@@ -218,6 +249,26 @@ def apply_v2_patch(content: str, instructions: List[Dict[str, Any]]) -> tuple[st
         
         if keyword == "FIND":
             last_find = block_content
+            continue
+            
+        if keyword == "LINE_RANGE":
+            if line_range is not None:
+                return current_content, f"[V2-042] Duplicate Line Range: Multiple 'LINE_RANGE' blocks found in a single 'PATCH'."
+            
+            parts = block_content.strip().split()
+            if len(parts) != 2:
+                return current_content, f"[V2-044] Invalid Line Range Value: 'LINE_RANGE' requires exactly two integers. Found: {repr(block_content)}"
+            
+            try:
+                start_l = int(parts[0])
+                end_l = int(parts[1])
+            except ValueError:
+                return current_content, f"[V2-044] Invalid Line Range Value: 'LINE_RANGE' contains non-integer values. Found: {repr(block_content)}"
+            
+            if start_l > end_l:
+                 return current_content, f"[V2-041] Invalid Line Range: StartLine ({start_l}) is greater than EndLine ({end_l})."
+            
+            line_range = (start_l, end_l)
             continue
         
         if keyword == "INSERT_TOP":
@@ -234,40 +285,49 @@ def apply_v2_patch(content: str, instructions: List[Dict[str, Any]]) -> tuple[st
             if last_find is None:
                 return current_content, f"[V2-012] Missing Context: Operation '{keyword}' requires a preceding 'FIND' block."
             
+            # --- LINE RANGE HINT ---
+            search_area = current_content
+            area_offset = 0
+            if line_range:
+                start_off, end_off = _get_byte_range_from_lines(current_content, line_range[0], line_range[1])
+                search_area = current_content[start_off:end_off]
+                area_offset = start_off
+
             # --- LITERAL MATCH CHECK (Mandatory: Exactly one match) ---
             # We use direct string operations to avoid regex-escape issues with newlines/tabs.
-            match_count = current_content.count(last_find)
+            match_count = search_area.count(last_find)
             
             # Prepare a short snippet for the UI error message
             find_snippet = (last_find[:40] + "...") if len(last_find) > 40 else last_find
             find_snippet_repr = repr(find_snippet)
+            range_info = f" in line range {line_range[0]}-{line_range[1]}" if line_range else ""
 
             if match_count == 0:
                 # --- DIAGNOSTIC LOGGING ---
-                sys_logger.error(f"[DIAGNOSTIC] FIND failed for {keyword}")
+                sys_logger.error(f"[DIAGNOSTIC] FIND failed for {keyword}{range_info}")
                 sys_logger.error(f"[DIAGNOSTIC] last_find (len={len(last_find)}): {repr(last_find)}")
                 sys_logger.error(f"[DIAGNOSTIC] last_find hex: {last_find.encode('utf-8').hex()}")
-                sys_logger.error(f"[DIAGNOSTIC] current_content total len: {len(current_content)}")
+                sys_logger.error(f"[DIAGNOSTIC] search_area total len: {len(search_area)}")
                 
                 # Check for Tab vs Space mismatch
                 lf_no_tabs = last_find.replace('\t', '    ')
-                cc_no_tabs = current_content.replace('\t', '    ')
+                cc_no_tabs = search_area.replace('\t', '    ')
                 if lf_no_tabs in cc_no_tabs:
                     sys_logger.error("[DIAGNOSTIC] Match found after normalizing TABS to SPACES. Please check indentation consistency.")
                 
                 # Check for common issues: whitespace mismatches
-                if last_find.strip() in current_content:
+                if last_find.strip() in search_area:
                     sys_logger.error("[DIAGNOSTIC] Found stripped version of last_find. Likely whitespace mismatch at start/end.")
                 
                 # --- FUZZY DIFF LOGGING ---
                 # Try to find the best match to show what is different
                 sys_logger.error("[DIAGNOSTIC] Attempting fuzzy match to identify differences...")
-                lines_cc = current_content.splitlines()
+                lines_cc = search_area.splitlines()
                 lines_lf = last_find.splitlines()
                 
                 if lines_lf:
                     first_line = lines_lf[0].strip()
-                    # Find all lines in content that contain the first line of our search block
+                    # Find all lines in search_area that contain the first line of our search block
                     potential_starts = [i for i, line in enumerate(lines_cc) if first_line in line]
                     
                     if potential_starts:
@@ -275,22 +335,23 @@ def apply_v2_patch(content: str, instructions: List[Dict[str, Any]]) -> tuple[st
                         best_idx = potential_starts[0]
                         window = lines_cc[best_idx : best_idx + len(lines_lf)]
                         
-                        sys_logger.error(f"[DIAGNOSTIC] Potential match found starting at line {best_idx + 1}")
+                        sys_logger.error(f"[DIAGNOSTIC] Potential match found starting at search_area line {best_idx + 1}")
                         diff = difflib.ndiff(lines_lf, window)
                         sys_logger.error("[DIAGNOSTIC] Line-by-line Diff (-: Expected, +: Actual):")
                         for line in diff:
                             if line.startswith(('-', '+', '?')):
                                 sys_logger.error(f"[DIAGNOSTIC] {repr(line)}")
                     else:
-                        sys_logger.error("[DIAGNOSTIC] Could not even find the first line of the search block in the file.")
+                        sys_logger.error("[DIAGNOSTIC] Could not even find the first line of the search block in the search_area.")
                 
-                return current_content, f"[V2-010] Text Not Found: Match failed for '{keyword}'. Searched for: {find_snippet_repr}"
+                return current_content, f"[V2-010] Text Not Found: Match failed for '{keyword}'{range_info}. Searched for: {find_snippet_repr}"
             
             if match_count > 1:
-                return current_content, f"[V2-011] Ambiguous Match: Found {match_count} occurrences for '{keyword}'. Searched for: {find_snippet_repr}"
+                return current_content, f"[V2-011] Ambiguous Match: Found {match_count} occurrences for '{keyword}'{range_info}. Searched for: {find_snippet_repr}"
             
-            # Find the start and end of the literal match
-            start = current_content.find(last_find)
+            # Find the start and end of the literal match within the search_area
+            match_start_in_area = search_area.find(last_find)
+            start = area_offset + match_start_in_area
             end = start + len(last_find)
             
             if keyword == "REPLACE":
@@ -313,6 +374,8 @@ def apply_v2_patch(content: str, instructions: List[Dict[str, Any]]) -> tuple[st
             last_find = None # Reset last_find after use? The spec implies one FIND per operation.
         elif keyword == "COMMENT":
             pass
+        elif keyword == "LINE_RANGE":
+            pass # Already handled above
         else:
             return current_content, f"Unsupported keyword '{keyword}' inside PATCH."
             
