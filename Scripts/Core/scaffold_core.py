@@ -242,6 +242,8 @@ def apply_v2_patch(content: str, instructions: List[Dict[str, Any]]) -> tuple[st
     current_content = content
     last_find = None
     line_range = None
+    scope_find = None
+    scope_end_find = None
     
     for instr in instructions:
         keyword = instr['keyword']
@@ -254,6 +256,8 @@ def apply_v2_patch(content: str, instructions: List[Dict[str, Any]]) -> tuple[st
         if keyword == "LINE_RANGE":
             if line_range is not None:
                 return current_content, f"[V2-042] Duplicate Line Range: Multiple 'LINE_RANGE' blocks found in a single 'PATCH'."
+            if scope_find is not None or scope_end_find is not None:
+                return current_content, f"[V2-056] Scope Cannot Be Used With Line Range: Both 'SCOPE_FIND' and 'LINE_RANGE' detected."
             
             parts = block_content.strip().split()
             if len(parts) != 2:
@@ -270,6 +274,20 @@ def apply_v2_patch(content: str, instructions: List[Dict[str, Any]]) -> tuple[st
             
             line_range = (start_l, end_l)
             continue
+
+        if keyword == "SCOPE_FIND":
+            if scope_find is not None:
+                return current_content, f"[V2-054] Duplicate Scope Block: Multiple 'SCOPE_FIND' blocks found in a single 'PATCH'."
+            if line_range is not None:
+                 return current_content, f"[V2-056] Scope Cannot Be Used With Line Range: Both 'SCOPE_FIND' and 'LINE_RANGE' detected."
+            scope_find = block_content
+            continue
+
+        if keyword == "SCOPE_END_FIND":
+            if scope_end_find is not None:
+                return current_content, f"[V2-054] Duplicate Scope Block: Multiple 'SCOPE_END_FIND' blocks found in a single 'PATCH'."
+            scope_end_find = block_content
+            continue
         
         if keyword == "INSERT_TOP":
             current_content = block_content + current_content
@@ -285,13 +303,56 @@ def apply_v2_patch(content: str, instructions: List[Dict[str, Any]]) -> tuple[st
             if last_find is None:
                 return current_content, f"[V2-012] Missing Context: Operation '{keyword}' requires a preceding 'FIND' block."
             
-            # --- LINE RANGE HINT ---
+            # --- SCOPE VALIDATION ---
+            if (scope_find is not None and scope_end_find is None) or (scope_find is None and scope_end_find is not None):
+                 return current_content, f"Scope Error: 'SCOPE_FIND' and 'SCOPE_END_FIND' must be used as a pair."
+
+            # --- SEARCH AREA CALCULATION ---
             search_area = current_content
             area_offset = 0
-            if line_range:
+            scope_info = ""
+
+            if scope_find is not None and scope_end_find is not None:
+                # 1. Find SCOPE_FIND match
+                scope_start_count = current_content.count(scope_find)
+                if scope_start_count == 0:
+                    return current_content, f"[V2-050] Scope Start Not Found: '{scope_find[:40]}...'"
+                if scope_start_count > 1:
+                    return current_content, f"[V2-051] Ambiguous Scope Start: Found {scope_start_count} occurrences of scope start."
+                
+                scope_start_pos = current_content.find(scope_find)
+                
+                # 2. Find SCOPE_END_FIND match AFTER scope_start_pos
+                post_start_content = current_content[scope_start_pos + len(scope_find):]
+                scope_end_count = post_start_content.count(scope_end_find)
+                
+                if scope_end_count == 0:
+                    return current_content, f"[V2-052] Scope End Not Found: '{scope_end_find[:40]}...' after scope start."
+                if scope_end_count > 1:
+                    return current_content, f"[V2-053] Ambiguous Scope End: Found {scope_end_count} occurrences of scope end after scope start."
+                
+                scope_end_pos_relative = post_start_content.find(scope_end_find)
+                scope_end_pos = scope_start_pos + len(scope_find) + scope_end_pos_relative
+                
+                # Double check range (should be valid by logic above)
+                if scope_end_pos <= scope_start_pos:
+                    return current_content, f"[V2-055] Invalid Scope Range: End occurs before or at start."
+
+                # Search area is from scope_start_pos to scope_end_pos
+                search_area = current_content[scope_start_pos:scope_end_pos]
+                area_offset = scope_start_pos
+                scope_info = " in scope"
+                
+                # Optional: Add line range of scope to scope_info for better errors
+                start_line = current_content.count('\n', 0, scope_start_pos) + 1
+                end_line = current_content.count('\n', 0, scope_end_pos) + 1
+                scope_info += f" (lines {start_line}-{end_line})"
+
+            elif line_range:
                 start_off, end_off = _get_byte_range_from_lines(current_content, line_range[0], line_range[1])
                 search_area = current_content[start_off:end_off]
                 area_offset = start_off
+                scope_info = f" in line range {line_range[0]}-{line_range[1]}"
 
             # --- LITERAL MATCH CHECK (Mandatory: Exactly one match) ---
             # We use direct string operations to avoid regex-escape issues with newlines/tabs.
@@ -300,11 +361,10 @@ def apply_v2_patch(content: str, instructions: List[Dict[str, Any]]) -> tuple[st
             # Prepare a short snippet for the UI error message
             find_snippet = (last_find[:40] + "...") if len(last_find) > 40 else last_find
             find_snippet_repr = repr(find_snippet)
-            range_info = f" in line range {line_range[0]}-{line_range[1]}" if line_range else ""
 
             if match_count == 0:
                 # --- DIAGNOSTIC LOGGING ---
-                sys_logger.error(f"[DIAGNOSTIC] FIND failed for {keyword}{range_info}")
+                sys_logger.error(f"[DIAGNOSTIC] FIND failed for {keyword}{scope_info}")
                 sys_logger.error(f"[DIAGNOSTIC] last_find (len={len(last_find)}): {repr(last_find)}")
                 sys_logger.error(f"[DIAGNOSTIC] last_find hex: {last_find.encode('utf-8').hex()}")
                 sys_logger.error(f"[DIAGNOSTIC] search_area total len: {len(search_area)}")
@@ -344,10 +404,10 @@ def apply_v2_patch(content: str, instructions: List[Dict[str, Any]]) -> tuple[st
                     else:
                         sys_logger.error("[DIAGNOSTIC] Could not even find the first line of the search block in the search_area.")
                 
-                return current_content, f"[V2-010] Text Not Found: Match failed for '{keyword}'{range_info}. Searched for: {find_snippet_repr}"
+                return current_content, f"[V2-010] Text Not Found: Match failed for '{keyword}'{scope_info}. Searched for: {find_snippet_repr}"
             
             if match_count > 1:
-                return current_content, f"[V2-011] Ambiguous Match: Found {match_count} occurrences for '{keyword}'{range_info}. Searched for: {find_snippet_repr}"
+                return current_content, f"[V2-011] Ambiguous Match: Found {match_count} occurrences for '{keyword}'{scope_info}. Searched for: {find_snippet_repr}"
             
             # Find the start and end of the literal match within the search_area
             match_start_in_area = search_area.find(last_find)
@@ -374,7 +434,7 @@ def apply_v2_patch(content: str, instructions: List[Dict[str, Any]]) -> tuple[st
             last_find = None # Reset last_find after use? The spec implies one FIND per operation.
         elif keyword == "COMMENT":
             pass
-        elif keyword == "LINE_RANGE":
+        elif keyword in ("LINE_RANGE", "SCOPE_FIND", "SCOPE_END_FIND"):
             pass # Already handled above
         else:
             return current_content, f"Unsupported keyword '{keyword}' inside PATCH."
