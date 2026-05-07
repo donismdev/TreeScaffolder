@@ -339,10 +339,13 @@ def create_right_panel(app):
     app.after_tree.bind("<<TreeviewSelect>>", app.on_after_select)
     app.after_list.bind("<<TreeviewSelect>>", app.on_after_select)
 
-    # Bind click for toggle logic (Single and Double click)
-    for event_type in ["<Button-1>", "<Double-1>"]:
-        app.after_tree.bind(event_type, lambda e: app._on_after_tree_click(e) if hasattr(app, "_on_after_tree_click") else None, add="+")
-        app.after_list.bind(event_type, lambda e: app._on_after_tree_click(e) if hasattr(app, "_on_after_tree_click") else None, add="+")
+    # Bind click for toggle logic (Single click)
+    app.after_tree.bind("<Button-1>", lambda e: app._on_after_tree_click(e) if hasattr(app, "_on_after_tree_click") else None, add="+")
+    app.after_list.bind("<Button-1>", lambda e: app._on_after_tree_click(e) if hasattr(app, "_on_after_tree_click") else None, add="+")
+
+    # Bind Double-1 for opening folder
+    app.after_tree.bind("<Double-1>", lambda e: app._on_after_tree_double_click(e) if hasattr(app, "_on_after_tree_double_click") else None, add="+")
+    app.after_list.bind("<Double-1>", lambda e: app._on_after_tree_double_click(e) if hasattr(app, "_on_after_tree_double_click") else None, add="+")
 
     # Bind Space for toggle logic
     app.after_tree.bind("<space>", lambda e: app._on_after_tree_space(e) if hasattr(app, "_on_after_tree_space") else None)
@@ -359,3 +362,79 @@ def create_right_panel(app):
     for tree in [app.after_tree, app.after_list]:
         # Bind Double-1 to break AFTER our custom handler runs to stop expansion
         tree.bind("<Double-1>", lambda e: "break", add="+")
+
+def create_grep_panel(app, parent_frame):
+    """Creates the UI for the Grep & Merge tool."""
+    # 1. Folder Selection Section
+    folder_selection_frame = ttk.LabelFrame(parent_frame, text=t("ui.section_1"), padding=10)
+    folder_selection_frame.pack(side=tk.TOP, fill=tk.X, padx=10, pady=(10, 5))
+    
+    path_row = ttk.Frame(folder_selection_frame)
+    path_row.pack(fill=tk.X)
+    
+    app.grep_folder_label = ttk.Label(path_row, textvariable=app.grep_root_path, relief="sunken", padding=3)
+    app.grep_folder_label.pack(side="left", fill="x", expand=True, padx=(0, 5))
+    
+    app.grep_browse_btn = ttk.Button(path_row, text=t("ui.browse"), width=12, command=lambda: action_handler.on_grep_browse_folder(app))
+    app.grep_browse_btn.pack(side="left", padx=2)
+    
+    app.grep_prev_btn = ttk.Button(path_row, text=t("ui.prev"), width=8, state=tk.DISABLED, command=lambda: action_handler.on_grep_previous_folder(app))
+    app.grep_prev_btn.pack(side="left", padx=2)
+    
+    app.grep_open_btn = ttk.Button(path_row, text=t("ui.open_folder"), width=12, command=lambda: action_handler.on_grep_open_folder(app))
+    app.grep_open_btn.pack(side="left", padx=2)
+
+    app.grep_check_btn = ttk.Button(path_row, text=t("ui.check_folder"), width=12, command=lambda: action_handler.on_grep_check_folder(app))
+    app.grep_check_btn.pack(side="left", padx=2)
+
+    # 2. Action Buttons Section
+    actions_frame = ttk.Frame(parent_frame, padding=(10, 5))
+    actions_frame.pack(side=tk.TOP, fill=tk.X)
+    
+    ttk.Label(actions_frame, text=t("ui.tab_grep"), font=("Segoe UI", 11, "bold")).pack(side="left", padx=(0, 20))
+    
+    app.grep_find_btn = ttk.Button(actions_frame, text=t("ui.grep_find_btn"), command=lambda: action_handler.on_grep_find(app))
+    app.grep_find_btn.pack(side="left", padx=5)
+    
+    app.grep_text_btn = ttk.Button(actions_frame, text=t("ui.grep_text_btn"), command=lambda: action_handler.on_grep_text(app))
+    app.grep_text_btn.pack(side="left", padx=5)
+    
+    app.grep_merge_btn = ttk.Button(actions_frame, text=t("ui.grep_merge_btn"), command=lambda: action_handler.on_grep_merge(app))
+    app.grep_merge_btn.pack(side="left", padx=5)
+
+    # 3. Main Paned Area (Editors)
+    paned = ttk.PanedWindow(parent_frame, orient=tk.HORIZONTAL)
+    paned.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
+
+    # Left: Inputs
+    left_frame = ttk.Frame(paned)
+    paned.add(left_frame, weight=1)
+    
+    app.grep_tabs = ttk.Notebook(left_frame)
+    app.grep_tabs.pack(fill=tk.BOTH, expand=True)
+
+    # Input Tab
+    tab_input = ttk.Frame(app.grep_tabs)
+    app.grep_tabs.add(tab_input, text=t("ui.grep_input_tab"))
+    app.grep_raw_text = tk.Text(tab_input, font=app.editor_font, undo=True)
+    app.grep_raw_text.pack(fill=tk.BOTH, expand=True)
+
+    # Tree View Tab (for pasting folder structures)
+    tab_tree = ttk.Frame(app.grep_tabs)
+    app.grep_tabs.add(tab_tree, text=t("ui.grep_context_tab"))
+    app.grep_tree_text = tk.Text(tab_tree, font=app.editor_font, undo=True)
+    app.grep_tree_text.pack(fill=tk.BOTH, expand=True)
+
+    # Right: Output
+    right_frame = ttk.Frame(paned)
+    paned.add(right_frame, weight=1)
+
+    header_frame = ttk.Frame(right_frame)
+    header_frame.pack(fill=tk.X, pady=(0, 5))
+    ttk.Label(header_frame, text=t("ui.grep_output_header"), font=("Segoe UI", 10, "bold")).pack(side="left")
+    
+    app.grep_copy_btn = ttk.Button(header_frame, text=t("ui.grep_copy_btn"), width=10, command=lambda: action_handler.on_grep_copy(app))
+    app.grep_copy_btn.pack(side="right", padx=2)
+
+    app.grep_output_text = tk.Text(right_frame, font=app.editor_font, bg="#fcfcfc", state=tk.DISABLED)
+    app.grep_output_text.pack(fill=tk.BOTH, expand=True)

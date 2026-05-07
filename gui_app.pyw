@@ -67,6 +67,7 @@ class ScaffoldApp:
 
         # --- Member Variables ---
         self.target_root_path = tk.StringVar(value=t("ui.no_folder_selected"))
+        self.grep_root_path = tk.StringVar(value=t("ui.no_folder_selected"))
         self.dry_run = tk.BooleanVar(value=True)
         self.open_folder_after_apply = tk.BooleanVar(value=False)
         self.create_gitkeep = tk.BooleanVar(value=False)
@@ -78,6 +79,7 @@ class ScaffoldApp:
         config_data = app_utils.load_config(self.CONFIG_FILE)
         self.similarity_threshold = tk.DoubleVar(value=config_data.get("SIMILARITY_RATIO_THRESHOLD", 0.86))
         self.last_root_path = None
+        self.last_grep_root_path = None
 
         self.current_plan: scaffold_core.Plan | None = None
         self.classifier = file_classifier.FileTypeClassifier()
@@ -100,23 +102,23 @@ class ScaffoldApp:
         self.last_selected_after_item = None 
         self._in_selection_sync = False 
         self.before_cache = {} 
-        
+        self._scaffold_applied = False
         self.widget_map = {} # Map action names to UI widgets for shortcut hints
         self.key_bindings_map = key_bindings._load_key_bindings_config()
 
         # --- Main Layout ---
-        self.main_paned_window = tk.PanedWindow(self.root, orient=tk.HORIZONTAL, sashrelief=tk.RAISED, sashwidth=4)
-        self.main_paned_window.pack(fill=tk.BOTH, expand=True)
-
-        self.left_frame = ttk.Frame(self.main_paned_window, padding=5)
-        self.main_paned_window.add(self.left_frame, stretch="always", minsize=400)
-
-        self.right_frame = ttk.Frame(self.main_paned_window)
-        self.main_paned_window.add(self.right_frame, stretch="always", minsize=400)
+        self.sidebar = ttk.Frame(self.root, width=40)
+        self.sidebar.pack(side=tk.LEFT, fill=tk.Y)
+        
+        self.main_container = ttk.Frame(self.root)
+        self.main_container.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
         init_fonts(self)
-        create_left_panel(self)
-        create_right_panel(self)
+        self._create_sidebar()
+
+        self.tool_frames = {}
+        self._setup_scaffold_tool()
+        self._setup_grep_tool()
 
         configure_tree_tags(self)
 
@@ -127,7 +129,8 @@ class ScaffoldApp:
         self.root.bind("<Destroy>", lambda event: app_utils.save_app_window_geometry(self) if event.widget == self.root else None)
         app_utils.load_app_window_geometry(self) 
         app_utils.set_console_visibility(self.show_console.get())
-        app_utils.load_last_root_path(self)
+        app_utils.load_last_root_path(self, target="scaffold")
+        app_utils.load_last_root_path(self, target="grep")
         key_bindings.setup_key_bindings(self)
         
         # --- Shortcut Hint Setup ---
@@ -141,7 +144,65 @@ class ScaffoldApp:
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
 
         action_handler.update_debug_ui(self)
+        self.switch_tool("scaffold")
         logger.debug("ScaffoldApp.__init__ completed")
+
+    # --- Tool Switcher Logic ---
+
+    def _create_sidebar(self):
+        """Creates the vertical sidebar with tool buttons."""
+        self.sidebar.config(padding=(5, 10))
+        
+        # Style for the sidebar buttons to look like vertical tabs
+        self.style.configure("Sidebar.TButton", font=("Segoe UI", 9), padding=5)
+        
+        # Tool 1: Tree Scaffold
+        self.scaffold_btn = ttk.Button(self.sidebar, text=t("ui.tab_scaffold_tree"), style="Sidebar.TButton", command=lambda: self.switch_tool("scaffold"))
+        self.scaffold_btn.pack(fill=tk.X, pady=2)
+        
+        # Tool 2: Grep & Merge
+        self.grep_btn = ttk.Button(self.sidebar, text=t("ui.tab_grep"), style="Sidebar.TButton", command=lambda: self.switch_tool("grep"))
+        self.grep_btn.pack(fill=tk.X, pady=2)
+
+    def _setup_scaffold_tool(self):
+        """Initializes the existing Tree Scaffold tool layout."""
+        scaffold_frame = ttk.Frame(self.main_container)
+        self.tool_frames["scaffold"] = scaffold_frame
+
+        self.main_paned_window = tk.PanedWindow(scaffold_frame, orient=tk.HORIZONTAL, sashrelief=tk.RAISED, sashwidth=4)
+        self.main_paned_window.pack(fill=tk.BOTH, expand=True)
+
+        self.left_frame = ttk.Frame(self.main_paned_window, padding=5)
+        self.main_paned_window.add(self.left_frame, stretch="always", minsize=400)
+
+        self.right_frame = ttk.Frame(self.main_paned_window)
+        self.main_paned_window.add(self.right_frame, stretch="always", minsize=400)
+
+        create_left_panel(self)
+        create_right_panel(self)
+
+    def _setup_grep_tool(self):
+        """Initializes the new Grep & Merge tool layout."""
+        from Scripts.UI.panels import create_grep_panel
+        grep_frame = ttk.Frame(self.main_container)
+        # Don't pack it yet, switch_tool will handle it
+        self.tool_frames["grep"] = grep_frame
+        create_grep_panel(self, grep_frame)
+
+    def switch_tool(self, tool_key):
+        """Switches the visible tool in the main container."""
+        for key, frame in self.tool_frames.items():
+            if key == tool_key:
+                frame.pack(fill=tk.BOTH, expand=True)
+                # Highlight active button (using a custom style would be better, but simple state for now)
+                if key == "scaffold":
+                    self.scaffold_btn.state(['pressed'])
+                    self.grep_btn.state(['!pressed'])
+                else:
+                    self.grep_btn.state(['pressed'])
+                    self.scaffold_btn.state(['!pressed'])
+            else:
+                frame.pack_forget()
 
     def on_closing(self):
         """Finalizes the session log and closes the application."""
@@ -161,6 +222,7 @@ class ScaffoldApp:
     def on_before_select(self, event): action_handler.on_before_select(self, event)
     def on_after_select(self, event): action_handler.on_after_select(self, event)
     def _on_after_tree_click(self, event): action_handler.on_after_tree_click(self, event)
+    def _on_after_tree_double_click(self, event): action_handler.on_after_tree_double_click(self, event)
     def _on_after_tree_space(self, event): return action_handler.on_after_tree_space(self, event)
 
     def refresh_ui(self):
@@ -176,18 +238,22 @@ class ScaffoldApp:
         self.root.title(t("ui.title"))
         self.widget_map = {} 
 
-        self.main_paned_window = tk.PanedWindow(self.root, orient=tk.HORIZONTAL, sashrelief=tk.RAISED, sashwidth=4)
-        self.main_paned_window.pack(fill=tk.BOTH, expand=True)
-
-        self.left_frame = ttk.Frame(self.main_paned_window, padding=5)
-        self.main_paned_window.add(self.left_frame, stretch="always", minsize=400)
-
-        self.right_frame = ttk.Frame(self.main_paned_window)
-        self.main_paned_window.add(self.right_frame, stretch="always", minsize=400)
+        # --- Re-setup Sidebar Layout ---
+        self.sidebar = ttk.Frame(self.root, width=40)
+        self.sidebar.pack(side=tk.LEFT, fill=tk.Y)
+        
+        self.main_container = ttk.Frame(self.root)
+        self.main_container.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
         init_fonts(self)
-        create_left_panel(self)
-        create_right_panel(self)
+        self._create_sidebar()
+
+        self.tool_frames = {}
+        self._setup_scaffold_tool()
+        
+        # Re-initialize other tools if any
+        if hasattr(self, "_setup_grep_tool"):
+            self._setup_grep_tool()
 
         if self.last_root_path:
             self.prev_dir_button.config(state=tk.NORMAL)

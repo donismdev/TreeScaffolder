@@ -11,6 +11,7 @@ from pathlib import Path
 import re
 from Scripts.Utils.i18n import t
 from Scripts.Core import scaffold_core
+from Scripts.Core import grep_engine
 from Scripts.UI import app_utils
 from Scripts.UI import scaffold_runner
 from Scripts.Utils import logger
@@ -53,6 +54,8 @@ def handle_apply_success(app, is_dry_run=False):
     """Called after the scaffold is applied successfully."""
     key = "apply_dry_run_success" if is_dry_run else "apply_success"
     update_summary(app, key)
+    # Set applied flag to True
+    app._scaffold_applied = True
 
 def handle_options_opened(app):
     """Called when the options window is opened."""
@@ -141,17 +144,57 @@ def on_check_folder(app):
     except Exception as e:
         app_utils.show_notification(app, 'error', t("message.error_title"), f"Error scanning folder: {e}")
 
-def on_browse_folder(app):
-    logger.debug("on_browse_folder called")
+def _on_browse_folder_generic(app, target_var, last_path_attr, target_context):
+    """Generic folder browse handler."""
     path = filedialog.askdirectory(mustexist=True, title=t("ui.section_1"))
     if not path:
         return
-    app_utils.verify_and_set_root(app, path, method="browse")
+    
+    is_valid, result = app_utils.validate_path(path)
+    if not is_valid:
+        app_utils.show_notification(app, 'error', t("message.invalid_folder_title"), result)
+        return
+
+    target_var.set(result)
+    app_utils.save_last_root_path(app, result, target=target_context)
+    setattr(app, last_path_attr, result)
+    
+    if target_context == "scaffold":
+        from Scripts.UI.tree_populator import populate_before_tree, _clear_tree
+        app.recompute_button.config(state=tk.NORMAL)
+        populate_before_tree(app, Path(result))
+        _clear_tree(app.after_tree)
+        _clear_tree(app.after_list)
+        app.apply_button.config(state=tk.DISABLED)
+        handle_folder_selected(app, result, method="browse")
+    else:
+        app_utils.log_message(app, t("summary.folder_browse", path=result))
+
+def on_browse_folder(app):
+    logger.debug("on_browse_folder called")
+    _on_browse_folder_generic(app, app.target_root_path, "last_root_path", "scaffold")
     logger.debug("on_browse_folder completed")
+
+def on_grep_browse_folder(app):
+    logger.debug("on_grep_browse_folder called")
+    _on_browse_folder_generic(app, app.grep_root_path, "last_grep_root_path", "grep")
 
 def on_previous_folder(app):
     if app.last_root_path:
         app_utils.verify_and_set_root(app, app.last_root_path, method="prev")
+
+def on_grep_previous_folder(app):
+    if app.last_grep_root_path:
+        is_valid, result = app_utils.validate_path(app.last_grep_root_path)
+        if is_valid:
+            app.grep_root_path.set(result)
+            app_utils.log_message(app, t("summary.folder_prev", path=result))
+        else:
+            app_utils.show_notification(app, 'error', t("message.invalid_folder_title"), result)
+            app.grep_root_path.set(t("ui.no_folder_selected"))
+            app_utils.save_last_root_path(app, "", target="grep")
+            if hasattr(app, "grep_prev_btn"):
+                app.grep_prev_btn.config(state=tk.DISABLED)
 
 def on_recompute(app, silent=False):
     logger.debug(f"on_recompute called (silent={silent})")
@@ -168,7 +211,9 @@ def on_recompute(app, silent=False):
     app.content_text.delete("1.0", tk.END)
     clear_tree_function(app.after_tree)
     clear_tree_function(app.after_list)
-    # ------------------------------------------------------
+    
+    # --- Reset applied flag ---
+    app._scaffold_applied = False
 
     root_path = Path(root_path_str)
     text_input = app.tree_text.get("1.0", "end-1c") + "\n" + app.source_code_text.get("1.0", "end-1c")
@@ -670,6 +715,25 @@ def _get_planned_content(app, path: Path) -> str | None:
 
 # --- Selection Checkbox Logic ---
 
+def on_after_tree_double_click(app, event):
+    tree = event.widget
+    item_id = tree.identify_row(event.y)
+    if not item_id: return
+
+    values = tree.item(item_id, "values")
+    if not values: return
+    path = Path(values[0])
+
+    # Case 1: Scaffold already applied -> Open folder for any item
+    if getattr(app, '_scaffold_applied', False):
+        app_utils.open_containing_folder(path)
+        return
+
+    # Case 2: Before scaffold applied -> Open folder ONLY IF it's not a newly created item
+    # Check if the path actually exists on disk
+    if path.exists():
+        app_utils.open_containing_folder(path)
+
 def on_after_tree_click(app, event):
     tree = event.widget
     item_id = tree.identify_row(event.y)
@@ -787,3 +851,102 @@ def focus_job_name(app):
         else:
             # Entry is disabled, meaning no valid plan exists
             messagebox.showwarning(t("message.error_title"), t("message.compute_first_job"))
+
+# --- Grep & Merge Handlers ---
+
+def on_grep_open_folder(app):
+    """Opens the current Grep root folder in explorer."""
+    path_str = app.grep_root_path.get()
+    if not path_str or path_str == t("ui.no_folder_selected"):
+        app_utils.show_notification(app, 'warning', t("message.error_title"), t("message.select_root_first"))
+        return
+    
+    path = Path(path_str)
+    if not app_utils.open_containing_folder(path):
+        app_utils.show_notification(app, 'error', t("message.error_title"), t("message.root_not_found"))
+
+def on_grep_check_folder(app):
+    """Check folder stats for Grep root."""
+    root_path_str = app.grep_root_path.get()
+    if not root_path_str or root_path_str == t("ui.no_folder_selected"):
+        app_utils.show_notification(app, 'warning', t("message.error_title"), t("message.select_root_first"))
+        return
+
+    try:
+        root_path = Path(root_path_str)
+        if not root_path.is_dir():
+            app_utils.show_notification(app, 'error', t("message.error_title"), t("message.root_not_found"))
+            return
+
+        stats = app_utils.get_folder_stats(root_path)
+        info_msg = t("ui.check_folder_result", 
+                     name=root_path.name, 
+                     dirs=stats["dirs"], 
+                     files=stats["files"], 
+                     normal=stats["normal"], 
+                     gitkeep=stats["gitkeep"], 
+                     total=stats["total"])
+        
+        app_utils.show_notification(app, 'info', t("ui.check_folder"), info_msg)
+    except Exception as e:
+        app_utils.show_notification(app, 'error', t("message.error_title"), f"Error scanning folder: {e}")
+
+def on_grep_find(app):
+    root_path_str = app.grep_root_path.get()
+    if not root_path_str or root_path_str == t("ui.no_folder_selected"):
+        app_utils.show_notification(app, 'warning', t("message.error_title"), t("message.select_root_first"))
+        return
+    
+    raw_input = app.grep_raw_text.get("1.0", tk.END).strip()
+    if not raw_input: return
+    
+    result = grep_engine.find_files(Path(root_path_str), raw_input)
+    
+    app.grep_output_text.config(state=tk.NORMAL)
+    app.grep_output_text.delete("1.0", tk.END)
+    app.grep_output_text.insert(tk.END, result)
+    app.grep_output_text.config(state=tk.DISABLED)
+
+def on_grep_text(app):
+    root_path_str = app.grep_root_path.get()
+    if not root_path_str or root_path_str == t("ui.no_folder_selected"):
+        app_utils.show_notification(app, 'warning', t("message.error_title"), t("message.select_root_first"))
+        return
+    
+    raw_input = app.grep_raw_text.get("1.0", tk.END).strip()
+    if not raw_input: return
+    
+    result = grep_engine.grep_text(Path(root_path_str), raw_input)
+    
+    app.grep_output_text.config(state=tk.NORMAL)
+    app.grep_output_text.delete("1.0", tk.END)
+    app.grep_output_text.insert(tk.END, result)
+    app.grep_output_text.config(state=tk.DISABLED)
+
+def on_grep_merge(app):
+    root_path_str = app.grep_root_path.get()
+    if not root_path_str or root_path_str == t("ui.no_folder_selected"):
+        app_utils.show_notification(app, 'warning', t("message.error_title"), t("message.select_root_first"))
+        return
+    
+    raw_input = app.grep_raw_text.get("1.0", tk.END).strip()
+    tree_input = app.grep_tree_text.get("1.0", tk.END).strip()
+    if not raw_input and not tree_input: return
+    
+    success, result = grep_engine.merge_files(Path(root_path_str), raw_input, tree_input)
+    
+    app.grep_output_text.config(state=tk.NORMAL)
+    app.grep_output_text.delete("1.0", tk.END)
+    if not success:
+        app.grep_output_text.insert(tk.END, "--- MERGE FAILED ---\n\n" + result)
+    else:
+        app.grep_output_text.insert(tk.END, result)
+    app.grep_output_text.config(state=tk.DISABLED)
+
+def on_grep_copy(app):
+    content = app.grep_output_text.get("1.0", tk.END).strip()
+    if not content: return
+    
+    app.root.clipboard_clear()
+    app.root.clipboard_append(content)
+    messagebox.showinfo("Success", "Copied to clipboard.")

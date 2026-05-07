@@ -7,6 +7,7 @@ window geometry management, and path validation.
 """
 import json
 import logging
+import os
 import re
 import sys
 import subprocess
@@ -110,6 +111,7 @@ def load_app_window_geometry(app):
     show_recovery_after_overwrite = True
     enable_similarity_scan = True
     show_console = False
+    grep_root_path = t("ui.no_folder_selected")
     main_sash_pos_loaded = None
     diff_sash_pos_loaded = None
     window_state_loaded = None
@@ -127,6 +129,7 @@ def load_app_window_geometry(app):
                 if "window_state" in config: window_state_loaded = config["window_state"]
                 if "main_sash_pos" in config: main_sash_pos_loaded = config["main_sash_pos"]
                 if "diff_sash_pos" in config: diff_sash_pos_loaded = config["diff_sash_pos"]
+                if "GREP_ROOT_PATH" in config: grep_root_path = config["GREP_ROOT_PATH"]
         except Exception as e:
             logger.error(f"Error loading window config: {e}")
             config = {}
@@ -138,6 +141,8 @@ def load_app_window_geometry(app):
     app.show_recovery_after_overwrite.set(show_recovery_after_overwrite)
     app.enable_similarity_scan.set(enable_similarity_scan)
     app.show_console.set(show_console)
+    app.grep_root_path.set(grep_root_path)
+    
     geometry_to_apply = app.DEFAULT_GEOMETRY
     if loaded_geometry:
         try:
@@ -186,6 +191,7 @@ def save_app_window_geometry(app):
         config["SHOW_RECOVERY_AFTER_OVERWRITE"] = app.show_recovery_after_overwrite.get()
         config["ENABLE_SIMILARITY_SCAN"] = app.enable_similarity_scan.get()
         config["SHOW_CONSOLE"] = app.show_console.get()
+        config["GREP_ROOT_PATH"] = app.grep_root_path.get()
 
         if hasattr(app, 'main_paned_window') and app.main_paned_window.winfo_exists():
             config["main_sash_pos"] = app.main_paned_window.sash_coord(0)[0]
@@ -198,35 +204,51 @@ def save_app_window_geometry(app):
     except Exception as e:
         logger.error(f"Error saving window config: {e}")
 
-def load_last_root_path(app):
+def load_last_root_path(app, target="scaffold"):
     """Loads the last selected root path from config.json and updates UI."""
     config_path = Path.cwd() / app.CONFIG_FILE
-    app.last_root_path = None
+    path_key = "last_root_path" if target == "scaffold" else "last_grep_root_path"
+    
+    loaded_path = None
     if config_path.exists():
         try:
             with open(config_path, "r", encoding="utf-8") as f:
                 config = json.load(f)
-                if "last_root_path" in config:
-                    path_str = config["last_root_path"]
-                    if Path(path_str).is_dir(): app.last_root_path = path_str
+                if path_key in config:
+                    path_str = config[path_key]
+                    if Path(path_str).is_dir(): loaded_path = path_str
         except: pass
     
-    if app.last_root_path: app.prev_dir_button.config(state=tk.NORMAL)
-    else: app.prev_dir_button.config(state=tk.DISABLED)
+    if target == "scaffold":
+        app.last_root_path = loaded_path
+        if loaded_path: app.prev_dir_button.config(state=tk.NORMAL)
+        else: app.prev_dir_button.config(state=tk.DISABLED)
+    else:
+        app.last_grep_root_path = loaded_path
+        if hasattr(app, "grep_prev_btn"):
+            if loaded_path: app.grep_prev_btn.config(state=tk.NORMAL)
+            else: app.grep_prev_btn.config(state=tk.DISABLED)
 
-def save_last_root_path(app, path: str):
+def save_last_root_path(app, path: str, target="scaffold"):
     """Saves the given path as the last selected root path to config.json."""
     config_path = Path.cwd() / app.CONFIG_FILE
+    path_key = "last_root_path" if target == "scaffold" else "last_grep_root_path"
     try:
         config = {}
         if config_path.exists():
             with open(config_path, "r", encoding="utf-8") as f:
                 config = json.load(f)
-        config["last_root_path"] = path
+        config[path_key] = path
         with open(config_path, "w", encoding="utf-8") as f:
             json.dump(config, f, indent=4)
-        app.last_root_path = path
-        app.prev_dir_button.config(state=tk.NORMAL)
+        
+        if target == "scaffold":
+            app.last_root_path = path
+            app.prev_dir_button.config(state=tk.NORMAL)
+        else:
+            app.last_grep_root_path = path
+            if hasattr(app, "grep_prev_btn"):
+                app.grep_prev_btn.config(state=tk.NORMAL)
     except Exception as e:
         logger.error(f"Error saving last root path: {e}")
 
@@ -383,3 +405,24 @@ def set_console_visibility(visible: bool):
         user32.ShowWindow(hwnd, 5 if visible else 0)
     except Exception as e:
         logger.error(f"Error setting console visibility: {e}")
+
+def open_containing_folder(path: Path):
+    """Opens the folder containing the specified path in the OS file explorer."""
+    try:
+        if not path.exists():
+            return False
+
+        target = path if path.is_dir() else path.parent
+        if not target.exists():
+            return False
+
+        path_str = str(target)
+        if sys.platform == "win32":
+            os.startfile(path_str)
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", path_str])
+        else:
+            subprocess.Popen(["xdg-open", path_str])
+        return True
+    except Exception:
+        return False

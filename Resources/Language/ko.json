@@ -5,6 +5,7 @@
         "no_folder_selected": "선택된 폴더 없음",
         "browse": "찾아보기...",
         "prev": "이전",
+        "open_folder": "폴더 열기",
         "check_folder": "폴더 체크",
         "section_2": "2. 작업 설정 (Job Setting)",
         "job_name_placeholder": "작업 이름을 입력하세요... (Write job name...)",
@@ -57,7 +58,15 @@
         "cleanup_now": "로그 정리 실행",
         "close": "닫기",
         "esc_to_close": "(Esc를 눌러 닫기)",
-        "check_folder_result": "대상: {name}\n\n- 폴더: {dirs}개\n- 파일: {files}개 (일반: {normal}, .gitkeep: {gitkeep})\n\n(전체 항목: {total}개)"
+        "check_folder_result": "대상: {name}\n\n- 폴더: {dirs}개\n- 파일: {files}개 (일반: {normal}, .gitkeep: {gitkeep})\n\n(전체 항목: {total}개)",
+        "tab_grep": "Grep & 병합",
+        "grep_input_tab": " 입력 키워드 ",
+        "grep_context_tab": " 트리 뷰 / 컨텍스트 ",
+        "grep_output_header": "출력 / 병합된 내용",
+        "grep_find_btn": "1. 파일 찾기",
+        "grep_text_btn": "2. 내용 검색",
+        "grep_merge_btn": "3. 파일 병합 (V2)",
+        "grep_copy_btn": "모두 복사"
     },
     "log": {
         "loading_test_data": "테스트 데이터를 로드하는 중...",

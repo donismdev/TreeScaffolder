@@ -5,6 +5,7 @@
         "no_folder_selected": "No folder selected.",
         "browse": "Browse...",
         "prev": "Prev",
+        "open_folder": "Open Folder",
         "check_folder": "Check Folder",
         "section_2": "2. Job Setting",
         "job_name_placeholder": "Write job name...",
@@ -57,7 +58,15 @@
         "cleanup_now": "Clean up logs",
         "close": "Close",
         "esc_to_close": "(Esc to close)",
-        "check_folder_result": "Target: {name}\n\n- Directories: {dirs}\n- Files: {files} (Normal: {normal}, .gitkeep: {gitkeep})\n\n(Total items: {total})"
+        "check_folder_result": "Target: {name}\n\n- Directories: {dirs}\n- Files: {files} (Normal: {normal}, .gitkeep: {gitkeep})\n\n(Total items: {total})",
+        "tab_grep": "Grep & Merge",
+        "grep_input_tab": " Input Keywords ",
+        "grep_context_tab": " Tree View / Context ",
+        "grep_output_header": "Output / Merged Content",
+        "grep_find_btn": "1. Find Files",
+        "grep_text_btn": "2. Grep Content",
+        "grep_merge_btn": "3. Merge Files (V2)",
+        "grep_copy_btn": "Copy All"
     },
     "log": {
         "loading_test_data": "Attempting to load test data...",

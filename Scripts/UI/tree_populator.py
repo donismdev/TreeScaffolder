@@ -226,9 +226,16 @@ def _populate_treeview_from_plan(app, tree_widget: ttk.Treeview, plan_obj, root_
                 check_char = "☑" if app.selected_paths[path] else "☐"
                 prefix = f"{check_char} "
 
+            # --- Empty File Markup ---
+            empty_markup = ""
+            if not item_is_directory:
+                planned_content = plan_obj.file_contents.get(path.resolve())
+                if planned_content is not None and not planned_content.strip():
+                     empty_markup = "[Empty] "
+
             should_open_this_item = auto_open_modified and item_is_directory
             
-            node_id = tree_widget.insert(parent_node_id, "end", text=f"{prefix}{icon} {path.name}", tags=tags, values=[str(path)], open=should_open_this_item)
+            node_id = tree_widget.insert(parent_node_id, "end", text=f"{prefix}{icon} {empty_markup}{path.name}", tags=tags, values=[str(path)], open=should_open_this_item)
             
             if node_map is not None:
                 node_map[str(path)] = node_id

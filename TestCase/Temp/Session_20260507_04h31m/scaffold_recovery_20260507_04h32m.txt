@@ -1,0 +1,1683 @@
+@@@COMMENT_BEGIN {{None}}
+SCAFFOLD EXECUTION RECOVERY LOG
+Date: 2026-05-07T04:32:16.258971
+Target Root Folder: C:\Users\azuli\Documents\Unreal Projects\CDR\Programming
+Number of Overwritten Files: 7
+Instructions: This file contains the original content of files that were overwritten.
+You can use these blocks to restore previous versions if needed.
+@@@COMMENT_END
+
+@@@FILE_BEGIN {{Root}}/Source/ModeMercenary/Public/Presentation/MercenaryInfoReturnWidget.h
+#pragma once
+
+#include "CoreMinimal.h"
+#include "Blueprint/UserWidget.h"
+#include "RaidResult/MercenaryRaidResultTypes.h"
+#include "MercenaryInfoReturnWidget.generated.h"
+
+class UButton;
+class UTextBlock;
+class UVerticalBox;
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FMercenaryInfoReturnWidgetDebugReturnRequested);
+
+UCLASS()
+class MODEMERCENARY_API UMercenaryInfoReturnWidget__Test final : public UUserWidget
+{
+	GENERATED_BODY()
+
+public:
+	UMercenaryInfoReturnWidget__Test(const FObjectInitializer& InObjectInitializer);
+
+	void SetSnapshot(const FMercenaryRaidResultSnapshot* InSnapshot);
+
+	UPROPERTY(BlueprintAssignable)
+	FMercenaryInfoReturnWidgetDebugReturnRequested OnDebugReturnRequested;
+
+protected:
+	virtual TSharedRef<SWidget> RebuildWidget() override;
+	virtual void NativeConstruct() override;
+
+private:
+	void BuildWidgetTree();
+	void RefreshWidget();
+	UTextBlock* AddRow(const FLinearColor& InColor);
+	void SetRow(UTextBlock* InRow, const FString& InText);
+
+	FString BuildReturnPressureLevelLabel(EMercenaryReturnPressureLevel InLevel) const;
+	FString BuildProgressDirectionLabel(EMercenaryProgressDirectionKind InDirection) const;
+	FString BuildProgressContextLabel(EMercenaryProgressContextKind InContext) const;
+
+	UFUNCTION()
+	void HandleDebugReturnClicked();
+
+private:
+	const FMercenaryRaidResultSnapshot* SnapshotPtr = nullptr;
+
+	UPROPERTY()
+	TObjectPtr<UVerticalBox> RootVerticalBox = nullptr;
+
+	UPROPERTY()
+	TObjectPtr<UTextBlock> Row_ReturnPressureHeader = nullptr;
+
+	UPROPERTY()
+	TObjectPtr<UTextBlock> Row_ReturnOpportunityCount = nullptr;
+
+	UPROPERTY()
+	TObjectPtr<UTextBlock> Row_ReturnRefusalCount = nullptr;
+
+	UPROPERTY()
+	TObjectPtr<UTextBlock> Row_ReturnPressureLevel = nullptr;
+
+	UPROPERTY()
+	TObjectPtr<UTextBlock> Row_MissingPenaltyLevel = nullptr;
+
+	UPROPERTY()
+	TObjectPtr<UTextBlock> Row_InjuryRiskLevel = nullptr;
+
+	UPROPERTY()
+	TObjectPtr<UTextBlock> Row_CurseRiskLevel = nullptr;
+
+	UPROPERTY()
+	TObjectPtr<UTextBlock> Row_LootLossRiskLevel = nullptr;
+
+	UPROPERTY()
+	TObjectPtr<UTextBlock> Row_ProgressDirectionHeader = nullptr;
+
+	UPROPERTY()
+	TObjectPtr<UTextBlock> Row_ProgressDirectionCounts = nullptr;
+
+	UPROPERTY()
+	TObjectPtr<UTextBlock> Row_ProgressContextCounts = nullptr;
+
+	UPROPERTY()
+	TObjectPtr<UTextBlock> Row_LastProgressDirection = nullptr;
+
+	UPROPERTY()
+	TObjectPtr<UTextBlock> Row_BreakDownHeader = nullptr;
+
+	UPROPERTY()
+	TObjectPtr<UTextBlock> Row_BreakDownState = nullptr;
+
+	UPROPERTY()
+	TObjectPtr<UTextBlock> Row_BreakDownReached = nullptr;
+
+	UPROPERTY()
+	TObjectPtr<UTextBlock> Row_RouteDataHeader = nullptr;
+
+	UPROPERTY()
+	TObjectPtr<UTextBlock> Row_RouteDataDummy = nullptr;
+
+	UPROPERTY()
+	TObjectPtr<UTextBlock> Row_RouteDataMission = nullptr;
+
+	UPROPERTY()
+	TObjectPtr<UTextBlock> Row_RouteDataBurden = nullptr;
+
+	UPROPERTY()
+	TObjectPtr<UTextBlock> Row_RouteDataRelic = nullptr;
+
+	UPROPERTY()
+	TObjectPtr<UButton> DebugReturnButton = nullptr;
+
+	UPROPERTY()
+	TObjectPtr<UTextBlock> DebugReturnButtonText = nullptr;
+};
+
+@@@FILE_END
+
+@@@FILE_BEGIN {{Root}}/Source/ModeMercenary/Private/Presentation/MercenaryInfoReturnWidget.cpp
+#include "Presentation/MercenaryInfoReturnWidget.h"
+
+#include "Blueprint/WidgetTree.h"
+#include "Components/Button.h"
+#include "Components/TextBlock.h"
+#include "Components/VerticalBox.h"
+#include "Components/VerticalBoxSlot.h"
+#include "Core/PlayCoreDisplayText.h"
+
+#define UMercenaryInfoReturnWidget UMercenaryInfoReturnWidget__Test
+
+UMercenaryInfoReturnWidget::UMercenaryInfoReturnWidget(const FObjectInitializer& InObjectInitializer)
+	: Super(InObjectInitializer)
+{
+}
+
+void UMercenaryInfoReturnWidget::SetSnapshot(const FMercenaryRaidResultSnapshot* InSnapshot)
+{
+	SnapshotPtr = InSnapshot;
+	RefreshWidget();
+}
+
+TSharedRef<SWidget> UMercenaryInfoReturnWidget::RebuildWidget()
+{
+	BuildWidgetTree();
+
+	TSharedRef<SWidget> WidgetRef = Super::RebuildWidget();
+	RefreshWidget();
+	return WidgetRef;
+}
+
+void UMercenaryInfoReturnWidget::NativeConstruct()
+{
+	Super::NativeConstruct();
+	RefreshWidget();
+}
+
+void UMercenaryInfoReturnWidget::BuildWidgetTree()
+{
+	if (WidgetTree == nullptr)
+	{
+		return;
+	}
+
+	RootVerticalBox = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("ReturnRootVerticalBox"));
+	if (RootVerticalBox == nullptr)
+	{
+		return;
+	}
+
+	WidgetTree->RootWidget = RootVerticalBox;
+
+	const FLinearColor HeaderColor(0.96f, 0.84f, 0.42f, 1.0f);
+	const FLinearColor NormalColor(0.88f, 0.88f, 0.92f, 1.0f);
+
+	Row_ReturnPressureHeader = AddRow(HeaderColor);
+	Row_ReturnOpportunityCount = AddRow(NormalColor);
+	Row_ReturnRefusalCount = AddRow(NormalColor);
+	Row_ReturnPressureLevel = AddRow(NormalColor);
+	Row_MissingPenaltyLevel = AddRow(NormalColor);
+	Row_InjuryRiskLevel = AddRow(NormalColor);
+	Row_CurseRiskLevel = AddRow(NormalColor);
+	Row_LootLossRiskLevel = AddRow(NormalColor);
+
+	Row_ProgressDirectionHeader = AddRow(HeaderColor);
+	Row_ProgressDirectionCounts = AddRow(NormalColor);
+	Row_ProgressContextCounts = AddRow(NormalColor);
+	Row_LastProgressDirection = AddRow(NormalColor);
+
+	Row_BreakDownHeader = AddRow(HeaderColor);
+	Row_BreakDownState = AddRow(NormalColor);
+	Row_BreakDownReached = AddRow(NormalColor);
+
+	Row_RouteDataHeader = AddRow(HeaderColor);
+	Row_RouteDataDummy = AddRow(NormalColor);
+	Row_RouteDataMission = AddRow(NormalColor);
+	Row_RouteDataBurden = AddRow(NormalColor);
+	Row_RouteDataRelic = AddRow(NormalColor);
+
+	DebugReturnButton = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), TEXT("DebugReturnButton"));
+	DebugReturnButtonText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("DebugReturnButtonText"));
+
+	if (DebugReturnButton != nullptr && DebugReturnButtonText != nullptr)
+	{
+		DebugReturnButtonText->SetText(PlayCoreDisplayText::UI(TEXT("테스트 귀환 팝업")));
+		DebugReturnButtonText->SetColorAndOpacity(FSlateColor(FLinearColor::White));
+
+		FSlateFontInfo FontInfo = DebugReturnButtonText->GetFont();
+		FontInfo.Size = 13;
+		DebugReturnButtonText->SetFont(FontInfo);
+
+		DebugReturnButton->SetContent(DebugReturnButtonText);
+		DebugReturnButton->OnClicked.AddDynamic(this, &UMercenaryInfoReturnWidget::HandleDebugReturnClicked);
+
+		if (UVerticalBoxSlot* DebugButtonSlot = RootVerticalBox->AddChildToVerticalBox(DebugReturnButton))
+		{
+			DebugButtonSlot->SetPadding(FMargin(0.0f, 4.0f, 0.0f, 2.0f));
+			DebugButtonSlot->SetSize(FSlateChildSize(ESlateSizeRule::Automatic));
+		}
+	}
+}
+
+void UMercenaryInfoReturnWidget::RefreshWidget()
+{
+	if (RootVerticalBox == nullptr)
+	{
+		return;
+	}
+
+	const FMercenaryReturnPressureState EmptyPressure;
+	const FMercenaryReturnPressureState& Pressure = SnapshotPtr != nullptr
+		? SnapshotPtr->ReturnPressureState
+		: EmptyPressure;
+
+	SetRow(Row_ReturnPressureHeader.Get(), TEXT("── 귀환 압력 ──"));
+	SetRow(Row_ReturnOpportunityCount.Get(), FString::Printf(TEXT("귀환 기회: %d"), Pressure.ReturnOpportunityCount));
+	SetRow(Row_ReturnRefusalCount.Get(), FString::Printf(TEXT("귀환 거부: %d"), Pressure.ReturnRefusalCount));
+	SetRow(Row_ReturnPressureLevel.Get(), FString::Printf(TEXT("압력: %s"), *BuildReturnPressureLevelLabel(Pressure.PressureLevel)));
+	SetRow(Row_MissingPenaltyLevel.Get(), FString::Printf(TEXT("실종 약화 위험: %d"), Pressure.MissingPenaltyLevel));
+	SetRow(Row_InjuryRiskLevel.Get(), FString::Printf(TEXT("영구 부상 위험: %d"), Pressure.InjuryRiskLevel));
+	SetRow(Row_CurseRiskLevel.Get(), FString::Printf(TEXT("저주 위험: %d"), Pressure.CurseRiskLevel));
+	SetRow(Row_LootLossRiskLevel.Get(), FString::Printf(TEXT("전리품 손실 위험: %d"), Pressure.LootLossRiskLevel));
+
+	SetRow(Row_ProgressDirectionHeader.Get(), TEXT("── 진행 방향 ──"));
+
+	const FMercenaryProgressDirectionState EmptyProgressDirection;
+	const FMercenaryProgressDirectionState& ProgressDirection = SnapshotPtr != nullptr
+		? SnapshotPtr->ProgressDirectionState
+		: EmptyProgressDirection;
+
+	SetRow(
+		Row_ProgressDirectionCounts.Get(),
+		FString::Printf(
+			TEXT("진행 %d / 퇴각 %d / 던전 진행 %d / 던전 탈출 %d"),
+			ProgressDirection.ForwardCount,
+			ProgressDirection.RetreatCount,
+			ProgressDirection.DungeonForwardCount,
+			ProgressDirection.DungeonExitCount
+		)
+	);
+
+	SetRow(
+		Row_ProgressContextCounts.Get(),
+		FString::Printf(
+			TEXT("일반 %d / 던전 %d / 미션 %d / 이벤트 %d / 귀환루트 %d"),
+			ProgressDirection.NormalContextCount,
+			ProgressDirection.DungeonContextCount,
+			ProgressDirection.MissionContextCount,
+			ProgressDirection.EventContextCount,
+			ProgressDirection.ReturnRouteContextCount
+		)
+	);
+
+	SetRow(
+		Row_LastProgressDirection.Get(),
+		FString::Printf(
+			TEXT("마지막: %s / %s"),
+			*BuildProgressDirectionLabel(ProgressDirection.LastDirection),
+			*BuildProgressContextLabel(ProgressDirection.LastContext)
+		)
+	);
+
+	SetRow(Row_BreakDownHeader.Get(), TEXT("── Breakdown ──"));
+
+	const FMercenaryAchievementState EmptyAchievement;
+	const FMercenaryAchievementState& Achievement = SnapshotPtr != nullptr
+		? SnapshotPtr->AchievementState
+		: EmptyAchievement;
+
+	SetRow(
+		Row_BreakDownState.Get(),
+		FString::Printf(
+			TEXT("현재 %d / 최대 %d / 발생 %d회"),
+			Achievement.BreakDownLevel,
+			Achievement.MaxBreakDownLevel,
+			Achievement.BreakDownTriggerCount
+		)
+	);
+
+	SetRow(
+		Row_BreakDownReached.Get(),
+		FString::Printf(
+			TEXT("10단 도달: %s / 20단 도달: %s"),
+			Achievement.bReachedBreakDown10 == true ? TEXT("true") : TEXT("false"),
+			Achievement.bReachedBreakDown20 == true ? TEXT("true") : TEXT("false")
+		)
+	);
+
+	SetRow(Row_RouteDataHeader.Get(), TEXT("── RouteData ──"));
+
+	if (SnapshotPtr == nullptr)
+	{
+		SetRow(Row_RouteDataDummy.Get(), TEXT("RouteData 없음"));
+		SetRow(Row_RouteDataMission.Get(), TEXT(""));
+		SetRow(Row_RouteDataBurden.Get(), TEXT(""));
+		SetRow(Row_RouteDataRelic.Get(), TEXT(""));
+
+		if (DebugReturnButton != nullptr)
+		{
+			DebugReturnButton->SetIsEnabled(false);
+		}
+
+		return;
+	}
+
+	const FMercenaryMissionProgress& MajorMission = SnapshotPtr->MissionState.MajorMission;
+
+	SetRow(
+		Row_RouteDataDummy.Get(),
+		FString::Printf(
+			TEXT("DummyRouteData: %s / BuildSeed: %s"),
+			SnapshotPtr->bDummyRouteData == true ? TEXT("true") : TEXT("false"),
+			*SnapshotPtr->BuildTraitSeedId.ToString()
+		)
+	);
+
+	SetRow(
+		Row_RouteDataMission.Get(),
+		FString::Printf(
+			TEXT("Mission: %s / Target: %s / Faction: %s / Route: %s"),
+			*MajorMission.MissionId.ToString(),
+			*MajorMission.TargetId.ToString(),
+			*MajorMission.FactionId.ToString(),
+			*UEnum::GetValueAsString(MajorMission.RouteResultState)
+		)
+	);
+
+	SetRow(
+		Row_RouteDataBurden.Get(),
+		FString::Printf(
+			TEXT("Burden: %s / Kind: %s"),
+			*SnapshotPtr->PersonalBurdenState.BurdenId.ToString(),
+			*UEnum::GetValueAsString(SnapshotPtr->PersonalBurdenState.Kind)
+		)
+	);
+
+	SetRow(
+		Row_RouteDataRelic.Get(),
+		FString::Printf(
+			TEXT("Relic: %s"),
+			*SnapshotPtr->AchievementState.RelicId.ToString()
+		)
+	);
+
+	if (DebugReturnButton != nullptr)
+	{
+		DebugReturnButton->SetIsEnabled(true);
+	}
+}
+
+UTextBlock* UMercenaryInfoReturnWidget::AddRow(const FLinearColor& InColor)
+{
+	if (RootVerticalBox == nullptr || WidgetTree == nullptr)
+	{
+		return nullptr;
+	}
+
+	UTextBlock* Block = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+	if (Block == nullptr)
+	{
+		return nullptr;
+	}
+
+	FSlateFontInfo FontInfo = Block->GetFont();
+	FontInfo.Size = 13;
+	Block->SetFont(FontInfo);
+	Block->SetColorAndOpacity(FSlateColor(InColor));
+	Block->SetAutoWrapText(true);
+
+	if (UVerticalBoxSlot* RowSlot = RootVerticalBox->AddChildToVerticalBox(Block))
+	{
+		RowSlot->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 3.0f));
+		RowSlot->SetSize(FSlateChildSize(ESlateSizeRule::Automatic));
+	}
+
+	return Block;
+}
+
+void UMercenaryInfoReturnWidget::SetRow(UTextBlock* InRow, const FString& InText)
+{
+	if (InRow == nullptr)
+	{
+		return;
+	}
+
+	InRow->SetText(PlayCoreDisplayText::UI(InText));
+	InRow->SetVisibility(InText.IsEmpty() == true ? ESlateVisibility::Collapsed : ESlateVisibility::SelfHitTestInvisible);
+}
+
+FString UMercenaryInfoReturnWidget::BuildReturnPressureLevelLabel(const EMercenaryReturnPressureLevel InLevel) const
+{
+	switch (InLevel)
+	{
+	case EMercenaryReturnPressureLevel::None:
+		return TEXT("없음");
+
+	case EMercenaryReturnPressureLevel::Light:
+		return TEXT("낮음");
+
+	case EMercenaryReturnPressureLevel::Moderate:
+		return TEXT("주의");
+
+	case EMercenaryReturnPressureLevel::High:
+		return TEXT("위험");
+
+	case EMercenaryReturnPressureLevel::Extreme:
+		return TEXT("극단");
+
+	default:
+		return UEnum::GetValueAsString(InLevel);
+	}
+}
+
+FString UMercenaryInfoReturnWidget::BuildProgressDirectionLabel(const EMercenaryProgressDirectionKind InDirection) const
+{
+	switch (InDirection)
+	{
+	case EMercenaryProgressDirectionKind::Forward:
+		return TEXT("진행");
+
+	case EMercenaryProgressDirectionKind::Retreat:
+		return TEXT("퇴각");
+
+	case EMercenaryProgressDirectionKind::DungeonForward:
+		return TEXT("던전 진행");
+
+	case EMercenaryProgressDirectionKind::DungeonExit:
+		return TEXT("던전 탈출");
+
+	case EMercenaryProgressDirectionKind::None:
+	default:
+		return TEXT("없음");
+	}
+}
+
+FString UMercenaryInfoReturnWidget::BuildProgressContextLabel(const EMercenaryProgressContextKind InContext) const
+{
+	switch (InContext)
+	{
+	case EMercenaryProgressContextKind::Normal:
+		return TEXT("일반");
+
+	case EMercenaryProgressContextKind::Dungeon:
+		return TEXT("던전");
+
+	case EMercenaryProgressContextKind::Mission:
+		return TEXT("미션");
+
+	case EMercenaryProgressContextKind::Event:
+		return TEXT("이벤트");
+
+	case EMercenaryProgressContextKind::ReturnRoute:
+		return TEXT("귀환 루트");
+
+	case EMercenaryProgressContextKind::None:
+	default:
+		return TEXT("없음");
+	}
+}
+
+void UMercenaryInfoReturnWidget::HandleDebugReturnClicked()
+{
+	OnDebugReturnRequested.Broadcast();
+}
+
+@@@FILE_END
+
+@@@FILE_BEGIN {{Root}}/Source/ModeMercenary/Public/Presentation/MercenaryInfoMissionWidget.h
+#pragma once
+
+#include "CoreMinimal.h"
+#include "Blueprint/UserWidget.h"
+#include "RaidResult/MercenaryRaidResultTypes.h"
+#include "MercenaryInfoMissionWidget.generated.h"
+
+class UTextBlock;
+class UVerticalBox;
+
+UCLASS()
+class MODEMERCENARY_API UMercenaryInfoMissionWidget__Test final : public UUserWidget
+{
+	GENERATED_BODY()
+
+public:
+	UMercenaryInfoMissionWidget__Test(const FObjectInitializer& InObjectInitializer);
+
+	void SetSnapshot(const FMercenaryRaidResultSnapshot* InSnapshot);
+
+protected:
+	virtual TSharedRef<SWidget> RebuildWidget() override;
+	virtual void NativeConstruct() override;
+
+private:
+	void BuildWidgetTree();
+	void RefreshWidget();
+	UTextBlock* AddRow(const FLinearColor& InColor);
+	void SetRow(UTextBlock* InRow, const FString& InText);
+
+private:
+	static constexpr int32 MinorMissionRowCount = 6;
+
+	const FMercenaryRaidResultSnapshot* SnapshotPtr = nullptr;
+
+	UPROPERTY()
+	TObjectPtr<UVerticalBox> RootVerticalBox = nullptr;
+
+	UPROPERTY()
+	TObjectPtr<UTextBlock> Row_MajorHeader = nullptr;
+
+	UPROPERTY()
+	TArray<TObjectPtr<UTextBlock>> Row_MajorMissionRows;
+
+	UPROPERTY()
+	TObjectPtr<UTextBlock> Row_MinorHeader = nullptr;
+
+	UPROPERTY()
+	TObjectPtr<UTextBlock> Row_MinorSummary = nullptr;
+
+	UPROPERTY()
+	TArray<TObjectPtr<UTextBlock>> Row_MinorMissionRows;
+};
+
+@@@FILE_END
+
+@@@FILE_BEGIN {{Root}}/Source/ModeMercenary/Private/Presentation/MercenaryInfoMissionWidget.cpp
+#include "Presentation/MercenaryInfoMissionWidget.h"
+
+#include "Blueprint/WidgetTree.h"
+#include "Components/TextBlock.h"
+#include "Components/VerticalBox.h"
+#include "Components/VerticalBoxSlot.h"
+#include "Core/PlayCoreDisplayText.h"
+
+#define UMercenaryInfoMissionWidget UMercenaryInfoMissionWidget__Test
+
+UMercenaryInfoMissionWidget::UMercenaryInfoMissionWidget(const FObjectInitializer& InObjectInitializer)
+	: Super(InObjectInitializer)
+{
+}
+
+void UMercenaryInfoMissionWidget::SetSnapshot(const FMercenaryRaidResultSnapshot* InSnapshot)
+{
+	SnapshotPtr = InSnapshot;
+	RefreshWidget();
+}
+
+TSharedRef<SWidget> UMercenaryInfoMissionWidget::RebuildWidget()
+{
+	BuildWidgetTree();
+
+	TSharedRef<SWidget> WidgetRef = Super::RebuildWidget();
+	RefreshWidget();
+	return WidgetRef;
+}
+
+void UMercenaryInfoMissionWidget::NativeConstruct()
+{
+	Super::NativeConstruct();
+	RefreshWidget();
+}
+
+void UMercenaryInfoMissionWidget::BuildWidgetTree()
+{
+	if (WidgetTree == nullptr)
+	{
+		return;
+	}
+
+	Row_MajorMissionRows.Reset();
+	Row_MinorMissionRows.Reset();
+
+	RootVerticalBox = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("MissionRootVerticalBox"));
+	if (RootVerticalBox == nullptr)
+	{
+		return;
+	}
+
+	WidgetTree->RootWidget = RootVerticalBox;
+
+	const FLinearColor HeaderColor(0.96f, 0.84f, 0.42f, 1.0f);
+	const FLinearColor NormalColor(0.88f, 0.88f, 0.92f, 1.0f);
+
+	Row_MajorHeader = AddRow(HeaderColor);
+	for (int32 Index = 0; Index < 5; ++Index)
+	{
+		Row_MajorMissionRows.Add(AddRow(NormalColor));
+	}
+
+	Row_MinorHeader = AddRow(HeaderColor);
+	Row_MinorSummary = AddRow(NormalColor);
+
+	for (int32 Index = 0; Index < MinorMissionRowCount; ++Index)
+	{
+		Row_MinorMissionRows.Add(AddRow(NormalColor));
+	}
+}
+
+void UMercenaryInfoMissionWidget::RefreshWidget()
+{
+	if (RootVerticalBox == nullptr)
+	{
+		return;
+	}
+
+	SetRow(Row_MajorHeader.Get(), TEXT("── 대미션 ──"));
+
+	if (SnapshotPtr == nullptr)
+	{
+		if (Row_MajorMissionRows.IsValidIndex(0) == true)
+		{
+			SetRow(Row_MajorMissionRows[0].Get(), TEXT("대미션 데이터 없음"));
+		}
+
+		SetRow(Row_MinorHeader.Get(), TEXT("── 자잘한 미션 ──"));
+		SetRow(Row_MinorSummary.Get(), TEXT("자잘한 미션 데이터 없음"));
+		return;
+	}
+
+	const FMercenaryMissionProgress& MajorMission = SnapshotPtr->MissionState.MajorMission;
+
+	if (Row_MajorMissionRows.IsValidIndex(0) == true)
+	{
+		SetRow(
+			Row_MajorMissionRows[0].Get(),
+			FString::Printf(
+				TEXT("Mission: %s / Kind: %s"),
+				*MajorMission.MissionId.ToString(),
+				*UEnum::GetValueAsString(MajorMission.Kind)
+			)
+		);
+	}
+
+	if (Row_MajorMissionRows.IsValidIndex(1) == true)
+	{
+		SetRow(
+			Row_MajorMissionRows[1].Get(),
+			FString::Printf(
+				TEXT("Target: %s / Faction: %s"),
+				*MajorMission.TargetId.ToString(),
+				*MajorMission.FactionId.ToString()
+			)
+		);
+	}
+
+	if (Row_MajorMissionRows.IsValidIndex(2) == true)
+	{
+		SetRow(
+			Row_MajorMissionRows[2].Get(),
+			FString::Printf(
+				TEXT("Progress: %s / %d/%d"),
+				*UEnum::GetValueAsString(MajorMission.ProgressState),
+				MajorMission.CurrentValue,
+				MajorMission.TargetValue
+			)
+		);
+	}
+
+	if (Row_MajorMissionRows.IsValidIndex(3) == true)
+	{
+		SetRow(
+			Row_MajorMissionRows[3].Get(),
+			FString::Printf(
+				TEXT("RouteResult: %s"),
+				*UEnum::GetValueAsString(MajorMission.RouteResultState)
+			)
+		);
+	}
+
+	if (Row_MajorMissionRows.IsValidIndex(4) == true)
+	{
+		SetRow(
+			Row_MajorMissionRows[4].Get(),
+			FString::Printf(
+				TEXT("Created %d / Updated %d / Completed %d / Life %d"),
+				MajorMission.CreatedTurnIndex,
+				MajorMission.LastUpdatedTurnIndex,
+				MajorMission.CompletedTurnIndex,
+				MajorMission.ActiveLifeCycleTurnCount
+			)
+		);
+	}
+
+	SetRow(Row_MinorHeader.Get(), TEXT("── 자잘한 미션 ──"));
+
+	const FMercenaryMissionState& MissionState = SnapshotPtr->MissionState;
+
+	SetRow(
+		Row_MinorSummary.Get(),
+		FString::Printf(
+			TEXT("활성 %d / 완료 %d / 총 생존주기 %d / 최대 %d"),
+			MissionState.ActiveMinorMissionCount,
+			MissionState.CompletedMinorMissionCount,
+			MissionState.TotalMinorMissionLifeCycleTurnCount,
+			MissionState.MaxMinorMissionLifeCycleTurnCount
+		)
+	);
+
+	int32 VisibleIndex = 0;
+	for (const FMercenaryMissionProgress& Mission : MissionState.MinorMissions)
+	{
+		if (Row_MinorMissionRows.IsValidIndex(VisibleIndex) == false)
+		{
+			break;
+		}
+
+		SetRow(
+			Row_MinorMissionRows[VisibleIndex].Get(),
+			FString::Printf(
+				TEXT("%s / %s / %s / %d턴 / %d/%d"),
+				*Mission.MissionId.ToString(),
+				*UEnum::GetValueAsString(Mission.Kind),
+				*UEnum::GetValueAsString(Mission.ProgressState),
+				Mission.ActiveLifeCycleTurnCount,
+				Mission.CurrentValue,
+				Mission.TargetValue
+			)
+		);
+
+		++VisibleIndex;
+	}
+
+	if (VisibleIndex == 0 && Row_MinorMissionRows.Num() > 0)
+	{
+		SetRow(Row_MinorMissionRows[0].Get(), TEXT("표시할 자잘한 미션 없음"));
+	}
+}
+
+UTextBlock* UMercenaryInfoMissionWidget::AddRow(const FLinearColor& InColor)
+{
+	if (RootVerticalBox == nullptr || WidgetTree == nullptr)
+	{
+		return nullptr;
+	}
+
+	UTextBlock* Block = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+	if (Block == nullptr)
+	{
+		return nullptr;
+	}
+
+	FSlateFontInfo FontInfo = Block->GetFont();
+	FontInfo.Size = 13;
+	Block->SetFont(FontInfo);
+	Block->SetColorAndOpacity(FSlateColor(InColor));
+	Block->SetAutoWrapText(true);
+
+	if (UVerticalBoxSlot* RowSlot = RootVerticalBox->AddChildToVerticalBox(Block))
+	{
+		RowSlot->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 3.0f));
+		RowSlot->SetSize(FSlateChildSize(ESlateSizeRule::Automatic));
+	}
+
+	return Block;
+}
+
+void UMercenaryInfoMissionWidget::SetRow(UTextBlock* InRow, const FString& InText)
+{
+	if (InRow == nullptr)
+	{
+		return;
+	}
+
+	InRow->SetText(PlayCoreDisplayText::UI(InText));
+	InRow->SetVisibility(InText.IsEmpty() == true ? ESlateVisibility::Collapsed : ESlateVisibility::SelfHitTestInvisible);
+}
+
+@@@FILE_END
+
+@@@FILE_BEGIN {{Root}}/Source/ModeMercenary/Private/Presentation/MercenaryInfoReturnConditionWidget.cpp
+#include "Presentation/MercenaryInfoReturnConditionWidget.h"
+
+#include "Blueprint/WidgetTree.h"
+#include "Components/TextBlock.h"
+#include "Components/VerticalBox.h"
+#include "Components/VerticalBoxSlot.h"
+#include "Core/PlayCoreDisplayText.h"
+
+#define UMercenaryInfoReturnConditionWidget UMercenaryInfoReturnConditionWidget__Test
+
+UMercenaryInfoReturnConditionWidget::UMercenaryInfoReturnConditionWidget(const FObjectInitializer& InObjectInitializer)
+	: Super(InObjectInitializer)
+{
+}
+
+void UMercenaryInfoReturnConditionWidget::SetSnapshot(const FMercenaryRaidResultSnapshot* InSnapshot)
+{
+	SnapshotPtr = InSnapshot;
+	RefreshWidget();
+}
+
+TSharedRef<SWidget> UMercenaryInfoReturnConditionWidget::RebuildWidget()
+{
+	BuildWidgetTree();
+
+	TSharedRef<SWidget> WidgetRef = Super::RebuildWidget();
+	RefreshWidget();
+	return WidgetRef;
+}
+
+void UMercenaryInfoReturnConditionWidget::NativeConstruct()
+{
+	Super::NativeConstruct();
+	RefreshWidget();
+}
+
+void UMercenaryInfoReturnConditionWidget::BuildWidgetTree()
+{
+	if (WidgetTree == nullptr)
+	{
+		return;
+	}
+
+	Row_Conditions.Reset();
+
+	RootVerticalBox = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("ReturnConditionRootVerticalBox"));
+	if (RootVerticalBox == nullptr)
+	{
+		return;
+	}
+
+	WidgetTree->RootWidget = RootVerticalBox;
+
+	const FLinearColor HeaderColor(0.96f, 0.84f, 0.42f, 1.0f);
+	const FLinearColor NormalColor(0.88f, 0.88f, 0.92f, 1.0f);
+
+	Row_Header = AddRow(HeaderColor);
+
+	for (int32 Index = 0; Index < ConditionRowCount; ++Index)
+	{
+		Row_Conditions.Add(AddRow(NormalColor));
+	}
+}
+
+void UMercenaryInfoReturnConditionWidget::RefreshWidget()
+{
+	if (RootVerticalBox == nullptr)
+	{
+		return;
+	}
+
+	SetRow(Row_Header.Get(), TEXT("── 돌아오는 조건 ──"));
+
+	for (TObjectPtr<UTextBlock>& Row : Row_Conditions)
+	{
+		SetRow(Row.Get(), TEXT(""));
+	}
+
+	if (SnapshotPtr == nullptr)
+	{
+		if (Row_Conditions.IsValidIndex(0) == true)
+		{
+			SetRow(Row_Conditions[0].Get(), TEXT("돌아오는 조건 데이터 없음"));
+		}
+
+		return;
+	}
+
+	int32 VisibleIndex = 0;
+	for (const FMercenaryReturnConditionProgress& Condition : SnapshotPtr->ReturnConditions)
+	{
+		if (Condition.bVisibleInMissionInfo == false)
+		{
+			continue;
+		}
+
+		if (Row_Conditions.IsValidIndex(VisibleIndex) == false)
+		{
+			break;
+		}
+
+		SetRow(
+			Row_Conditions[VisibleIndex].Get(),
+			FString::Printf(
+				TEXT("%s: %d / %d  | Triggered=%s | Opportunities=%d"),
+				*BuildReturnConditionKindLabel(Condition.Kind),
+				Condition.CurrentValue,
+				Condition.TargetValue,
+				Condition.bTriggered == true ? TEXT("true") : TEXT("false"),
+				Condition.OpportunityCount
+			)
+		);
+
+		++VisibleIndex;
+	}
+
+	if (VisibleIndex == 0 && Row_Conditions.Num() > 0)
+	{
+		SetRow(Row_Conditions[0].Get(), TEXT("표시할 돌아오는 조건 없음"));
+	}
+}
+
+UTextBlock* UMercenaryInfoReturnConditionWidget::AddRow(const FLinearColor& InColor)
+{
+	if (RootVerticalBox == nullptr || WidgetTree == nullptr)
+	{
+		return nullptr;
+	}
+
+	UTextBlock* Block = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+	if (Block == nullptr)
+	{
+		return nullptr;
+	}
+
+	FSlateFontInfo FontInfo = Block->GetFont();
+	FontInfo.Size = 13;
+	Block->SetFont(FontInfo);
+	Block->SetColorAndOpacity(FSlateColor(InColor));
+	Block->SetAutoWrapText(true);
+
+	if (UVerticalBoxSlot* RowSlot = RootVerticalBox->AddChildToVerticalBox(Block))
+	{
+		RowSlot->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 3.0f));
+		RowSlot->SetSize(FSlateChildSize(ESlateSizeRule::Automatic));
+	}
+
+	return Block;
+}
+
+void UMercenaryInfoReturnConditionWidget::SetRow(UTextBlock* InRow, const FString& InText)
+{
+	if (InRow == nullptr)
+	{
+		return;
+	}
+
+	InRow->SetText(PlayCoreDisplayText::UI(InText));
+	InRow->SetVisibility(InText.IsEmpty() == true ? ESlateVisibility::Collapsed : ESlateVisibility::SelfHitTestInvisible);
+}
+
+FString UMercenaryInfoReturnConditionWidget::BuildReturnConditionKindLabel(const EMercenaryReturnConditionKind InKind) const
+{
+	switch (InKind)
+	{
+	case EMercenaryReturnConditionKind::MajorMissionComplete:
+		return TEXT("대미션 완료");
+
+	case EMercenaryReturnConditionKind::PersonalBurdenCleared:
+		return TEXT("개인 사정 해결");
+
+	case EMercenaryReturnConditionKind::InventoryValueReached:
+		return TEXT("가방 가치");
+
+	case EMercenaryReturnConditionKind::BossKillCountReached:
+		return TEXT("보스 처치");
+
+	case EMercenaryReturnConditionKind::BountyProofReached:
+		return TEXT("현상금 증거");
+
+	case EMercenaryReturnConditionKind::DungeonClearCountReached:
+		return TEXT("던전 클리어");
+
+	case EMercenaryReturnConditionKind::MinorMissionCountReached:
+		return TEXT("자잘한 미션");
+
+	case EMercenaryReturnConditionKind::FactionBondReached:
+		return TEXT("팩션 신뢰");
+
+	case EMercenaryReturnConditionKind::GrowthMilestoneReached:
+		return TEXT("성장 달성");
+
+	case EMercenaryReturnConditionKind::StageRelicAcquired:
+		return TEXT("이벤트 아이템");
+
+	case EMercenaryReturnConditionKind::BreakdownLevel10Reached:
+		return TEXT("Breakdown 10단");
+
+	case EMercenaryReturnConditionKind::BreakdownLevel20Reached:
+		return TEXT("Breakdown 20단");
+
+	case EMercenaryReturnConditionKind::Custom:
+		return TEXT("특수 조건");
+
+	case EMercenaryReturnConditionKind::None:
+	default:
+		return UEnum::GetValueAsString(InKind);
+	}
+}
+
+@@@FILE_END
+
+@@@FILE_BEGIN {{Root}}/Source/ModeMercenary/Public/Presentation/MercenaryInfoReturnConditionWidget.h
+#pragma once
+
+#include "CoreMinimal.h"
+#include "Blueprint/UserWidget.h"
+#include "RaidResult/MercenaryRaidResultTypes.h"
+#include "MercenaryInfoReturnConditionWidget.generated.h"
+
+class UTextBlock;
+class UVerticalBox;
+
+UCLASS()
+class MODEMERCENARY_API UMercenaryInfoReturnConditionWidget__Test final : public UUserWidget
+{
+	GENERATED_BODY()
+
+public:
+	UMercenaryInfoReturnConditionWidget__Test(const FObjectInitializer& InObjectInitializer);
+
+	void SetSnapshot(const FMercenaryRaidResultSnapshot* InSnapshot);
+
+protected:
+	virtual TSharedRef<SWidget> RebuildWidget() override;
+	virtual void NativeConstruct() override;
+
+private:
+	void BuildWidgetTree();
+	void RefreshWidget();
+	UTextBlock* AddRow(const FLinearColor& InColor);
+	void SetRow(UTextBlock* InRow, const FString& InText);
+	FString BuildReturnConditionKindLabel(EMercenaryReturnConditionKind InKind) const;
+
+private:
+	static constexpr int32 ConditionRowCount = 16;
+
+	const FMercenaryRaidResultSnapshot* SnapshotPtr = nullptr;
+
+	UPROPERTY()
+	TObjectPtr<UVerticalBox> RootVerticalBox = nullptr;
+
+	UPROPERTY()
+	TObjectPtr<UTextBlock> Row_Header = nullptr;
+
+	UPROPERTY()
+	TArray<TObjectPtr<UTextBlock>> Row_Conditions;
+};
+
+@@@FILE_END
+
+@@@FILE_BEGIN {{Root}}/Source/ModeMercenary/Private/Presentation/Info/MercenaryInfoPanelWidget.cpp
+#include "Presentation/Info/MercenaryInfoPanelWidget.h"
+
+#include "Blueprint/UserWidget.h"
+#include "Blueprint/WidgetTree.h"
+#include "Components/Border.h"
+#include "Components/Button.h"
+#include "Components/HorizontalBox.h"
+#include "Components/HorizontalBoxSlot.h"
+#include "Components/SizeBox.h"
+#include "Components/TextBlock.h"
+#include "Components/VerticalBox.h"
+#include "Components/VerticalBoxSlot.h"
+#include "ModeMercenary/Info/MercenaryInfoInventoryWidget.h"
+#include "ModeMercenary/Info/MercenaryInfoOverallWidget.h"
+#include "ModeMercenary/Info/MercenaryInfoPieceDeckWidget.h"
+#include "ModeMercenary/Info/MercenaryInfoSkillWidget.h"
+#include "ModeMercenary/Info/MercenaryInfoStatsWidget.h"
+#include "ModeMercenary/Info/MercenaryInfoTreeWidget.h"
+#include "Presentation/MercenaryInfoDossierWidget.h"
+#include "Presentation/MercenaryInfoEntityTestWidget.h"
+#include "Presentation/MercenaryInfoMissionWidget.h"
+#include "Presentation/MercenaryInfoRegionWidget.h"
+#include "Presentation/MercenaryInfoReturnConditionWidget.h"
+#include "Presentation/MercenaryInfoReturnWidget.h"
+#include "Runtime/MercenaryStageRuntime.h"
+#include "Analytics/Runtime/PlayCoreSessionAnalytics.h"
+#include "Core/PlayCoreDisplayText.h"
+
+#define UMercenaryInfoOverallWidget UMercenaryInfoOverallWidget__Test
+#define UMercenaryInfoStatsWidget UMercenaryInfoStatsWidget__Test
+#define UMercenaryInfoMissionWidget UMercenaryInfoMissionWidget__Test
+#define UMercenaryInfoReturnConditionWidget UMercenaryInfoReturnConditionWidget__Test
+#define UMercenaryInfoReturnWidget UMercenaryInfoReturnWidget__Test
+#define UMercenaryInfoDossierWidget UMercenaryInfoDossierWidget__Test
+#define UMercenaryInfoRegionWidget UMercenaryInfoRegionWidget__Test
+#define UMercenaryInfoEntityTestWidget UMercenaryInfoEntityTestWidget__Test
+
+namespace
+{
+	static constexpr float GPanelWidth = 980.0f;
+	static constexpr float GPanelHeight = 700.0f;
+	static constexpr float GTabButtonSpacing = 6.0f;
+
+	static const TCHAR* GTabLabels[] =
+	{
+		TEXT("오버롤"),
+		TEXT("스킬"),
+		TEXT("토큰"),
+		TEXT("트리"),
+		TEXT("인벤/버프"),
+		TEXT("통계"),
+		TEXT("미션"),
+		TEXT("돌아오는 조건"),
+		TEXT("귀환"),
+		TEXT("도쎄"),
+		TEXT("리젼"),
+		TEXT("엔티티T"),
+	};
+}
+
+UMercenaryInfoPanelWidget::UMercenaryInfoPanelWidget(const FObjectInitializer& InObjectInitializer)
+	: Super(InObjectInitializer)
+{
+}
+
+void UMercenaryInfoPanelWidget::SetSessionData(
+	const FPlayCorePartyRuntimeData* InPartyData,
+	const FPlayCoreMercenaryRuntimeData* InMercenaryData,
+	const FPlayCoreRaidAnalyticsData* InAnalyticsData,
+	const FPlayCorePieceTokenDeckData* InStageDeck
+)
+{
+	SetSessionData(
+		InPartyData,
+		InMercenaryData,
+		InAnalyticsData,
+		InStageDeck,
+		nullptr
+	);
+}
+
+void UMercenaryInfoPanelWidget::SetSessionData(
+	const FPlayCorePartyRuntimeData* InPartyData,
+	const FPlayCoreMercenaryRuntimeData* InMercenaryData,
+	const FPlayCoreRaidAnalyticsData* InAnalyticsData,
+	const FPlayCorePieceTokenDeckData* InStageDeck,
+	const FMercenaryRaidResultSnapshot* InRaidResultSnapshot
+)
+{
+	PartyDataPtr = InPartyData;
+	MercenaryDataPtr = InMercenaryData;
+	AnalyticsDataPtr = InAnalyticsData;
+	StageDeckPtr = InStageDeck;
+	RaidResultSnapshotPtr = InRaidResultSnapshot;
+
+	Refresh();
+}
+
+void UMercenaryInfoPanelWidget::SetRegionState(const FMercenaryRegionRuntimeState* InRegionState)
+{
+	RegionStatePtr = InRegionState;
+	Refresh();
+}
+
+void UMercenaryInfoPanelWidget::SetSessionAnalytics(const UPlayCoreSessionAnalytics* InSessionAnalytics)
+{
+	SessionAnalyticsPtr = InSessionAnalytics;
+	Refresh();
+}
+
+void UMercenaryInfoPanelWidget::SetPartyRegionExpData(
+	const TMap<FName, int32>* InPartyRegionExpById,
+	const TMap<FName, int32>* InPartyFactionExpById,
+	const TMap<FName, int32>* InPartyTerrainExpById,
+	const TMap<FName, int32>* InPartyFactionTerrainExpById
+)
+{
+	PartyRegionExpByIdPtr = InPartyRegionExpById;
+	PartyFactionExpByIdPtr = InPartyFactionExpById;
+	PartyTerrainExpByIdPtr = InPartyTerrainExpById;
+	PartyFactionTerrainExpByIdPtr = InPartyFactionTerrainExpById;
+	Refresh();
+}
+
+void UMercenaryInfoPanelWidget::SetStageDebugData(
+	const FMercenaryStageRuntimeState* InStageState,
+	const TArray<FPlayCoreDomainEntityState>* InEntities
+)
+{
+	StageStatePtr = InStageState;
+	DomainEntitiesPtr = InEntities;
+	Refresh();
+}
+
+TSharedRef<SWidget> UMercenaryInfoPanelWidget::RebuildWidget()
+{
+	BuildWidgetTree();
+
+	TSharedRef<SWidget> WidgetRef = Super::RebuildWidget();
+	Refresh();
+	return WidgetRef;
+}
+
+void UMercenaryInfoPanelWidget::NativeConstruct()
+{
+	Super::NativeConstruct();
+	Refresh();
+}
+
+void UMercenaryInfoPanelWidget::BuildWidgetTree()
+{
+	if (WidgetTree == nullptr)
+	{
+		return;
+	}
+
+	TabButtons.Reset();
+	TabTextBlocks.Reset();
+
+	RootSizeBox = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass(), TEXT("RootSizeBox"));
+	if (RootSizeBox == nullptr)
+	{
+		return;
+	}
+
+	RootSizeBox->SetWidthOverride(GPanelWidth);
+	RootSizeBox->SetHeightOverride(GPanelHeight);
+	WidgetTree->RootWidget = RootSizeBox;
+
+	RootBorder = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(), TEXT("RootBorder"));
+	if (RootBorder == nullptr)
+	{
+		return;
+	}
+
+	RootBorder->SetBrushColor(FLinearColor(0.025f, 0.025f, 0.035f, 0.96f));
+	RootBorder->SetPadding(FMargin(12.0f));
+	RootSizeBox->SetContent(RootBorder);
+
+	RootVerticalBox = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("RootVerticalBox"));
+	if (RootVerticalBox == nullptr)
+	{
+		return;
+	}
+
+	RootBorder->SetContent(RootVerticalBox);
+
+	TabButtonRow = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass(), TEXT("TabButtonRow"));
+	if (TabButtonRow != nullptr)
+	{
+		if (UVerticalBoxSlot* TabRowSlot = RootVerticalBox->AddChildToVerticalBox(TabButtonRow))
+		{
+			TabRowSlot->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 8.0f));
+			TabRowSlot->SetSize(FSlateChildSize(ESlateSizeRule::Automatic));
+		}
+
+		const int32 TabCount = static_cast<int32>(EMercenaryInfoTab::Count);
+		for (int32 Index = 0; Index < TabCount; ++Index)
+		{
+			UButton* Btn = WidgetTree->ConstructWidget<UButton>(
+				UButton::StaticClass(),
+				*FString::Printf(TEXT("TabBtn_%d"), Index)
+			);
+
+			UTextBlock* Txt = WidgetTree->ConstructWidget<UTextBlock>(
+				UTextBlock::StaticClass(),
+				*FString::Printf(TEXT("TabTxt_%d"), Index)
+			);
+
+			if (Btn == nullptr || Txt == nullptr)
+			{
+				continue;
+			}
+
+			if (Index < UE_ARRAY_COUNT(GTabLabels))
+			{
+				Txt->SetText(PlayCoreDisplayText::UI(GTabLabels[Index]));
+			}
+			else
+			{
+				Txt->SetText(PlayCoreDisplayText::UI(TEXT("Unknown")));
+			}
+
+			Btn->SetContent(Txt);
+
+			switch (Index)
+			{
+			case 0:
+				Btn->OnClicked.AddDynamic(this, &UMercenaryInfoPanelWidget::HandleTabOverall);
+				break;
+
+			case 1:
+				Btn->OnClicked.AddDynamic(this, &UMercenaryInfoPanelWidget::HandleTabSkill);
+				break;
+
+			case 2:
+				Btn->OnClicked.AddDynamic(this, &UMercenaryInfoPanelWidget::HandleTabPieceDeck);
+				break;
+
+			case 3:
+				Btn->OnClicked.AddDynamic(this, &UMercenaryInfoPanelWidget::HandleTabTree);
+				break;
+
+			case 4:
+				Btn->OnClicked.AddDynamic(this, &UMercenaryInfoPanelWidget::HandleTabInventory);
+				break;
+
+			case 5:
+				Btn->OnClicked.AddDynamic(this, &UMercenaryInfoPanelWidget::HandleTabStats);
+				break;
+
+			case 6:
+				Btn->OnClicked.AddDynamic(this, &UMercenaryInfoPanelWidget::HandleTabMission);
+				break;
+
+			case 7:
+				Btn->OnClicked.AddDynamic(this, &UMercenaryInfoPanelWidget::HandleTabReturnCondition);
+				break;
+
+			case 8:
+				Btn->OnClicked.AddDynamic(this, &UMercenaryInfoPanelWidget::HandleTabReturn);
+				break;
+
+			case 9:
+				Btn->OnClicked.AddDynamic(this, &UMercenaryInfoPanelWidget::HandleTabDossier);
+				break;
+
+			case 10:
+				Btn->OnClicked.AddDynamic(this, &UMercenaryInfoPanelWidget::HandleTabRegion);
+				break;
+
+			case 11:
+				Btn->OnClicked.AddDynamic(this, &UMercenaryInfoPanelWidget::HandleTabEntityTest);
+				break;
+
+			default:
+				break;
+			}
+
+			if (UHorizontalBoxSlot* BtnSlot = TabButtonRow->AddChildToHorizontalBox(Btn))
+			{
+				BtnSlot->SetPadding(FMargin(0.0f, 0.0f, GTabButtonSpacing, 0.0f));
+				BtnSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+			}
+
+			TabButtons.Add(Btn);
+			TabTextBlocks.Add(Txt);
+		}
+	}
+
+	Panel_Overall = WidgetTree->ConstructWidget<UMercenaryInfoOverallWidget>(UMercenaryInfoOverallWidget::StaticClass(), TEXT("Panel_Overall"));
+	Panel_Skill = WidgetTree->ConstructWidget<UMercenaryInfoSkillWidget>(UMercenaryInfoSkillWidget::StaticClass(), TEXT("Panel_Skill"));
+	Panel_PieceDeck = WidgetTree->ConstructWidget<UMercenaryInfoPieceDeckWidget>(UMercenaryInfoPieceDeckWidget::StaticClass(), TEXT("Panel_PieceDeck"));
+	Panel_Tree = WidgetTree->ConstructWidget<UMercenaryInfoTreeWidget>(UMercenaryInfoTreeWidget::StaticClass(), TEXT("Panel_Tree"));
+	Panel_Inventory = WidgetTree->ConstructWidget<UMercenaryInfoInventoryWidget>(UMercenaryInfoInventoryWidget::StaticClass(), TEXT("Panel_Inventory"));
+	Panel_Stats = WidgetTree->ConstructWidget<UMercenaryInfoStatsWidget>(UMercenaryInfoStatsWidget::StaticClass(), TEXT("Panel_Stats"));
+	Panel_Mission = WidgetTree->ConstructWidget<UMercenaryInfoMissionWidget>(UMercenaryInfoMissionWidget::StaticClass(), TEXT("Panel_Mission"));
+	Panel_ReturnCondition = WidgetTree->ConstructWidget<UMercenaryInfoReturnConditionWidget>(UMercenaryInfoReturnConditionWidget::StaticClass(), TEXT("Panel_ReturnCondition"));
+	Panel_Return = WidgetTree->ConstructWidget<UMercenaryInfoReturnWidget>(UMercenaryInfoReturnWidget::StaticClass(), TEXT("Panel_Return"));
+	Panel_Dossier = WidgetTree->ConstructWidget<UMercenaryInfoDossierWidget>(UMercenaryInfoDossierWidget::StaticClass(), TEXT("Panel_Dossier"));
+	Panel_Region = WidgetTree->ConstructWidget<UMercenaryInfoRegionWidget>(UMercenaryInfoRegionWidget::StaticClass(), TEXT("Panel_Region"));
+	Panel_EntityTest = WidgetTree->ConstructWidget<UMercenaryInfoEntityTestWidget>(UMercenaryInfoEntityTestWidget::StaticClass(), TEXT("Panel_EntityTest"));
+
+	if (Panel_Return != nullptr)
+	{
+		Panel_Return->OnDebugReturnRequested.AddDynamic(this, &UMercenaryInfoPanelWidget::HandleDebugReturnClicked);
+	}
+
+	UUserWidget* AllPanels[] =
+	{
+		Panel_Overall.Get(),
+		Panel_Skill.Get(),
+		Panel_PieceDeck.Get(),
+		Panel_Tree.Get(),
+		Panel_Inventory.Get(),
+		Panel_Stats.Get(),
+		Panel_Mission.Get(),
+		Panel_ReturnCondition.Get(),
+		Panel_Return.Get(),
+		Panel_Dossier.Get(),
+		Panel_Region.Get(),
+		Panel_EntityTest.Get(),
+	};
+
+	for (UUserWidget* Panel : AllPanels)
+	{
+		if (Panel == nullptr)
+		{
+			continue;
+		}
+
+		if (UVerticalBoxSlot* PanelSlot = RootVerticalBox->AddChildToVerticalBox(Panel))
+		{
+			PanelSlot->SetPadding(FMargin(0.0f));
+			PanelSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+		}
+	}
+
+	CloseButton = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), TEXT("CloseButton"));
+	CloseTextBlock = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("CloseTextBlock"));
+
+	if (CloseButton != nullptr && CloseTextBlock != nullptr)
+	{
+		CloseTextBlock->SetText(PlayCoreDisplayText::UI(TEXT("닫기 (ESC)")));
+		CloseButton->SetContent(CloseTextBlock);
+		CloseButton->OnClicked.AddDynamic(this, &UMercenaryInfoPanelWidget::HandleCloseClicked);
+
+		if (UVerticalBoxSlot* CloseSlot = RootVerticalBox->AddChildToVerticalBox(CloseButton))
+		{
+			CloseSlot->SetPadding(FMargin(12.0f, 6.0f, 12.0f, 10.0f));
+			CloseSlot->SetHorizontalAlignment(HAlign_Right);
+			CloseSlot->SetSize(FSlateChildSize(ESlateSizeRule::Automatic));
+		}
+	}
+}
+
+void UMercenaryInfoPanelWidget::Refresh()
+{
+	RefreshTabButtons();
+	RefreshPanelVisibility();
+	PushDataToCurrentPanel();
+
+	if (CloseTextBlock != nullptr)
+	{
+		FSlateFontInfo FontInfo = CloseTextBlock->GetFont();
+		FontInfo.Size = 13;
+		CloseTextBlock->SetFont(FontInfo);
+		CloseTextBlock->SetColorAndOpacity(FSlateColor(FLinearColor(0.75f, 0.75f, 0.80f, 1.0f)));
+	}
+}
+
+void UMercenaryInfoPanelWidget::SwitchTab(const EMercenaryInfoTab InTab)
+{
+	if (CurrentTab == InTab)
+	{
+		return;
+	}
+
+	CurrentTab = InTab;
+	RefreshTabButtons();
+	RefreshPanelVisibility();
+	PushDataToCurrentPanel();
+}
+
+void UMercenaryInfoPanelWidget::PushDataToCurrentPanel()
+{
+	if (CurrentTab == EMercenaryInfoTab::Overall && Panel_Overall != nullptr && PartyDataPtr != nullptr && MercenaryDataPtr != nullptr)
+	{
+		Panel_Overall->SetSessionData(
+			*PartyDataPtr,
+			*MercenaryDataPtr,
+			AnalyticsDataPtr
+		);
+		return;
+	}
+
+	if (CurrentTab == EMercenaryInfoTab::Skill && Panel_Skill != nullptr && MercenaryDataPtr != nullptr)
+	{
+		Panel_Skill->SetSessionData(*MercenaryDataPtr);
+		return;
+	}
+
+	if (CurrentTab == EMercenaryInfoTab::PieceDeck && Panel_PieceDeck != nullptr && MercenaryDataPtr != nullptr && StageDeckPtr != nullptr)
+	{
+		Panel_PieceDeck->SetDeckData(
+			MercenaryDataPtr->BasePieceTokenDeck,
+			*StageDeckPtr
+		);
+		return;
+	}
+
+	if (CurrentTab == EMercenaryInfoTab::Tree && Panel_Tree != nullptr && MercenaryDataPtr != nullptr)
+	{
+		Panel_Tree->SetSessionData(*MercenaryDataPtr);
+		return;
+	}
+
+	if (CurrentTab == EMercenaryInfoTab::Inventory && Panel_Inventory != nullptr && MercenaryDataPtr != nullptr)
+	{
+		Panel_Inventory->SetSessionData(*MercenaryDataPtr);
+		return;
+	}
+
+	if (CurrentTab == EMercenaryInfoTab::Stats && Panel_Stats != nullptr && PartyDataPtr != nullptr && MercenaryDataPtr != nullptr && AnalyticsDataPtr != nullptr)
+	{
+		Panel_Stats->SetSessionAnalytics(SessionAnalyticsPtr);
+		Panel_Stats->SetSessionData(*PartyDataPtr, *MercenaryDataPtr, *AnalyticsDataPtr);
+		return;
+	}
+
+	if (CurrentTab == EMercenaryInfoTab::Mission && Panel_Mission != nullptr)
+	{
+		Panel_Mission->SetSnapshot(RaidResultSnapshotPtr);
+		return;
+	}
+
+	if (CurrentTab == EMercenaryInfoTab::ReturnCondition && Panel_ReturnCondition != nullptr)
+	{
+		Panel_ReturnCondition->SetSnapshot(RaidResultSnapshotPtr);
+		return;
+	}
+
+	if (CurrentTab == EMercenaryInfoTab::Return && Panel_Return != nullptr)
+	{
+		Panel_Return->SetSnapshot(RaidResultSnapshotPtr);
+		return;
+	}
+
+	if (CurrentTab == EMercenaryInfoTab::Dossier && Panel_Dossier != nullptr)
+	{
+		Panel_Dossier->SetSnapshot(RaidResultSnapshotPtr);
+		return;
+	}
+
+	if (CurrentTab == EMercenaryInfoTab::Region && Panel_Region != nullptr)
+	{
+		Panel_Region->SetRegionState(RegionStatePtr);
+		Panel_Region->SetPartyRegionExpData(
+			PartyRegionExpByIdPtr,
+			PartyFactionExpByIdPtr,
+			PartyTerrainExpByIdPtr,
+			PartyFactionTerrainExpByIdPtr
+		);
+		return;
+	}
+
+	if (CurrentTab == EMercenaryInfoTab::EntityTest && Panel_EntityTest != nullptr)
+	{
+		Panel_EntityTest->SetDebugData(StageStatePtr, RegionStatePtr, DomainEntitiesPtr);
+		return;
+	}
+}
+
+FString UMercenaryInfoPanelWidget::BuildRegionExpText(const FMercenaryRegionRuntimeState* InRegionState) const
+{
+	if (InRegionState == nullptr || InRegionState->RegionExpById.Num() <= 0)
+	{
+		return TEXT("없음");
+	}
+
+	FString Result;
+
+	for (const TPair<FName, int32>& Entry : InRegionState->RegionExpById)
+	{
+		if (Result.IsEmpty() == false)
+		{
+			Result += TEXT(" / ");
+		}
+
+		Result += FString::Printf(
+			TEXT("%s:%d"),
+			*Entry.Key.ToString(),
+			Entry.Value
+		);
+	}
+
+	return Result;
+}
+
+FString UMercenaryInfoPanelWidget::BuildStartRoadObjectText(const FMercenaryRegionRuntimeState* InRegionState) const
+{
+	if (InRegionState == nullptr || InRegionState->StartRoadObjectAcquiredById.Num() <= 0)
+	{
+		return TEXT("없음");
+	}
+
+	FString Result;
+
+	for (const TPair<FName, bool>& Entry : InRegionState->StartRoadObjectAcquiredById)
+	{
+		if (Result.IsEmpty() == false)
+		{
+			Result += TEXT(" / ");
+		}
+
+		Result += FString::Printf(
+			TEXT("%s:%s"),
+			*Entry.Key.ToString(),
+			Entry.Value == true ? TEXT("획득") : TEXT("미획득")
+		);
+	}
+
+	return Result;
+}
+
+void UMercenaryInfoPanelWidget::RefreshTabButtons()
+{
+	const int32 TabCount = static_cast<int32>(EMercenaryInfoTab::Count);
+	for (int32 Index = 0; Index < TabCount; ++Index)
+	{
+		if (TabButtons.IsValidIndex(Index) == false || TabButtons[Index] == nullptr)
+		{
+			continue;
+		}
+
+		const bool bActive = Index == static_cast<int32>(CurrentTab);
+
+		const FLinearColor NormalColor = bActive == true
+			? FLinearColor(0.20f, 0.45f, 0.80f, 1.0f)
+			: FLinearColor(0.14f, 0.14f, 0.18f, 1.0f);
+
+		FButtonStyle Style = TabButtons[Index]->GetStyle();
+		Style.Normal.TintColor = FSlateColor(NormalColor);
+		Style.Hovered.TintColor = FSlateColor(NormalColor * 1.1f);
+		Style.Pressed.TintColor = FSlateColor(NormalColor * 0.9f);
+		TabButtons[Index]->SetStyle(Style);
+
+		if (TabTextBlocks.IsValidIndex(Index) == false || TabTextBlocks[Index] == nullptr)
+		{
+			continue;
+		}
+
+		FSlateFontInfo FontInfo = TabTextBlocks[Index]->GetFont();
+		FontInfo.Size = 12;
+		TabTextBlocks[Index]->SetFont(FontInfo);
+		TabTextBlocks[Index]->SetColorAndOpacity(FSlateColor(FLinearColor::White));
+	}
+}
+
+void UMercenaryInfoPanelWidget::RefreshPanelVisibility()
+{
+	struct FPanelEntry
+	{
+		UUserWidget* Widget = nullptr;
+		EMercenaryInfoTab Tab = EMercenaryInfoTab::Overall;
+	};
+
+	const FPanelEntry Entries[] =
+	{
+		{ Panel_Overall.Get(), EMercenaryInfoTab::Overall },
+		{ Panel_Skill.Get(), EMercenaryInfoTab::Skill },
+		{ Panel_PieceDeck.Get(), EMercenaryInfoTab::PieceDeck },
+		{ Panel_Tree.Get(), EMercenaryInfoTab::Tree },
+		{ Panel_Inventory.Get(), EMercenaryInfoTab::Inventory },
+		{ Panel_Stats.Get(), EMercenaryInfoTab::Stats },
+		{ Panel_Mission.Get(), EMercenaryInfoTab::Mission },
+		{ Panel_ReturnCondition.Get(), EMercenaryInfoTab::ReturnCondition },
+		{ Panel_Return.Get(), EMercenaryInfoTab::Return },
+		{ Panel_Dossier.Get(), EMercenaryInfoTab::Dossier },
+		{ Panel_Region.Get(), EMercenaryInfoTab::Region },
+		{ Panel_EntityTest.Get(), EMercenaryInfoTab::EntityTest },
+	};
+
+	for (const FPanelEntry& Entry : Entries)
+	{
+		if (Entry.Widget == nullptr)
+		{
+			continue;
+		}
+
+		Entry.Widget->SetVisibility(
+			Entry.Tab == CurrentTab
+				? ESlateVisibility::SelfHitTestInvisible
+				: ESlateVisibility::Collapsed
+		);
+	}
+}
+
+void UMercenaryInfoPanelWidget::HandleTabOverall() { SwitchTab(EMercenaryInfoTab::Overall); }
+void UMercenaryInfoPanelWidget::HandleTabSkill() { SwitchTab(EMercenaryInfoTab::Skill); }
+void UMercenaryInfoPanelWidget::HandleTabPieceDeck() { SwitchTab(EMercenaryInfoTab::PieceDeck); }
+void UMercenaryInfoPanelWidget::HandleTabTree() { SwitchTab(EMercenaryInfoTab::Tree); }
+void UMercenaryInfoPanelWidget::HandleTabInventory() { SwitchTab(EMercenaryInfoTab::Inventory); }
+void UMercenaryInfoPanelWidget::HandleTabStats() { SwitchTab(EMercenaryInfoTab::Stats); }
+void UMercenaryInfoPanelWidget::HandleTabMission() { SwitchTab(EMercenaryInfoTab::Mission); }
+void UMercenaryInfoPanelWidget::HandleTabReturnCondition() { SwitchTab(EMercenaryInfoTab::ReturnCondition); }
+void UMercenaryInfoPanelWidget::HandleTabReturn() { SwitchTab(EMercenaryInfoTab::Return); }
+void UMercenaryInfoPanelWidget::HandleTabDossier() { SwitchTab(EMercenaryInfoTab::Dossier); }
+void UMercenaryInfoPanelWidget::HandleTabRegion() { SwitchTab(EMercenaryInfoTab::Region); }
+void UMercenaryInfoPanelWidget::HandleTabEntityTest() { SwitchTab(EMercenaryInfoTab::EntityTest); }
+
+void UMercenaryInfoPanelWidget::HandleDebugReturnClicked()
+{
+	OnDebugReturnRequested.Broadcast();
+	RequestCloseSelf();
+}
+
+void UMercenaryInfoPanelWidget::HandleCloseClicked()
+{
+	RequestCloseSelf();
+}
+
+@@@FILE_END
